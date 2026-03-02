@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.bak
+*.env.local
+
+# Data (runtime state, not source)
+data/settings.json
+data/profiles/
+data/templates/
+data/weekly_plans/
+data/branding/
+data/custom-icons/
+data/current_menu.json
+data/generation_history.json
+data/schedules.json
+
+# Logs
+*.log
+morsl.log
+
+# Icons (generated at runtime)
+web/icons/favicon.svg
+web/icons/favicon-*.png
+web/icons/apple-touch-icon.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Backups from dev-reset.sh
+.claude/backups/
+data/categories.json

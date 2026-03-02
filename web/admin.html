@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morsl - Admin</title>
+
+    <meta name="theme-color" content="#7a8b9a">
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Theme CSS (swap immediately from cache to avoid flash) -->
+    <link id="theme-css" rel="stylesheet" href="/css/theme-cast-iron.css">
+    <script>try{var t=localStorage.getItem('morsl-theme');if(t)document.getElementById('theme-css').href='/css/theme-'+t+'.css';}catch(e){}</script>
+
+    <!-- App + Admin styles -->
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body x-data="adminApp()" x-init="init()" @keydown.escape="closeRecipe()" class="admin-shell">
+
+    <!-- Hamburger navigation -->
+    <button class="nav-hamburger" x-show="adminReady" x-cloak @click="navOpen = !navOpen" aria-label="Navigation menu">&#9776;</button>
+    <div class="nav-menu" x-show="adminReady && navOpen" x-cloak role="menu" @click.outside="navOpen = false"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 transform -translate-x-2"
+         x-transition:enter-end="opacity-100 transform translate-x-0"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <a href="/" class="nav-menu-item" role="menuitem">Menu</a>
+        <a href="/docs" class="nav-menu-item" role="menuitem">API Docs</a>
+    </div>
+
+    <!-- Sticky Header -->
+    <header class="admin-header" x-show="adminReady" x-cloak>
+        <h1 style="margin-left: 2.5rem;" x-text="settings.app_name || 'Morsl'"></h1>
+        <div class="header-right">
+            <div class="tier-selector" role="radiogroup" aria-label="Admin complexity tier">
+                <button class="tier-pill" role="radio"
+                        :aria-checked="adminTier === 'essential'"
+                        @click="setTier('essential')">
+                    <span class="tier-label-full">Standard</span><span class="tier-label-short">S</span>
+                </button>
+                <button class="tier-pill" role="radio"
+                        :aria-checked="adminTier === 'standard'"
+                        @click="setTier('standard')">
+                    <span class="tier-label-full">Advanced</span><span class="tier-label-short">A</span>
+                </button>
+                <button class="tier-pill" role="radio"
+                        :aria-checked="adminTier === 'advanced'"
+                        @click="setTier('advanced')">
+                    <span class="tier-label-full">Expert</span><span class="tier-label-short">E</span>
+                </button>
+            </div>
+            <button class="btn-generate btn-secondary"
+                    x-show="settings.kiosk_enabled"
+                    @click="lockKiosk()"
+                    style="height:30px; font-size:0.8rem; padding:0 0.75rem; margin-right:0.5rem;"
+                    title="Lock and return to menu page">&#128274; Lock</button>
+            <span class="status-badge" :class="status.state" aria-live="polite" role="status">
+                <span class="dot"></span>
+                <span x-text="status.state === 'generating' ? generatingElapsed() : status.state"></span>
+            </span>
+        </div>
+    </header>
+
+    <main class="admin-content" x-show="adminReady" x-cloak>
+
+        <!-- Tab Bar -->
+        <nav class="admin-tabs" role="tablist" @keydown.arrow-right.prevent="focusNextTab($event)" @keydown.arrow-left.prevent="focusPrevTab($event)">
+            <button id="tab-generate" class="admin-tab" :class="{ active: activeTab === 'generate' }"
+                    @click="activeTab = 'generate'" role="tab" :aria-selected="activeTab === 'generate'"
+                    :tabindex="activeTab === 'generate' ? 0 : -1" aria-controls="panel-generate">Generate</button>
+            <button id="tab-profiles" class="admin-tab" :class="{ active: activeTab === 'profiles' }"
+                    @click="activeTab = 'profiles'" role="tab" :aria-selected="activeTab === 'profiles'"
+                    :tabindex="activeTab === 'profiles' ? 0 : -1" aria-controls="panel-profiles">Profiles</button>
+            <button id="tab-weekly" class="admin-tab" :class="{ active: activeTab === 'weekly' }"
+                    @click="activeTab = 'weekly'" role="tab" :aria-selected="activeTab === 'weekly'"
+                    :tabindex="activeTab === 'weekly' ? 0 : -1" aria-controls="panel-weekly">Weekly</button>
+            <button id="tab-settings" class="admin-tab" :class="{ active: activeTab === 'settings' }"
+                    @click="activeTab = 'settings'" role="tab" :aria-selected="activeTab === 'settings'"
+                    :tabindex="activeTab === 'settings' ? 0 : -1" aria-controls="panel-settings">Settings</button>
+            <button id="tab-branding" class="admin-tab" :class="{ active: activeTab === 'branding' }"
+                    @click="activeTab = 'branding'" role="tab" :aria-selected="activeTab === 'branding'"
+                    :tabindex="activeTab === 'branding' ? 0 : -1" aria-controls="panel-branding"
+                    x-show="tierVisible('advanced')" x-transition.opacity.duration.150ms>Branding</button>
+            <button id="tab-orders" class="admin-tab" :class="{ active: activeTab === 'orders' }"
+                    @click="activeTab = 'orders'" role="tab" :aria-selected="activeTab === 'orders'"
+                    :tabindex="activeTab === 'orders' ? 0 : -1" aria-controls="panel-orders"
+                    x-show="tierVisible('advanced') && settings.orders_enabled !== false" x-transition.opacity.duration.150ms>
+                Orders
+                <span class="tab-badge" x-show="orders.length > 0" x-text="orders.length"></span>
+            </button>
+        </nav>
+
+        <!-- ==================== GENERATE TAB ==================== -->
+        <div id="panel-generate" role="tabpanel" aria-labelledby="tab-generate" x-show="activeTab === 'generate'" x-transition:enter.opacity.duration.150ms>
+
+        <!-- Generate from Profile -->
+        <section class="admin-section">
+            <h2 class="section-title">
+                <span class="section-icon" style="width:24px; height:24px; display:inline-flex; color:var(--accent-color);" x-html="getHeadingIcon()"></span>
+                Generate Menu
+            </h2>
+            <small class="section-help">Pick a profile and create a new menu.</small>
+            <div class="generate-row">
+                <select x-model="selectedProfile" :disabled="status.state === 'generating'">
+                    <template x-for="p in profiles" :key="p.name">
+                        <option :value="p.name"
+                                x-text="p.name + ' (' + itemNounText(p.choices, p.item_noun || settings.item_noun) + ', ' + p.constraint_count + ' rules)'">
+                        </option>
+                    </template>
+                </select>
+                <button class="btn-generate"
+                        :disabled="status.state === 'generating' || !selectedProfile"
+                        @click="generateProfile()">
+                    <span x-text="status.state === 'generating' ? 'Generating...' : 'Generate'"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Schedule Menu -->
+        <section class="admin-section">
+            <h2 class="section-title">
+                Schedule Menu
+            </h2>
+            <small class="section-help">Automatically generate menus on a recurring schedule.</small>
+            <button class="btn-generate btn-secondary" @click="startNewSchedule()"
+                    style="margin-bottom:0.75rem; height:30px; font-size:0.85rem;">
+                + Add Schedule
+            </button>
+
+            <!-- Schedule Form -->
+            <div x-show="showScheduleForm" class="schedule-form" x-transition:enter.opacity.duration.150ms>
+                <div class="branding-subheader">Schedule</div>
+                <div class="settings-row" x-show="templates.length > 0">
+                    <div class="settings-label">Type</div>
+                    <div class="schedule-type-toggle">
+                        <button type="button" class="schedule-type-btn"
+                                :class="{ active: scheduleForm.mode === 'profile' }"
+                                @click="scheduleForm.mode = 'profile'">Profile</button>
+                        <button type="button" class="schedule-type-btn"
+                                :class="{ active: scheduleForm.mode === 'template' }"
+                                @click="scheduleForm.mode = 'template'">Template</button>
+                    </div>
+                </div>
+                <small class="section-help" x-show="scheduleForm.mode === 'profile'" style="padding:0.25rem 0.75rem;">Generate a menu from one profile, repeated on the days you select.</small>
+                <small class="section-help" x-show="scheduleForm.mode === 'template'" style="padding:0.25rem 0.75rem;">Repeat a weekly template to automatically create multi-day meal plans.</small>
+                <div class="settings-row" x-show="scheduleForm.mode === 'profile'">
+                    <div class="settings-label">Profile</div>
+                    <select class="drawer-select" x-model="scheduleForm.profile">
+                        <template x-for="p in profiles" :key="p.name">
+                            <option :value="p.name" x-text="p.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="settings-row" x-show="scheduleForm.mode === 'template'">
+                    <div class="settings-label">Template</div>
+                    <select class="drawer-select" x-model="scheduleForm.template">
+                        <template x-for="t in templates" :key="t.name">
+                            <option :value="t.name" x-text="t.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="settings-row" x-show="scheduleForm.mode === 'profile'">
+                    <div class="settings-label">Days</div>
+                    <div class="schedule-day-picker">
+                        <template x-for="d in scheduleDays" :key="d.key">
+                            <button type="button"
+                                    class="schedule-day-btn"
+                                    :class="{ active: scheduleForm._selectedDays.includes(d.key) }"
+                                    @click="toggleScheduleDay(d.key)"
+                                    x-text="d.label">
+                            </button>
+                        </template>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">Time</div>
+                    <div class="schedule-time-group">
+                        <input type="number" class="drawer-input drawer-input--small"
+                               x-model.number="scheduleForm.hour" min="0" max="23">
+                        <span class="schedule-time-sep">:</span>
+                        <input type="number" class="drawer-input drawer-input--small"
+                               x-model.number="scheduleForm.minute" min="0" max="59">
+                        <span class="schedule-time-hint">24h</span>
+                    </div>
+                </div>
+                <div class="schedule-preview"
+                     x-text="'Runs ' + formatScheduleDays(scheduleForm.day_of_week) + ' at ' + String(scheduleForm.hour).padStart(2,'0') + ':' + String(scheduleForm.minute).padStart(2,'0')">
+                </div>
+                <div class="branding-subheader">Options</div>
+                <div class="settings-row">
+                    <div class="settings-label">Enabled</div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="scheduleForm.enabled">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">Clear Local Menu<small>Start fresh — clear the current menu before generating</small></div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="scheduleForm.clear_before_generate">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="branding-subheader">Meal Plan</div>
+                <div class="settings-row">
+                    <div class="settings-label">Save to Meal Plan</div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="scheduleForm.create_meal_plan">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div x-show="scheduleForm.create_meal_plan" class="schedule-subgroup" x-transition:enter.opacity.duration.150ms>
+                    <div class="settings-row">
+                        <div class="settings-label">Meal Type</div>
+                        <select class="drawer-select" x-model.number="scheduleForm.meal_plan_type">
+                            <option :value="null">-- select --</option>
+                            <template x-for="mt in mealTypes" :key="mt.id">
+                                <option :value="mt.id" x-text="mt.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-label">
+                            Uncooked Meal Cleanup
+                            <small>Automatically remove uncooked meal plans older than this many days (0 = off)</small>
+                        </div>
+                        <input type="number" class="drawer-input drawer-input--small"
+                               x-model.number="scheduleForm.cleanup_uncooked_days"
+                               min="0" max="30">
+                    </div>
+                </div>
+                <div class="schedule-form-actions">
+                    <button class="btn-generate" @click="saveSchedule()">Save</button>
+                    <button class="btn-generate btn-secondary" @click="showScheduleForm = false; editingScheduleId = null;">Cancel</button>
+                </div>
+            </div>
+
+            <div x-show="schedules.length === 0 && !showScheduleForm" class="tag-empty">No schedules configured</div>
+            <template x-for="s in schedules" :key="s.id">
+                <div class="constraint-chip schedule-chip" :class="{ 'schedule-chip--disabled': !s.enabled }">
+                    <span style="flex:1; display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem;">
+                        <strong x-text="s.template || s.profile"></strong>
+                        <span x-show="s.template" class="schedule-badge">Weekly</span>
+                        <span x-text="formatScheduleDays(s.day_of_week) + ' @ ' + String(s.hour).padStart(2,'0') + ':' + String(s.minute).padStart(2,'0')"></span>
+                        <span x-show="s.create_meal_plan" class="schedule-badge">Meal Plan</span>
+                        <span x-show="!s.enabled" class="schedule-badge schedule-badge--off">Disabled</span>
+                    </span>
+                    <small x-show="s.last_run" class="schedule-chip-meta" x-text="'Last: ' + (s.last_run ? new Date(s.last_run).toLocaleString() : '')"></small>
+                    <span style="display:flex; gap:0.15rem;">
+                        <button class="btn-chip-remove" @click.stop="toggleScheduleEnabled(s)" :title="s.enabled ? 'Disable' : 'Enable'"
+                                x-text="s.enabled ? '&#10004;' : '&#10006;'" style="font-size:0.8rem;"></button>
+                        <button class="btn-chip-remove" @click.stop="editSchedule(s)" title="Edit" style="color:var(--accent-color);">&#9998;</button>
+                        <button class="btn-chip-remove" @click.stop="deleteSchedule(s.id)" title="Delete">&times;</button>
+                    </span>
+                </div>
+            </template>
+        </section>
+
+        <!-- Current Menu -->
+        <section class="admin-section" x-show="recipes.length > 0">
+            <h2 class="section-title">
+                Current Menu
+            </h2>
+            <div style="margin-bottom: 0.75rem;">
+                <button class="btn-generate btn-secondary" @click="clearRecipes()"
+                        style="height:30px; font-size:0.85rem;">
+                    Clear All Recipes
+                </button>
+            </div>
+            <div class="menu-grid">
+                <template x-for="recipe in recipes" :key="recipe.id">
+                    <div class="menu-card" @click="openRecipe(recipe)">
+                        <img class="menu-card-image" x-show="recipe.image"
+                             :src="recipe.image" :alt="recipe.name"
+                             @error="$el.style.display='none'">
+                        <div class="menu-card-placeholder" x-show="!recipe.image">
+                            <img src="/img/placeholder-cocktail.svg" alt="No image">
+                        </div>
+                        <div class="menu-card-body">
+                            <h3 x-text="recipe.name"></h3>
+                            <div class="menu-card-meta">
+                                <span class="stars-interactive" @click.stop>
+                                    <template x-for="i in 5" :key="i">
+                                        <span class="star-btn" @click.stop="setRating(recipe.id, i)"
+                                              :class="{ filled: i <= Math.round(recipe.rating || 0) }"
+                                              x-text="i <= Math.round(recipe.rating || 0) ? '\u2605' : '\u2606'"></span>
+                                    </template>
+                                </span>
+                                <span x-text="(recipe.ingredients || []).length + ' ing.'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        <!-- Solver Diagnostics -->
+        <section class="admin-section" x-show="(warnings.length > 0 || relaxedConstraints.length > 0 || menuMeta.status) && tierVisible('advanced')">
+            <h2 class="section-title">
+                Generation Details
+            </h2>
+            <small class="section-help">Details about the last menu generation.</small>
+            <ul class="diagnostics-list">
+                <template x-for="w in warnings" :key="w">
+                    <li class="warn-item" x-text="'Warning: ' + w"></li>
+                </template>
+                <template x-for="rc in relaxedConstraints" :key="rc.label">
+                    <li class="relax-item" x-text="rc.label + ' adjusted by ' + rc.slack_value.toFixed(1) + ' (priority: ' + rc.weight + ')'"></li>
+                </template>
+                <li class="meta-item" x-show="menuMeta.status" x-text="'Status: ' + formatSolverStatus(menuMeta.status)"></li>
+                <li class="meta-item" x-show="menuMeta.requested_count" x-text="'Requested: ' + itemNounText(menuMeta.requested_count, resolveNoun(selectedProfile))"></li>
+                <li class="meta-item" x-show="menuMeta.constraint_count" x-text="'Rules: ' + menuMeta.constraint_count"></li>
+                <li class="meta-item" x-show="menuMeta.generated_at" x-text="'Generated: ' + (menuMeta.generated_at ? new Date(menuMeta.generated_at).toLocaleString() : '')"></li>
+            </ul>
+        </section>
+
+        <!-- Error display -->
+        <div class="error-banner" x-show="status.state === 'error'">
+            <strong>Error:</strong> <span x-text="status.error || 'An error occurred'"></span>
+        </div>
+
+
+        <!-- Generation History -->
+        <section class="admin-section" x-show="tierVisible('standard') && historyTotal > 0">
+            <h2 class="section-title">Generation History</h2>
+            <small class="section-help">Previous menu generations.</small>
+
+            <div class="history-table">
+                <template x-for="h in history" :key="h.id">
+                    <button type="button" class="history-row"
+                         :aria-expanded="expandedHistoryId === h.id"
+                         @click="toggleHistoryDetail(h.id)">
+                        <div class="history-summary">
+                            <span class="history-date" x-text="new Date(h.generated_at).toLocaleString()"></span>
+                            <span class="history-profile" x-text="h.profile"></span>
+                            <span class="history-recipes-count" x-text="itemNounText(h.recipe_count, resolveNoun(h.profile))"></span>
+                            <span class="history-status" :class="'status-' + h.status"
+                                  x-text="formatSolverStatus(h.status)"></span>
+                            <span class="history-duration" x-text="(h.duration_ms / 1000).toFixed(1) + 's'"></span>
+                            <span class="history-expand" aria-hidden="true" x-text="expandedHistoryId === h.id ? '\u25BE' : '\u25B8'"></span>
+                        </div>
+
+                        <div x-show="expandedHistoryId === h.id" x-transition:enter.opacity.duration.150ms
+                             class="history-detail" @click.stop>
+                            <div class="history-detail-row">
+                                <strong>Recipes:</strong>
+                                <span x-text="h.recipes.map(r => r.name).join(', ')"></span>
+                            </div>
+                            <div class="history-detail-row" x-show="h.constraint_count">
+                                <strong>Constraints:</strong>
+                                <span x-text="h.constraint_count + ' rules applied'"></span>
+                            </div>
+                            <template x-if="h.relaxed_constraints.length > 0">
+                                <div class="history-detail-row">
+                                    <strong>Relaxed:</strong>
+                                    <template x-for="rc in h.relaxed_constraints" :key="rc.label">
+                                        <span class="history-relaxed-chip" x-text="rc.label + ' (' + rc.slack_value.toFixed(1) + ')'"></span>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="h.warnings.length > 0">
+                                <div class="history-detail-row">
+                                    <strong>Warnings:</strong>
+                                    <template x-for="w in h.warnings" :key="w">
+                                        <span class="warn-item" x-text="w"></span>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <div class="history-footer">
+                <div class="history-pagination" x-show="historyTotal > historyPageSize">
+                    <button class="btn-generate btn-secondary btn-sm" @click="loadHistory(historyPage - 1)" :disabled="historyPage === 0" aria-label="Previous page">&laquo; Prev</button>
+                    <span x-text="(historyPage + 1) + ' / ' + historyTotalPages"></span>
+                    <button class="btn-generate btn-secondary btn-sm" @click="loadHistory(historyPage + 1)" :disabled="historyPage + 1 >= historyTotalPages" aria-label="Next page">Next &raquo;</button>
+                </div>
+                <button class="btn-generate btn-secondary btn-sm" @click="clearHistory()">Clear History</button>
+            </div>
+        </section>
+
+        <!-- Constraint Analytics -->
+        <section class="admin-section" x-show="tierVisible('advanced') && analytics && analytics.total_generations > 0">
+            <h2 class="section-title">Constraint Analytics</h2>
+            <small class="section-help">Usage patterns and statistics across all generated menus.</small>
+
+            <div class="analytics-summary">
+                <div class="analytics-stat">
+                    <div class="analytics-value" x-text="analytics.total_generations"></div>
+                    <div class="analytics-label">Generations</div>
+                </div>
+                <div class="analytics-stat">
+                    <div class="analytics-value" x-text="(analytics.avg_duration_ms / 1000).toFixed(1) + 's'"></div>
+                    <div class="analytics-label">Avg Duration</div>
+                </div>
+                <div class="analytics-stat">
+                    <div class="analytics-value" x-text="analytics.avg_recipes_per_generation.toFixed(1)"></div>
+                    <div class="analytics-label">Avg Recipes</div>
+                </div>
+            </div>
+
+            <template x-if="analytics.most_relaxed.length > 0">
+                <div class="analytics-constraints">
+                    <div class="section-help" style="margin-bottom:0.5rem;">Most Frequently Relaxed Constraints</div>
+                    <template x-for="c in analytics.most_relaxed" :key="c.label">
+                        <div class="analytics-constraint-row">
+                            <span class="analytics-constraint-label" x-text="c.label"></span>
+                            <span class="analytics-bar">
+                                <span class="analytics-bar-fill" :style="'width:' + (c.relaxation_rate * 100) + '%'"></span>
+                            </span>
+                            <span class="analytics-constraint-pct" x-text="(c.relaxation_rate * 100).toFixed(0) + '%'"></span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <div class="analytics-profiles" x-show="Object.keys(analytics.profile_counts || {}).length > 1">
+                <div class="section-help" style="margin-bottom:0.5rem;">Profile Usage</div>
+                <template x-for="[name, count] in Object.entries(analytics.profile_counts || {})" :key="name">
+                    <div class="analytics-profile-row">
+                        <span x-text="name"></span>
+                        <span x-text="count + ' generations'"></span>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        </div><!-- /generate tab -->
+
+        <!-- ==================== PROFILES TAB ==================== -->
+        <div id="panel-profiles" role="tabpanel" aria-labelledby="tab-profiles" x-show="activeTab === 'profiles'" x-transition:enter.opacity.duration.150ms>
+
+        <!-- Categories -->
+        <section class="admin-section">
+            <h2 class="section-title">
+                Categories
+            </h2>
+            <small class="section-help">Organize profiles into tabs that appear on the menu page.</small>
+            <button class="btn-generate btn-secondary" @click="startNewCategory()"
+                    style="margin-bottom:0.75rem; height:30px; font-size:0.85rem;">
+                + Add Category
+            </button>
+
+            <!-- Category Form -->
+            <div x-show="showCategoryForm" class="constraint-group" style="margin-bottom:1rem;">
+                <div class="choices-row">
+                    <label>Name:</label>
+                    <input type="text" class="search-input" x-model="categoryForm.display_name"
+                           placeholder="e.g. Weeknight Dinners" style="width:200px;">
+                </div>
+                <div class="choices-row">
+                    <label>Subtitle:</label>
+                    <input type="text" class="search-input" x-model="categoryForm.subtitle"
+                           placeholder="Shown below category name">
+                </div>
+                <div class="choices-row">
+                    <label>Icon:</label>
+                    <button type="button" class="icon-picker-trigger" @click="window.iconPicker.show(categoryForm.icon, k => categoryForm.icon = k)">
+                        <span x-show="categoryForm.icon" x-html="resolveIcon(categoryForm.icon)"
+                              style="width:24px; height:24px; display:inline-flex; color:var(--accent-color);"></span>
+                        <span x-text="categoryForm.icon || 'Choose icon\u2026'"></span>
+                        <span style="margin-left:auto; font-size:0.7em;">&#9662;</span>
+                    </button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                    <button class="btn-generate" @click="saveCategory()" style="height:30px; font-size:0.85rem;">Save</button>
+                    <button class="btn-generate btn-secondary" @click="showCategoryForm = false; editingCategoryId = null;" style="height:30px; font-size:0.85rem;">Cancel</button>
+                </div>
+            </div>
+
+            <div x-show="categories.length === 0 && !showCategoryForm" class="tag-empty">No categories configured</div>
+            <div class="category-drag-list" x-ref="categoryList">
+                <template x-for="(cat, catIdx) in categories" :key="cat.id">
+                    <div class="constraint-chip category-drag-item"
+                         :data-id="cat.id"
+                         style="justify-content:space-between; cursor:default;">
+                        <span style="display:flex; align-items:center; gap:0.5rem;">
+                            <span class="drag-handle" style="cursor:grab; opacity:0.5; font-size:1.1rem;" title="Drag to reorder">&#9776;</span>
+                            <span>
+                                <strong x-text="cat.display_name || cat.id"></strong>
+                                <small x-show="cat.subtitle" x-text="cat.subtitle" style="opacity:0.6;"></small>
+                            </span>
+                        </span>
+                        <span>
+                            <button class="btn-chip-remove" @click.stop="editCategory(cat)" title="Edit" style="color:var(--accent-color);">&#9998;</button>
+                            <button class="btn-chip-remove" @click.stop="deleteCategory(cat.id)" title="Delete">&times;</button>
+                        </span>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        <section class="admin-section">
+                <h2 class="section-title">Profiles</h2>
+                <small class="section-help">Each profile defines which recipes to include and how many to pick.</small>
+                <!-- Profile card grid -->
+                <div class="profile-grid">
+                    <!-- New Profile card -->
+                    <div class="profile-card profile-card--new" @click="startNewProfile()">
+                        <div class="profile-card-icon">+</div>
+                        <h4>New Profile</h4>
+                        <p>Create a new profile</p>
+                    </div>
+                    <!-- Existing profiles -->
+                    <template x-for="p in profiles" :key="p.name">
+                        <div class="profile-card" :class="{ 'profile-card--active': editingProfile && profileEditor.originalName === p.name }">
+                            <div class="profile-card-icon">
+                                <span x-show="p.icon" x-html="resolveIcon(p.icon)"
+                                      style="width:24px; height:24px; display:inline-flex; color:var(--accent-color);"></span>
+                                <span x-show="!p.icon" x-html="getHeadingIcon()"
+                                      style="width:24px; height:24px; display:inline-flex; color:var(--accent-color);"></span>
+                            </div>
+                            <h4 x-text="p.name"></h4>
+                            <p x-text="p.description || 'No description'"></p>
+                            <div class="profile-card-stats">
+                                <span x-text="itemNounText(p.choices, p.item_noun || settings.item_noun)"></span>
+                                <span>&middot;</span>
+                                <span x-text="p.constraint_count + ' rules'"></span>
+                            </div>
+                            <div class="profile-card-actions">
+                                <button class="profile-card-btn" @click.stop="startEditProfile(p.name)">Edit</button>
+                                <button class="profile-card-btn profile-card-btn--danger" @click.stop="deleteProfile(p.name)">Delete</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+            </div>
+        </section>
+
+        </div><!-- /profiles tab -->
+
+        <!-- ==================== WEEKLY TAB ==================== -->
+        <div id="panel-weekly" role="tabpanel" aria-labelledby="tab-weekly" x-show="activeTab === 'weekly'" x-transition:enter.opacity.duration.150ms>
+
+        <!-- Templates -->
+        <section class="admin-section">
+            <h2 class="section-title">Meal Plan Templates</h2>
+            <small class="section-help">Templates define multi-day meal plans — which profiles, days, and meal types. Generate one manually below, or set up automatic scheduling on the Generate tab.</small>
+            <button class="btn-generate btn-secondary" @click="startNewTemplate()"
+                    style="margin-bottom:0.75rem; height:30px; font-size:0.85rem;">
+                + New Template
+            </button>
+            <div x-show="templates.length === 0" class="tag-empty">No templates yet. Create one to get started.</div>
+            <template x-for="t in templates" :key="t.name">
+                <div class="constraint-chip" style="justify-content:space-between;">
+                    <span style="flex:1; display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem;">
+                        <strong x-text="t.name"></strong>
+                        <span x-show="t.description" x-text="t.description" style="color:var(--text-muted); font-size:0.8rem;"></span>
+                        <span class="schedule-badge" x-text="t.slot_count + ' slot' + (t.slot_count !== 1 ? 's' : '')"></span>
+                    </span>
+                    <span style="display:flex; gap:0.15rem;">
+                        <button class="btn-chip-remove" @click.stop="startEditTemplate(t.name)" title="Edit" style="color:var(--accent-color);">&#9998;</button>
+                        <button class="btn-chip-remove" @click.stop="deleteTemplate(t.name)" title="Delete">&times;</button>
+                    </span>
+                </div>
+            </template>
+        </section>
+
+        <!-- Weekly Generation -->
+        <section class="admin-section">
+            <h2 class="section-title">Generate Weekly Plan</h2>
+            <small class="section-help">Generate a multi-day meal plan from a template.</small>
+            <div class="generate-row" style="margin-bottom:0.75rem;">
+                <select x-model="selectedWeeklyTemplate" :disabled="weeklyGenerating">
+                    <template x-for="t in templates" :key="t.name">
+                        <option :value="t.name" x-text="t.name + ' (' + t.slot_count + ' slots)'"></option>
+                    </template>
+                </select>
+                <input type="date" class="drawer-input" x-model="weeklyWeekStart"
+                       :disabled="weeklyGenerating"
+                       title="Week start date (defaults to this Monday)"
+                       style="width:auto; max-width:160px;">
+                <button class="btn-generate"
+                        :disabled="weeklyGenerating || !selectedWeeklyTemplate || templates.length === 0"
+                        @click="generateWeekly()">
+                    <span x-text="weeklyGenerating ? 'Generating...' : 'Generate'"></span>
+                </button>
+            </div>
+
+            <!-- Progress indicators -->
+            <div class="weekly-progress" x-show="weeklyStatus.state === 'generating' || weeklyStatus.state === 'complete'">
+                <template x-for="(status, profileName) in weeklyStatus.profile_progress" :key="profileName">
+                    <div class="weekly-progress-row">
+                        <span x-text="profileName"></span>
+                        <span class="schedule-badge" :class="'pstate--' + status" x-text="status"></span>
+                    </div>
+                </template>
+            </div>
+            <template x-for="w in (weeklyStatus.warnings || [])" :key="w">
+                <div class="error-banner" style="margin-top:0.5rem; background:rgba(251,191,36,0.08); border-color:rgba(251,191,36,0.25); color:#fbbf24;">
+                    <span x-text="w"></span>
+                </div>
+            </template>
+            <div class="error-banner" x-show="weeklyStatus.state === 'error'" style="margin-top:0.5rem;">
+                <strong>Error:</strong> <span x-text="weeklyStatus.error || 'Generation failed'"></span>
+            </div>
+        </section>
+
+        <!-- Plan Viewer -->
+        <section class="admin-section" x-show="weeklyPlan">
+            <h2 class="section-title">Weekly Plan</h2>
+            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+                <button class="btn-generate" @click="saveWeeklyPlan()"
+                        :disabled="weeklyPlanSaving || weeklyPlanSaved">
+                    <span x-text="weeklyPlanSaved ? 'Saved' : (weeklyPlanSaving ? 'Saving...' : 'Save to Tandoor')"></span>
+                </button>
+                <button class="btn-generate btn-secondary" @click="discardWeeklyPlan()">Discard Plan</button>
+            </div>
+
+            <!-- Jump-to-day pills -->
+            <div class="plan-day-pills" x-show="weeklyPlanDays.length >= 5">
+                <template x-for="entry in weeklyPlanDays" :key="'pill-' + entry.date">
+                    <a class="plan-day-pill" :href="'#plan-day-' + entry.date"
+                       x-text="weeklyPlanDayLabel(entry.date)"></a>
+                </template>
+            </div>
+
+            <!-- Daily swim lanes -->
+            <div class="plan-lanes">
+                <template x-for="entry in weeklyPlanDays" :key="'day-' + entry.date">
+                    <div class="plan-day" :id="'plan-day-' + entry.date">
+                        <div class="plan-day-header">
+                            <span x-text="weeklyPlanDayLabel(entry.date)"></span>
+                            <small x-text="entry.date" style="color:var(--text-muted);"></small>
+                        </div>
+                        <div class="plan-day-slots">
+                            <template x-for="[mtId, meal] in Object.entries(entry.data.meals || {})" :key="entry.date + '-' + mtId">
+                                <div class="plan-slot">
+                                    <div class="plan-slot-header">
+                                        <span x-text="meal.meal_type_name || ('Type ' + mtId)"></span>
+                                        <button class="plan-slot-regen" title="Regenerate this slot"
+                                                :disabled="weeklyRegenSlot !== null"
+                                                @click="regenerateSlot(entry.date, Number(mtId))">
+                                            <span x-show="weeklyRegenSlot?.date === entry.date && weeklyRegenSlot?.mealTypeId === Number(mtId)">...</span>
+                                            <span x-show="!(weeklyRegenSlot?.date === entry.date && weeklyRegenSlot?.mealTypeId === Number(mtId))">&#8635;</span>
+                                        </button>
+                                    </div>
+                                    <div class="plan-slot-recipes">
+                                        <template x-for="recipe in (meal.recipes || [])" :key="recipe.id">
+                                            <div class="plan-recipe-card" @click="openRecipe(recipe)">
+                                                <img class="plan-recipe-img" x-show="recipe.image"
+                                                     :src="recipe.image" :alt="recipe.name"
+                                                     @error="$el.style.display='none'">
+                                                <span class="plan-recipe-name" x-text="recipe.name"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        </div><!-- /weekly tab -->
+
+        <!-- ==================== ORDERS TAB ==================== -->
+        <div id="panel-orders" role="tabpanel" aria-labelledby="tab-orders" x-show="activeTab === 'orders'" x-transition:enter.opacity.duration.150ms>
+
+        <!-- Order Queue -->
+        <section class="admin-section">
+            <h2 class="section-title">
+                Order Queue
+                <span class="tab-badge" x-show="orders.length > 0" style="margin-left:0.5rem;"
+                      x-text="orders.length"></span>
+            </h2>
+            <div style="margin-bottom:0.75rem;">
+                <button class="btn-generate btn-secondary" @click="clearOrders()"
+                        :disabled="orders.length === 0" style="height:30px; font-size:0.85rem;">
+                    Clear All Orders
+                </button>
+            </div>
+            <div x-show="orders.length === 0" class="tag-empty">No orders yet</div>
+            <div class="diagnostics-list" style="max-height:400px; overflow-y:auto;">
+                <template x-for="order in orders" :key="order.id">
+                    <div class="constraint-chip order-row" style="justify-content:space-between;"
+                         @click="viewOrderRecipe(order)">
+                        <span>
+                            <strong x-text="order.recipe_name"></strong>
+                            <span class="order-user-name" x-show="order.customer_name"
+                                  x-text="' \u2014 ' + (order.customer_name || '')"></span>
+                            <small x-text="new Date(order.timestamp).toLocaleTimeString()"></small>
+                        </span>
+                        <button class="btn-icon-danger" @click.stop="deleteOrder(order)" title="Delete order">&times;</button>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Order Counts Summary -->
+            <div x-show="orderCounts.length > 0" style="margin-top:0.75rem;">
+                <h3 class="constraint-group-title">Totals</h3>
+                <template x-for="oc in orderCounts" :key="oc.recipe_id">
+                    <div class="constraint-chip">
+                        <strong x-text="oc.recipe_name"></strong>
+                        <span x-text="'x' + oc.count"></span>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        </div><!-- /orders tab -->
+
+        <!-- ==================== BRANDING TAB ==================== -->
+        <div id="panel-branding" role="tabpanel" aria-labelledby="tab-branding" x-show="activeTab === 'branding'" x-transition:enter.opacity.duration.150ms>
+
+        <section class="admin-section">
+            <h2 class="section-title">
+                Branding
+            </h2>
+            <div x-show="!settingsLoaded" class="tag-empty">Loading settings...</div>
+            <div x-show="settingsLoaded" class="branding-grid">
+                <div class="branding-field">
+                    <label class="branding-label">App Name</label>
+                    <input type="text" class="drawer-input branding-input"
+                           :value="settings.app_name || ''"
+                           @change="saveBranding('app_name', $event.target.value)"
+                           placeholder="Morsl">
+                    <small class="branding-help">Shown in the page header, browser tab title, and app install screen</small>
+                </div>
+                <div class="branding-field">
+                    <label class="branding-label">Header Tagline</label>
+                    <input type="text" class="drawer-input branding-input"
+                           :value="settings.slogan_header || ''"
+                           @change="saveBranding('slogan_header', $event.target.value)"
+                           placeholder="Optional header tagline">
+                    <small class="branding-help">Appears below the app name on the menu page</small>
+                </div>
+                <div class="branding-field">
+                    <label class="branding-label">Footer Tagline</label>
+                    <input type="text" class="drawer-input branding-input"
+                           :value="settings.slogan_footer || ''"
+                           @change="saveBranding('slogan_footer', $event.target.value)"
+                           placeholder="Optional footer tagline">
+                    <small class="branding-help">Appears at the bottom of the menu page</small>
+                </div>
+                <div class="branding-field">
+                    <label class="branding-label">Default Item Noun</label>
+                    <input type="text" class="drawer-input branding-input"
+                           :value="settings.item_noun || ''"
+                           @change="saveBranding('item_noun', $event.target.value)"
+                           placeholder="recipe">
+                    <small class="branding-help">Default label for menu items (e.g. "cocktail", "recipe", "dish"). Each profile can set its own.</small>
+                </div>
+                <div class="branding-subheader">Images</div>
+                <div class="branding-field">
+                    <label class="branding-label">Logo</label>
+                    <div class="branding-image-row">
+                        <div class="branding-cell-preview">
+                            <div x-show="!settings.logo_url" x-ref="logoDefaultPreview" class="branding-preview branding-preview--logo"></div>
+                            <div x-show="settings.logo_url" x-ref="logoPreview" class="branding-preview branding-preview--logo"></div>
+                        </div>
+                        <div class="branding-cell-actions">
+                            <button class="btn-branding" @click="$refs.logoInput.click()">Upload</button>
+                            <input type="file" accept=".svg,.png,.jpg,.jpeg,.webp" @change="uploadBranding('logo', $event)"
+                                   x-ref="logoInput" hidden>
+                            <button x-show="settings.logo_url" class="btn-branding btn-branding--reset"
+                                    @click="removeBranding('logo')">Remove</button>
+                        </div>
+                        <div class="branding-cell-toggle">
+                            <template x-if="settings.logo_url">
+                                <span class="branding-toggle-inline">
+                                    <label class="toggle-switch-sm">
+                                        <input type="checkbox"
+                                               :checked="settings.show_logo !== false"
+                                               @change="saveBranding('show_logo', $event.target.checked)">
+                                        <span class="toggle-track-sm"></span>
+                                    </label>
+                                    <span class="branding-toggle-label">Show in header</span>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                    <small class="branding-help">Also used for the browser tab icon and loading animation when "Use logo" is enabled</small>
+                </div>
+                <div class="branding-field">
+                    <label class="branding-label">Favicon &amp; App Icons</label>
+                    <div class="branding-image-row">
+                        <div class="branding-cell-preview">
+                            <div x-show="!settings.favicon_url && !settings.favicon_use_logo" x-ref="faviconDefaultPreview" class="branding-preview"></div>
+                            <div x-show="settings.favicon_url && !settings.favicon_use_logo" x-ref="faviconPreview" class="branding-preview"></div>
+                            <div x-show="settings.favicon_use_logo && settings.logo_url" x-ref="faviconLogoPreview" class="branding-preview"></div>
+                        </div>
+                        <div class="branding-cell-actions">
+                            <button x-show="!settings.favicon_use_logo" class="btn-branding" @click="$refs.faviconInput.click()">Upload</button>
+                            <input type="file" accept=".svg,.png" @change="uploadBranding('favicon', $event)"
+                                   x-ref="faviconInput" hidden>
+                            <button x-show="settings.favicon_url && !settings.favicon_use_logo" class="btn-branding btn-branding--reset"
+                                    @click="removeBranding('favicon')">Remove</button>
+                        </div>
+                        <div class="branding-cell-toggle">
+                            <span class="branding-toggle-inline">
+                                <label class="toggle-switch-sm" :class="{ 'toggle-disabled': !settings.logo_url }">
+                                    <input type="checkbox"
+                                           :checked="settings.favicon_use_logo"
+                                           :disabled="!settings.logo_url"
+                                           @change="syncIconToLogo('favicon', $event.target.checked)">
+                                    <span class="toggle-track-sm"></span>
+                                </label>
+                                <span class="branding-toggle-label"
+                                      :title="!settings.logo_url ? 'Upload a logo first' : ''">Use logo</span>
+                            </span>
+                        </div>
+                    </div>
+                    <small class="branding-help">Creates app icons in all required sizes from your image (SVG or PNG)</small>
+                </div>
+                <div class="branding-field">
+                    <label class="branding-label">Loading Icon</label>
+                    <div class="branding-image-row">
+                        <div class="branding-cell-preview">
+                            <div x-show="!settings.loading_icon_url && !settings.loading_icon_use_logo" x-ref="loadingDefaultPreview" class="branding-preview"></div>
+                            <div x-show="settings.loading_icon_url && !settings.loading_icon_use_logo" x-ref="loadingPreview" class="branding-preview"></div>
+                            <div x-show="settings.loading_icon_use_logo && settings.logo_url" x-ref="loadingLogoPreview" class="branding-preview"></div>
+                        </div>
+                        <div class="branding-cell-actions">
+                            <button x-show="!settings.loading_icon_use_logo" class="btn-branding" @click="$refs.loadingInput.click()">Upload</button>
+                            <input type="file" accept=".svg,.png" @change="uploadBranding('loading-icon', $event)"
+                                   x-ref="loadingInput" hidden>
+                            <button x-show="settings.loading_icon_url && !settings.loading_icon_use_logo" class="btn-branding btn-branding--reset"
+                                    @click="removeBranding('loading-icon')">Remove</button>
+                        </div>
+                        <div class="branding-cell-toggle">
+                            <span class="branding-toggle-inline">
+                                <label class="toggle-switch-sm" :class="{ 'toggle-disabled': !settings.logo_url }">
+                                    <input type="checkbox"
+                                           :checked="settings.loading_icon_use_logo"
+                                           :disabled="!settings.logo_url"
+                                           @change="syncIconToLogo('loading-icon', $event.target.checked)">
+                                    <span class="toggle-track-sm"></span>
+                                </label>
+                                <span class="branding-toggle-label"
+                                      :title="!settings.logo_url ? 'Upload a logo first' : ''">Use logo</span>
+                            </span>
+                        </div>
+                    </div>
+                    <small class="branding-help">Displayed while a menu is being generated. Accepts SVG or PNG.</small>
+                </div>
+                <div class="branding-field">
+                    <button class="btn-branding btn-branding--reset"
+                            @click="resetBranding()">Reset All to Defaults</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Placeholder Mappings -->
+        <section class="admin-section">
+            <h2 class="section-title">Placeholder Mappings</h2>
+            <small class="section-help">Assign icons to keywords or foods. When a recipe has no photo, the app checks its keywords (A-Z) then its foods (A-Z) and uses the first matching icon.</small>
+
+            <!-- Keyword Mappings -->
+            <div class="branding-subheader" style="margin-top:1rem;">Keyword Mappings</div>
+            <div style="margin-bottom:0.5rem;">
+                <template x-for="[name, icon] of Object.entries(iconMappings.keyword_icons || {}).sort((a,b) => a[0].localeCompare(b[0]))" :key="name">
+                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.25rem 0;">
+                        <span style="width:24px; height:24px; display:inline-flex;" x-html="resolveIcon(icon)"></span>
+                        <span style="flex:1; color:var(--text-color,#ccc);" x-text="name"></span>
+                        <button type="button" class="btn-branding btn-branding--reset" style="padding:0.15rem 0.5rem; font-size:0.8rem;"
+                                @click="removeMapping('keyword', name)">&times;</button>
+                    </div>
+                </template>
+                <div x-show="!Object.keys(iconMappings.keyword_icons || {}).length" style="color:var(--text-muted,#999); font-size:0.85rem; padding:0.25rem 0;">
+                    No keyword mappings yet.
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;">
+                <div style="flex:1; position:relative;" @click.outside="mappingKwResults = []">
+                    <template x-if="!newKwName">
+                        <div>
+                            <input type="text" class="drawer-input" x-model="mappingKwSearch"
+                                   @input="searchMappingKeywords()" placeholder="Search keywords..."
+                                   style="width:100%; padding:0.3rem 0.5rem;">
+                            <ul class="search-results-list" x-show="mappingKwResults.length > 0"
+                                style="position:absolute; left:0; right:0; z-index:10;">
+                                <template x-for="kw in mappingKwResults" :key="kw.id">
+                                    <li class="search-result-row" @click="selectMappingKeyword(kw)">
+                                        <span class="search-result-path" x-text="kw.name"></span>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+                    <template x-if="newKwName">
+                        <div style="display:flex; align-items:center; gap:0.35rem; padding:0.3rem 0.5rem; background:var(--card-bg,#1a1a1a); border-radius:6px; border:1px solid var(--card-border,rgba(255,255,255,0.1));">
+                            <span style="flex:1; color:var(--text-color,#e8e0d0); font-size:0.85rem;" x-text="newKwName"></span>
+                            <button type="button" style="background:none; border:none; color:var(--text-muted,#999); cursor:pointer; padding:0 0.25rem; font-size:1rem;"
+                                    @click="newKwName = ''">&times;</button>
+                        </div>
+                    </template>
+                </div>
+                <button type="button" class="btn-branding" style="display:flex; align-items:center; gap:0.25rem; padding:0.3rem 0.5rem;"
+                        @click="window.iconPicker && window.iconPicker.show(newKwIcon, (k) => { newKwIcon = k; })">
+                    <span x-show="newKwIcon" style="width:18px; height:18px; display:inline-flex;" x-html="resolveIcon(newKwIcon)"></span>
+                    <span x-text="newKwIcon ? 'Change' : 'Icon'"></span>
+                </button>
+                <button type="button" class="btn-branding" @click="addMapping('keyword')" :disabled="!newKwName.trim() || !newKwIcon">Add</button>
+            </div>
+
+            <!-- Food Mappings -->
+            <div class="branding-subheader">Food Mappings</div>
+            <div style="margin-bottom:0.5rem;">
+                <template x-for="[name, icon] of Object.entries(iconMappings.food_icons || {}).sort((a,b) => a[0].localeCompare(b[0]))" :key="name">
+                    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.25rem 0;">
+                        <span style="width:24px; height:24px; display:inline-flex;" x-html="resolveIcon(icon)"></span>
+                        <span style="flex:1; color:var(--text-color,#ccc);" x-text="name"></span>
+                        <button type="button" class="btn-branding btn-branding--reset" style="padding:0.15rem 0.5rem; font-size:0.8rem;"
+                                @click="removeMapping('food', name)">&times;</button>
+                    </div>
+                </template>
+                <div x-show="!Object.keys(iconMappings.food_icons || {}).length" style="color:var(--text-muted,#999); font-size:0.85rem; padding:0.25rem 0;">
+                    No food mappings yet.
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <div style="flex:1; position:relative;" @click.outside="mappingFoodResults = []">
+                    <template x-if="!newFoodName">
+                        <div>
+                            <input type="text" class="drawer-input" x-model="mappingFoodSearch"
+                                   @input="searchMappingFoods()" placeholder="Search foods..."
+                                   style="width:100%; padding:0.3rem 0.5rem;">
+                            <ul class="search-results-list" x-show="mappingFoodResults.length > 0"
+                                style="position:absolute; left:0; right:0; z-index:10;">
+                                <template x-for="food in mappingFoodResults" :key="food.id">
+                                    <li class="search-result-row" @click="selectMappingFood(food)">
+                                        <span class="search-result-path" x-text="food.name"></span>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+                    <template x-if="newFoodName">
+                        <div style="display:flex; align-items:center; gap:0.35rem; padding:0.3rem 0.5rem; background:var(--card-bg,#1a1a1a); border-radius:6px; border:1px solid var(--card-border,rgba(255,255,255,0.1));">
+                            <span style="flex:1; color:var(--text-color,#e8e0d0); font-size:0.85rem;" x-text="newFoodName"></span>
+                            <button type="button" style="background:none; border:none; color:var(--text-muted,#999); cursor:pointer; padding:0 0.25rem; font-size:1rem;"
+                                    @click="newFoodName = ''">&times;</button>
+                        </div>
+                    </template>
+                </div>
+                <button type="button" class="btn-branding" style="display:flex; align-items:center; gap:0.25rem; padding:0.3rem 0.5rem;"
+                        @click="window.iconPicker && window.iconPicker.show(newFoodIcon, (k) => { newFoodIcon = k; })">
+                    <span x-show="newFoodIcon" style="width:18px; height:18px; display:inline-flex;" x-html="resolveIcon(newFoodIcon)"></span>
+                    <span x-text="newFoodIcon ? 'Change' : 'Icon'"></span>
+                </button>
+                <button type="button" class="btn-branding" @click="addMapping('food')" :disabled="!newFoodName.trim() || !newFoodIcon">Add</button>
+            </div>
+        </section>
+
+        <!-- Custom Icons -->
+        <section class="admin-section">
+            <h2 class="section-title">Custom Icons</h2>
+            <small class="section-help">Upload SVG icons for use in profile and category cards. Manage icons here; assign them in the Profiles tab.</small>
+            <div style="margin:0.75rem 0;">
+                <input type="file" accept=".svg" @change="window.iconPicker && window.iconPicker.uploadIcon($event)" id="branding-icon-upload" style="display:none;">
+                <label for="branding-icon-upload" class="btn-branding" style="cursor:pointer;">+ Upload SVG</label>
+            </div>
+            <div class="icon-picker-grid" x-show="(void _iconGen, window.iconPicker?.customIcons?.length > 0)" style="gap:0.75rem;">
+                <template x-for="icon in (void _iconGen, window.iconPicker ? window.iconPicker.customIcons : [])" :key="icon.key">
+                    <div style="position:relative; display:inline-flex; flex-direction:column; align-items:center; gap:0.25rem;"
+                         x-data="{ editing: false, newName: '' }">
+                        <div style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border-color, #333); border-radius:8px; padding:4px;">
+                            <span x-html="resolveIcon(icon.key)" style="width:32px; height:32px; display:inline-flex;"></span>
+                        </div>
+                        <span x-show="!editing" role="button" tabindex="0"
+                              @click="editing = true; newName = icon.key.replace('custom:','')"
+                              @keydown.enter="editing = true; newName = icon.key.replace('custom:','')"
+                              style="font-size:0.75rem; color:var(--text-muted, #999); max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;"
+                              x-text="icon.key.replace('custom:','')"
+                              aria-label="Rename icon"></span>
+                        <input x-show="editing" x-model="newName" type="text"
+                               aria-label="New icon name"
+                               @keydown.enter="if(window.iconPicker) window.iconPicker.renameCustomIcon(icon.key, newName); editing = false"
+                               @keydown.escape="editing = false"
+                               @click.outside="editing = false"
+                               x-effect="if(editing) $nextTick(() => $el.focus())"
+                               style="font-size:0.75rem; width:80px; background:var(--input-bg, #1a1a1a); color:var(--text-color, #ccc); border:1px solid var(--accent-color); border-radius:4px; padding:1px 4px; text-align:center;">
+                        <button type="button" @click="window.iconPicker && window.iconPicker.deleteCustomIcon(icon.key)"
+                                style="position:absolute; top:-4px; right:-4px; width:18px; height:18px; border-radius:50%; border:none; background:var(--danger-color, #dc3545); color:#fff; font-size:11px; line-height:1; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;"
+                                title="Delete">&times;</button>
+                    </div>
+                </template>
+            </div>
+            <div x-show="(void _iconGen, !window.iconPicker?.customIcons?.length)" style="color:var(--text-muted, #999); font-size:0.85rem; padding:0.5rem 0;">
+                No custom icons yet. Upload an SVG to get started.
+            </div>
+        </section>
+
+        </div><!-- /branding tab -->
+
+        <!-- ==================== SETTINGS TAB ==================== -->
+        <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" x-show="activeTab === 'settings'" x-transition:enter.opacity.duration.150ms>
+
+        <!-- Appearance -->
+        <section class="admin-section">
+            <h2 class="section-title">
+                Appearance
+            </h2>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Theme
+                        <small>Visual theme for the menu</small>
+                    </div>
+                    <select class="drawer-select"
+                            :value="settings.theme || 'cast-iron'"
+                            @change="changeTheme($event.target.value)">
+                        <template x-for="[key, info] of Object.entries(themeRegistry).sort((a,b) => a[1].label.localeCompare(b[1].label))" :key="key">
+                            <option :value="key" x-text="info.label"
+                                    :selected="key === (settings.theme || 'cast-iron')"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Orders -->
+        <section class="admin-section" x-show="tierVisible('advanced')" x-transition>
+            <h2 class="section-title">
+                Orders
+            </h2>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Orders Enabled
+                        <small>Show order buttons on the menu page</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.orders_enabled !== false"
+                               @change="toggleSetting('orders_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row" x-show="settings.orders_enabled !== false">
+                    <div class="settings-label">
+                        Save Orders to Tandoor
+                        <small>Save orders to Tandoor as meal plan entries</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.save_orders_to_tandoor !== false"
+                               @change="toggleSetting('save_orders_to_tandoor', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row" x-show="settings.orders_enabled !== false && settings.save_orders_to_tandoor !== false" style="border-top:none; padding-top:0;">
+                    <div class="settings-label">
+                        Order Meal Type
+                        <small>Meal type used when saving orders to Tandoor</small>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+                        <select class="drawer-select"
+                                :value="settings.order_meal_type_id || ''"
+                                @change="toggleSetting('order_meal_type_id', $event.target.value ? Number($event.target.value) : null)">
+                            <option value="" disabled x-show="!mealTypes.length">No meal types found</option>
+                            <template x-for="mt in mealTypes" :key="mt.id">
+                                <option :value="mt.id" x-text="mt.name"></option>
+                            </template>
+                        </select>
+                        <button class="btn-generate btn-secondary"
+                                x-show="!showNewMealType"
+                                @click="showNewMealType = true"
+                                style="height:30px; font-size:0.8rem; padding:0 0.75rem;">+ New</button>
+                        <div x-show="showNewMealType" style="display:flex; gap:0.25rem; align-items:center;">
+                            <input type="text" class="drawer-input" x-model="newMealTypeName"
+                                   placeholder="Type name" style="width:140px; height:30px; font-size:0.85rem;"
+                                   @keydown.enter="createMealType()" @keydown.escape="showNewMealType = false">
+                            <button class="btn-generate" @click="createMealType()"
+                                    style="height:30px; font-size:0.8rem; padding:0 0.75rem;">Save</button>
+                            <button class="btn-generate btn-secondary" @click="showNewMealType = false; newMealTypeName = ''"
+                                    style="height:30px; font-size:0.8rem; padding:0 0.5rem;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Display & Features (Standard tier) -->
+        <section class="admin-section" x-show="tierVisible('standard')" x-transition>
+            <h2 class="section-title">
+                Display & Features
+            </h2>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Ratings
+                        <small>Display existing star ratings on recipe cards</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.show_ratings !== false"
+                               @change="toggleSetting('show_ratings', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Ingredients
+                        <small>Display ingredient lists on recipe cards</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.show_ingredients !== false"
+                               @change="toggleSetting('show_ingredients', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Descriptions
+                        <small>Display recipe descriptions on recipe cards</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.show_descriptions !== false"
+                               @change="toggleSetting('show_descriptions', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Ratings
+                        <small>Let users rate recipes from the menu page</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.ratings_enabled !== false"
+                               @change="toggleSetting('ratings_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tandoor Integration (Standard tier) -->
+        <section class="admin-section" x-show="tierVisible('standard')" x-transition>
+            <h2 class="section-title">
+                Tandoor Integration
+            </h2>
+            <div x-show="!settingsLoaded" class="tag-empty">Loading settings...</div>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Save to Tandoor Meal Plans
+                        <small>Add a "Save to Meal Plan" button on the menu page for saving generated menus to Tandoor</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.meal_plan_enabled !== false"
+                               @change="toggleSetting('meal_plan_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        API Cache
+                        <small>How long (in minutes) to cache data from Tandoor. Lower values show fresher data but make more requests.</small>
+                    </div>
+                    <input type="number" class="drawer-input drawer-input--small"
+                           :value="settings.api_cache_minutes ?? 240" min="0"
+                           @change="toggleSetting('api_cache_minutes', Number($event.target.value))"
+                           style="width:80px;">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Save Ratings to Tandoor
+                        <small>Send ratings back to Tandoor when users rate recipes</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.save_ratings_to_tandoor !== false"
+                               @change="toggleSetting('save_ratings_to_tandoor', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Tuning (Advanced tier) -->
+        <section class="admin-section" x-show="tierVisible('advanced')" x-transition>
+            <h2 class="section-title">
+                Advanced Tuning
+            </h2>
+            <div x-show="!settingsLoaded" class="tag-empty">Loading settings...</div>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <label class="settings-label" for="setting-menu-poll">
+                        Menu Poll Interval
+                        <small>How often (in seconds) the menu page refreshes to check for new menus</small>
+                    </label>
+                    <input type="number" id="setting-menu-poll"
+                           class="drawer-input drawer-input--small"
+                           :value="settings.menu_poll_seconds ?? 60" min="10" max="300"
+                           @change="toggleSetting('menu_poll_seconds',
+                               Math.max(10, Math.min(300, Number($event.target.value) || 60)))">
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="setting-toast">
+                        Toast Duration
+                        <small>How long (in seconds) to show confirmation messages</small>
+                    </label>
+                    <input type="number" id="setting-toast"
+                           class="drawer-input drawer-input--small"
+                           :value="settings.toast_seconds ?? 2" min="1" max="10"
+                           @change="toggleSetting('toast_seconds',
+                               Math.max(1, Math.min(10, Number($event.target.value) || 2)))">
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="setting-max-discover">
+                        Max Discover Generations
+                        <small>How many menu generations to keep in the history carousel</small>
+                    </label>
+                    <input type="number" id="setting-max-discover"
+                           class="drawer-input drawer-input--small"
+                           :value="settings.max_discover_generations ?? 10" min="1" max="50"
+                           @change="toggleSetting('max_discover_generations',
+                               Math.max(1, Math.min(50, Number($event.target.value) || 10)))">
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="setting-max-previous">
+                        Max Previous Recipes
+                        <small>Number of recently shown recipes to track for the 'previously seen' section</small>
+                    </label>
+                    <input type="number" id="setting-max-previous"
+                           class="drawer-input drawer-input--small"
+                           :value="settings.max_previous_recipes ?? 50" min="10" max="200"
+                           @change="toggleSetting('max_previous_recipes',
+                               Math.max(10, Math.min(200, Number($event.target.value) || 50)))">
+                </div>
+            </div>
+        </section>
+
+        <!-- Security & Kiosk -->
+        <section class="admin-section" x-transition>
+            <h2 class="section-title">
+                Security & Kiosk
+            </h2>
+            <div x-show="!settingsLoaded" class="tag-empty">Loading settings...</div>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Require PIN for Admin
+                        <small>Require a PIN to access the admin page</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.admin_pin_enabled"
+                               @change="toggleSetting('admin_pin_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row" x-show="tierVisible('standard')">
+                    <div class="settings-label">
+                        Enable Kiosk Mode
+                        <small>Restrict the menu page for unattended display (hides navigation, prevents changes)</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.kiosk_enabled"
+                               @change="toggleSetting('kiosk_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row" x-show="tierVisible('standard') && settings.kiosk_enabled">
+                    <div class="settings-label">
+                        Admin Access Method
+                        <small>How to reach the admin panel from the menu page</small>
+                    </div>
+                    <select class="drawer-select"
+                            :value="settings.kiosk_gesture || 'menu'"
+                            @change="toggleSetting('kiosk_gesture', $event.target.value)">
+                        <option value="menu">Menu (hamburger visible)</option>
+                        <option value="double-tap">Double Tap header</option>
+                        <option value="long-press">Long Press header</option>
+                        <option value="swipe-up">Swipe Up from bottom</option>
+                    </select>
+                </div>
+                <div class="settings-row" x-show="tierVisible('standard') && settings.kiosk_enabled">
+                    <div class="settings-label">
+                        Kiosk PIN
+                        <small>Require the PIN when using the kiosk gesture to access admin</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.kiosk_pin_enabled"
+                               @change="toggleSetting('kiosk_pin_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row" x-show="settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled)">
+                    <div class="settings-label">
+                        PIN Code
+                        <small>Set the PIN used for admin and kiosk access</small>
+                    </div>
+                    <input type="password" class="drawer-input" style="max-width:160px; letter-spacing:0.2em; text-align:center;"
+                           :value="settings.kiosk_pin || ''"
+                           @change="toggleSetting('kiosk_pin', $event.target.value)"
+                           placeholder="Enter PIN"
+                           autocomplete="off">
+                </div>
+                <div class="settings-row" x-show="(settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled)) && !settings.kiosk_pin"
+                     style="border:none; padding-top:0;">
+                    <div class="settings-label">
+                        <small style="color: var(--warning-text, #ffc107);">Warning: PIN is enabled but empty. Anyone can access admin without entering a PIN.</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Factory Reset -->
+        <section class="admin-section" x-show="tierVisible('standard')" x-transition>
+            <h2 class="section-title">
+                Factory Reset
+            </h2>
+            <small class="section-help">Erase all profiles, categories, schedules, history, branding, and settings. Returns the app to first-run state.</small>
+            <div style="margin-top: 0.75rem;">
+                <button class="btn-generate btn-danger" @click="factoryReset()">Reset Everything</button>
+            </div>
+        </section>
+
+        </div><!-- /settings tab -->
+
+    </main>
+
+    <!-- Recipe detail modal -->
+    <div class="modal-backdrop"
+         x-show="selectedRecipe"
+         x-transition:enter.opacity.duration.200ms
+         x-transition:leave.opacity.duration.200ms
+         @click.self="closeRecipe()">
+        <div class="recipe-modal" :class="{ 'recipe-modal--full': selectedRecipe?.steps?.length }"
+             x-show="selectedRecipe" x-trap.noscroll="selectedRecipe"
+             role="dialog" aria-modal="true" aria-labelledby="admin-recipe-title"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-95">
+            <button class="modal-close" @click="closeRecipe()" aria-label="Close">&times;</button>
+            <img x-show="selectedRecipe?.image" :src="selectedRecipe?.image" :alt="selectedRecipe?.name" class="modal-image">
+            <h2 id="admin-recipe-title" x-text="selectedRecipe?.name"></h2>
+            <div class="modal-rating" x-show="selectedRecipe" role="group" aria-label="Rate this recipe">
+                <template x-for="i in 5" :key="i">
+                    <button class="star-btn" @click="setRating(selectedRecipe?.id, i)"
+                          :class="{ filled: i <= Math.round(selectedRecipe?.rating || 0) }"
+                          x-text="i <= Math.round(selectedRecipe?.rating || 0) ? '\u2605' : '\u2606'"
+                          :aria-label="i + ' star' + (i > 1 ? 's' : '')"
+                          :aria-pressed="i <= Math.round(selectedRecipe?.rating || 0)"
+                          style="cursor:pointer; font-size:1.5rem; background:none; border:none; padding:0;"></button>
+                </template>
+            </div>
+            <p class="modal-description" x-show="selectedRecipe?.description" x-text="selectedRecipe?.description"></p>
+            <div class="modal-columns" x-show="selectedRecipe?.steps?.length">
+                <div class="modal-col-ingredients">
+                    <h3>Ingredients</h3>
+                    <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length">
+                        <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'admin-modal-ing-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
+                            <li x-text="formatIngredient(ing)"></li>
+                        </template>
+                    </ul>
+                </div>
+                <div class="modal-col-instructions">
+                    <h3>Instructions</h3>
+                    <template x-for="(step, sIdx) in (selectedRecipe?.steps || [])" :key="'step-' + sIdx">
+                        <div class="modal-step">
+                            <div class="modal-step-header" x-show="selectedRecipe.steps.length > 1">
+                                <span class="modal-step-number" x-text="'Step ' + (sIdx + 1)"></span>
+                                <span class="modal-step-name" x-show="step.name" x-text="step.name"></span>
+                                <span class="modal-step-time" x-show="step.time" x-text="step.time + ' min'"></span>
+                            </div>
+                            <p class="modal-step-text" x-text="step.instruction"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length && !selectedRecipe?.steps?.length">
+                <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'admin-modal-ing-simple-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
+                    <li x-text="formatIngredient(ing)"></li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Profile Editor Drawer -->
+    <div class="drawer-backdrop"
+         x-show="editingProfile"
+         x-transition:enter.opacity.duration.200ms
+         x-transition:leave.opacity.duration.200ms
+         @click="cancelEditProfile()">
+    </div>
+    <div class="profile-drawer"
+         :class="{ open: editingProfile }"
+         x-show="editingProfile" x-trap.noscroll="editingProfile"
+         role="dialog" aria-modal="true" aria-labelledby="profile-drawer-title"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="transform translate-x-full"
+         x-transition:enter-end="transform translate-x-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="transform translate-x-0"
+         x-transition:leave-end="transform translate-x-full">
+        <div class="drawer-header">
+            <h3 id="profile-drawer-title" x-text="isNewProfile ? 'New Profile' : 'Edit Profile'"></h3>
+            <button class="drawer-close" @click="cancelEditProfile()" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="drawer-body">
+            <div class="drawer-section">
+                <label class="drawer-label">Name</label>
+                <input type="text" x-model="profileEditor.name"
+                       class="drawer-input" placeholder="profile-name">
+                <small x-show="!isNewProfile && profileEditor.name !== profileEditor.originalName"
+                       class="drawer-rename-hint">
+                    Renaming from "<span x-text="profileEditor.originalName"></span>"
+                </small>
+            </div>
+
+            <div class="drawer-section">
+                <div class="settings-row">
+                    <div class="settings-label">Default Profile<small>This profile will be pre-selected when generating and shown first on the menu page</small></div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="profileEditor.default">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">Show on Menu<small>Display this profile on the customer menu page</small></div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="profileEditor.show_on_menu">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <label class="drawer-label">Description</label>
+                <input type="text" x-model="profileEditor.description"
+                       class="drawer-input" placeholder="Optional description">
+            </div>
+
+            <div class="drawer-section">
+                <label class="drawer-label">Item Noun</label>
+                <input type="text" x-model="profileEditor.item_noun"
+                       class="drawer-input" placeholder="recipe">
+                <small style="color:var(--text-muted);font-size:0.75rem;">Singular noun for items (e.g. "cocktail", "dessert"). Empty uses global default.</small>
+            </div>
+
+            <div class="drawer-section">
+                <label class="drawer-label">Icon</label>
+                <button type="button" class="icon-picker-trigger" @click="window.iconPicker.show(profileEditor.icon, k => profileEditor.icon = k)">
+                    <span x-show="profileEditor.icon" x-html="resolveIcon(profileEditor.icon)"
+                          style="width:24px; height:24px; display:inline-flex; color:var(--accent-color);"></span>
+                    <span x-text="profileEditor.icon || 'Choose icon\u2026'"></span>
+                    <span style="margin-left:auto; font-size:0.7em;">&#9662;</span>
+                </button>
+            </div>
+
+            <div class="drawer-section">
+                <label class="drawer-label">Category</label>
+                <select x-model="profileEditor.category" class="drawer-input">
+                    <option value="">None</option>
+                    <template x-for="cat in categories" :key="cat.id">
+                        <option :value="cat.id" x-text="cat.display_name || cat.id"></option>
+                    </template>
+                </select>
+                <small class="drawer-help">Controls where this profile appears in the menu page navigation.</small>
+            </div>
+
+            <div class="drawer-section drawer-row">
+                <div>
+                    <label class="drawer-label">Recipes</label>
+                    <input type="number" class="drawer-input drawer-input--small"
+                           x-model.number="profileEditor.choices" min="1" max="20"
+                           title="Target number of recipes to select">
+                </div>
+                <div>
+                    <label class="drawer-label">Min</label>
+                    <input type="number" class="drawer-input drawer-input--small"
+                           x-model.number="profileEditor.min_choices" min="0" max="20"
+                           placeholder="-"
+                           title="Minimum acceptable if target can't be reached">
+                </div>
+            </div>
+            <small class="drawer-help">
+                <strong>Recipes:</strong> How many recipes to pick.
+                <strong>Min:</strong> Accept fewer if rules are too strict.
+            </small>
+
+            <!-- Constraints List (v2 format) -->
+            <div class="drawer-section">
+                <div class="drawer-label-row">
+                    <label class="drawer-label">
+                        Rules
+                        <span class="constraint-count-badge" x-text="profileEditor.constraints?.length || 0"></span>
+                    </label>
+                    <button class="btn-toggle-all-groups"
+                            x-show="profileEditor.constraints?.length > 0"
+                            @click="toggleAllGroups()"
+                            x-text="areAllGroupsCollapsed() ? 'Expand All' : 'Collapse All'"></button>
+                </div>
+
+                <!-- Constraint List (grouped by type) -->
+                <div class="constraint-list">
+                    <template x-for="(c, idx) in (profileEditor.constraints || [])" :key="idx">
+                        <div x-show="(idx === 0 || profileEditor.constraints[idx - 1]?.type !== c.type) || !collapsedGroups[c.type]">
+                        <!-- Group header (shown before first constraint of each type) -->
+                        <div class="constraint-group-header" x-show="idx === 0 || (profileEditor.constraints[idx - 1]?.type !== c.type)" @click="toggleGroupCollapse(c.type)" :class="{ collapsed: collapsedGroups[c.type] }">
+                            <span class="constraint-type-icon" x-html="constraintTypes[c.type]?.icon || '?'"></span>
+                            <span class="constraint-group-label" x-text="constraintTypes[c.type]?.label || c.type"></span>
+                            <span class="constraint-count-badge" x-text="countConstraintsByType(c.type)"></span>
+                            <span class="constraint-expand-icon" x-text="collapsedGroups[c.type] ? '&#9660;' : '&#9650;'" style="margin-left:auto;"></span>
+                        </div>
+                        <div class="constraint-item" x-show="!collapsedGroups[c.type]" :class="{ expanded: expandedConstraint === idx }">
+                            <!-- Collapsed view (summary) -->
+                            <div class="constraint-summary" @click="toggleConstraintExpand(idx)">
+                                <span class="constraint-type-icon" x-html="constraintTypes[c.type]?.icon || '?'"></span>
+                                <span class="constraint-type-label" x-text="constraintTypes[c.type]?.label || c.type"></span>
+                                <span class="constraint-summary-text" x-text="getConstraintSummary(c)"></span>
+                                <span class="constraint-soft-badge" x-show="isConstraintSoft(c)">soft</span>
+                                <span class="constraint-expand-icon" x-text="expandedConstraint === idx ? '▲' : '▼'"></span>
+                            </div>
+
+                            <!-- Expanded view (edit form) -->
+                            <div class="constraint-details" x-show="expandedConstraint === idx" x-transition>
+                                <!-- Label -->
+                                <div class="constraint-field">
+                                    <label>Label (optional)</label>
+                                    <input type="text" class="drawer-input" x-model="c.label"
+                                           placeholder="e.g., 'Must have gin'">
+                                </div>
+
+                                <!-- Items (for keyword/food/book) -->
+                                <div class="constraint-field" x-show="c.type === 'keyword' || c.type === 'food' || c.type === 'book'">
+                                    <label x-text="constraintTypes[c.type]?.label + 's'">Items</label>
+                                    <small class="field-help" x-text="constraintTypes[c.type]?.help"></small>
+                                    <div class="constraint-items-list">
+                                        <template x-for="(item, iidx) in (c.items || [])" :key="item.id">
+                                            <span class="constraint-item-tag">
+                                                <span x-text="getItemDisplayName(item, c.type)"></span>
+                                                <button @click="removeItemFromConstraint(c, item.id)" aria-label="Remove">&times;</button>
+                                            </span>
+                                        </template>
+                                        <span class="constraint-empty" x-show="!c.items || c.items.length === 0">
+                                            No items selected - search below to add
+                                        </span>
+                                    </div>
+                                    <!-- Search to add items -->
+                                    <div class="constraint-item-search" x-show="c.type === 'keyword'">
+                                        <input type="text" class="drawer-input" placeholder="Type to search keywords..."
+                                               x-model="keywordSearch" @input="searchKeywords()">
+                                        <ul class="search-results-list" x-show="keywordResults.length > 0">
+                                            <template x-for="kw in keywordResults" :key="kw.id">
+                                                <li class="search-result-row"
+                                                    @click="addItemToConstraint(c, kw); keywordSearch = ''; keywordResults = [];">
+                                                    <span class="search-result-path" x-text="kw.path || kw.name"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                    <div class="constraint-item-search" x-show="c.type === 'food'">
+                                        <input type="text" class="drawer-input" placeholder="Type to search ingredients..."
+                                               x-model="foodSearch" @input="searchFoods()">
+                                        <ul class="search-results-list" x-show="foodResults.length > 0">
+                                            <template x-for="food in foodResults" :key="food.id">
+                                                <li class="search-result-row"
+                                                    @click="addItemToConstraint(c, food); foodSearch = ''; foodResults = [];">
+                                                    <span class="search-result-path" x-text="food.path || food.name"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- Rating fields -->
+                                <div class="constraint-field" x-show="c.type === 'rating'">
+                                    <label>Rating Range</label>
+                                    <small class="field-help" x-text="constraintTypes['rating']?.help"></small>
+                                    <div class="constraint-inline-row">
+                                        <input type="number" class="drawer-input drawer-input--small"
+                                               x-model.number="c.min" min="0" max="5" step="0.5" placeholder="0">
+                                        <span>to</span>
+                                        <input type="number" class="drawer-input drawer-input--small"
+                                               x-model.number="c.max" min="0" max="5" step="0.5" placeholder="5">
+                                        <span>stars</span>
+                                    </div>
+                                    <small class="field-hint">Leave empty for any rating. Use decimals like 4.5 for precision.</small>
+                                </div>
+
+                                <!-- Last Made fields (cookedon) -->
+                                <div class="constraint-field" x-show="c.type === 'cookedon'">
+                                    <label>Date Filter</label>
+                                    <small class="field-help">Filter recipes by when they were last made</small>
+                                    <div class="constraint-inline-row">
+                                        <select class="drawer-select" x-model="c.date_direction" @change="syncDateFields(c)">
+                                            <option value="within">Made within last</option>
+                                            <option value="older">Made more than</option>
+                                        </select>
+                                        <input type="number" class="drawer-input drawer-input--small"
+                                               x-model.number="c.date_days" min="1" placeholder="30"
+                                               @change="syncDateFields(c)">
+                                        <span>days <span x-show="c.date_direction === 'older'">ago</span></span>
+                                    </div>
+                                </div>
+
+                                <!-- Date Added fields (createdon) -->
+                                <div class="constraint-field" x-show="c.type === 'createdon'">
+                                    <label>Date Filter</label>
+                                    <small class="field-help">Filter recipes by when they were added to Tandoor</small>
+                                    <div class="constraint-inline-row">
+                                        <select class="drawer-select" x-model="c.date_direction" @change="syncDateFields(c)">
+                                            <option value="within">Added within last</option>
+                                            <option value="older">Added more than</option>
+                                        </select>
+                                        <input type="number" class="drawer-input drawer-input--small"
+                                               x-model.number="c.date_days" min="1" placeholder="30"
+                                               @change="syncDateFields(c)">
+                                        <span>days <span x-show="c.date_direction === 'older'">ago</span></span>
+                                    </div>
+                                </div>
+
+                                <!-- Except items (for keyword/food) -->
+                                <div class="constraint-field" x-show="c.type === 'keyword' || c.type === 'food'">
+                                    <label>Exceptions</label>
+                                    <small class="field-help">Exclude specific items even if they match the constraint above</small>
+                                    <div class="constraint-items-list">
+                                        <template x-for="(item, eidx) in (c.except || [])" :key="'except-' + item.id">
+                                            <span class="constraint-item-tag constraint-item-tag--except">
+                                                <span x-text="getItemDisplayName(item, c.type)"></span>
+                                                <button @click="c.except.splice(eidx, 1)" aria-label="Remove">&times;</button>
+                                            </span>
+                                        </template>
+                                        <span class="constraint-empty" x-show="!c.except || c.except.length === 0">
+                                            None
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Operator and count -->
+                                <div class="constraint-field">
+                                    <label>Requirement</label>
+                                    <div class="constraint-inline-row">
+                                        <select x-model="c.operator" class="drawer-select">
+                                            <option value=">=">At least</option>
+                                            <option value="<=">At most</option>
+                                            <option value="==">Exactly</option>
+                                        </select>
+                                        <input type="number" class="drawer-input drawer-input--small"
+                                               x-model.number="c.count" min="0" max="20">
+                                        <span>recipes</span>
+                                    </div>
+                                </div>
+
+                                <!-- Soft rule toggle -->
+                                <div class="constraint-field constraint-options">
+
+                                    <label class="drawer-checkbox">
+                                        <input type="checkbox" :checked="isConstraintSoft(c)" @change="toggleConstraintSoft(c)">
+                                        <span>Flexible rule</span>
+                                    </label>
+                                    <small>Flexible rules can be relaxed if not all requirements can be satisfied</small>
+                                </div>
+
+                                <!-- Include children (per-constraint) -->
+                                <div class="constraint-field constraint-options" x-show="c.type === 'keyword' || c.type === 'food'">
+                                    <label class="drawer-checkbox">
+                                        <input type="checkbox" x-model="c.include_children">
+                                        <span>Include child items</span>
+                                    </label>
+                                    <small>Also match recipes with sub-keywords or sub-ingredients</small>
+                                </div>
+
+                                <!-- Action buttons -->
+                                <div class="constraint-actions">
+                                    <button class="constraint-action-btn" @click="moveConstraintUp(idx)" :disabled="idx === 0" title="Move up">↑</button>
+                                    <button class="constraint-action-btn" @click="moveConstraintDown(idx)" :disabled="idx === profileEditor.constraints.length - 1" title="Move down">↓</button>
+                                    <button class="constraint-action-btn" @click="duplicateConstraint(idx)" title="Duplicate">⧉</button>
+                                    <button class="constraint-action-btn constraint-action-btn--danger" @click="removeConstraint(idx)" title="Delete">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <div class="constraint-empty-state" x-show="!profileEditor.constraints || profileEditor.constraints.length === 0">
+                        No rules defined. Add rules below to filter which recipes are selected.
+                    </div>
+                </div>
+
+                <!-- Add constraint dropdown -->
+                <div class="add-constraint-dropdown" x-data="{ open: false }">
+                    <button class="btn-add-constraint" @click="open = !open" type="button">
+                        <span>+ Add Rule</span>
+                        <span x-text="open ? '▲' : '▼'" style="font-size: 0.7em; margin-left: 0.5rem;"></span>
+                    </button>
+                    <div class="add-constraint-menu" x-show="open" @click.outside="open = false" x-transition>
+                        <template x-for="(typeInfo, typeKey) in constraintTypes" :key="typeKey">
+                            <button class="add-constraint-option" @click="addConstraint(typeKey); open = false">
+                                <span class="add-constraint-option-icon" x-html="typeInfo.icon"></span>
+                                <span class="add-constraint-option-content">
+                                    <span class="add-constraint-option-label" x-text="typeInfo.label"></span>
+                                    <span class="add-constraint-option-desc" x-text="typeInfo.description"></span>
+                                </span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-footer">
+            <button class="btn-generate btn-secondary" @click="previewProfile()" :disabled="profilePreviewing" style="flex:0 0 auto; padding:0 1rem;">
+                <span x-text="profilePreviewing ? '...' : 'Test'"></span>
+            </button>
+            <span class="preview-result" x-show="previewResult !== null" x-text="typeof previewResult === 'number' ? previewResult + ' recipes match' : previewResult"></span>
+            <button class="btn-generate" @click="saveProfile()" :disabled="profileSaving" style="margin-left:auto;">
+                <span x-text="profileSaving ? 'Saving...' : 'Save Profile'"></span>
+            </button>
+            <button class="btn-generate btn-secondary" @click="cancelEditProfile()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Template Editor Drawer -->
+    <div class="drawer-backdrop"
+         x-show="editingTemplate"
+         x-transition:enter.opacity.duration.200ms
+         x-transition:leave.opacity.duration.200ms
+         @click="cancelEditTemplate()">
+    </div>
+    <div class="profile-drawer"
+         :class="{ open: editingTemplate }"
+         x-show="editingTemplate" x-trap.noscroll="editingTemplate"
+         role="dialog" aria-modal="true" aria-labelledby="template-drawer-title"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="transform translate-x-full"
+         x-transition:enter-end="transform translate-x-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="transform translate-x-0"
+         x-transition:leave-end="transform translate-x-full">
+        <div class="drawer-header">
+            <h3 id="template-drawer-title" x-text="isNewTemplate ? 'New Template' : 'Edit Template'"></h3>
+            <button class="drawer-close" @click="cancelEditTemplate()" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="drawer-body">
+            <div class="drawer-section">
+                <label class="drawer-label">Name</label>
+                <input type="text" x-model="templateEditor.name" :disabled="!isNewTemplate"
+                       class="drawer-input" placeholder="e.g. weeknight-dinners">
+            </div>
+            <div class="drawer-section">
+                <label class="drawer-label">Description</label>
+                <input type="text" x-model="templateEditor.description"
+                       class="drawer-input" placeholder="Optional description">
+            </div>
+            <div class="drawer-section">
+                <div class="settings-row" style="border:none; padding:0;">
+                    <div class="settings-label">Deduplicate Recipes<small>Avoid the same recipe on different days</small></div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="templateEditor.deduplicate">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Slots -->
+            <div class="drawer-section">
+                <label class="drawer-label">
+                    Slots
+                    <span class="constraint-count-badge" x-text="templateEditor.slots?.length || 0"></span>
+                </label>
+                <div class="constraint-list">
+                    <template x-for="(slot, sIdx) in (templateEditor.slots || [])" :key="sIdx">
+                        <div class="template-slot-card" :class="{ expanded: _expandedSlot === sIdx }">
+                            <div class="template-slot-header" @click="toggleSlotExpand(sIdx)">
+                                <span x-text="(slot.meal_type_name || 'Meal Type ' + slot.meal_type_id) + ' \u2014 ' + slot.profile"></span>
+                                <span style="font-size:0.75rem; color:var(--text-muted);" x-text="slot.days.length + ' days, ' + itemNounText(slot.recipes_per_day, resolveNoun(slot.profile)) + '/day'"></span>
+                                <span class="constraint-expand-icon" x-text="_expandedSlot === sIdx ? '\u25B2' : '\u25BC'"></span>
+                            </div>
+                            <div class="template-slot-detail" x-show="_expandedSlot === sIdx" x-transition>
+                                <div class="constraint-field">
+                                    <label>Days</label>
+                                    <div class="schedule-day-picker">
+                                        <template x-for="d in scheduleDays" :key="'slot-' + sIdx + '-' + d.key">
+                                            <button type="button" class="schedule-day-btn"
+                                                    :class="{ active: slot.days.includes(d.key) }"
+                                                    @click="toggleSlotDay(sIdx, d.key)"
+                                                    x-text="d.label">
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="constraint-field">
+                                    <label>Meal Type</label>
+                                    <select class="drawer-select" x-model.number="slot.meal_type_id"
+                                            @change="slot.meal_type_name = mealTypes.find(m => m.id === slot.meal_type_id)?.name || ''">
+                                        <template x-for="mt in mealTypes" :key="mt.id">
+                                            <option :value="mt.id" x-text="mt.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="constraint-field">
+                                    <label>Profile</label>
+                                    <select class="drawer-select" x-model="slot.profile">
+                                        <template x-for="p in profiles" :key="p.name">
+                                            <option :value="p.name" x-text="p.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="constraint-field">
+                                    <label>Recipes Per Day</label>
+                                    <input type="number" class="drawer-input drawer-input--small"
+                                           x-model.number="slot.recipes_per_day" min="1" max="10">
+                                </div>
+                                <div class="constraint-actions">
+                                    <button class="constraint-action-btn constraint-action-btn--danger" @click="removeSlot(sIdx)" title="Remove slot">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div class="constraint-empty-state" x-show="!templateEditor.slots || templateEditor.slots.length === 0">
+                        No slots defined. Add slots to configure which meals appear on which days.
+                    </div>
+                </div>
+                <button class="btn-add-constraint" @click="addSlot()" type="button" style="margin-top:0.5rem;">
+                    + Add Slot
+                </button>
+            </div>
+        </div>
+
+        <div class="drawer-footer">
+            <button class="btn-generate" @click="saveTemplate()" :disabled="templateSaving" style="margin-left:auto;">
+                <span x-text="templateSaving ? 'Saving...' : 'Save Template'"></span>
+            </button>
+            <button class="btn-generate btn-secondary" @click="cancelEditTemplate()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal-backdrop confirm-modal-backdrop"
+         x-show="confirmModal.show"
+         x-transition:enter.opacity.duration.200ms
+         x-transition:leave.opacity.duration.200ms
+         @click.self="confirmModal.show = false">
+        <div class="confirm-modal"
+             x-show="confirmModal.show" x-trap.noscroll="confirmModal.show"
+             role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-95">
+            <h3 id="admin-confirm-title" x-text="confirmModal.title"></h3>
+            <p x-text="confirmModal.message"></p>
+            <div class="confirm-modal-actions">
+                <button class="btn-generate btn-secondary" @click="confirmModal.show = false">Cancel</button>
+                <button class="btn-generate btn-danger" @click="confirmModal.onConfirm(); confirmModal.show = false">
+                    <span x-text="confirmModal.confirmText || 'Confirm'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Gate overlay (blocks admin until PIN verified) -->
+    <div class="pin-gate-backdrop" x-cloak
+         x-show="showPinGate"
+         x-transition:enter.opacity.duration.200ms
+         x-transition:leave.opacity.duration.200ms>
+        <div class="pin-gate-modal" x-trap.noscroll="showPinGate"
+             role="dialog" aria-modal="true" aria-labelledby="admin-pin-title">
+            <h2 id="admin-pin-title" class="pin-gate-title">Admin Access</h2>
+            <p class="pin-gate-subtitle">Enter PIN to continue</p>
+            <form @submit.prevent="submitPin()">
+                <div class="pin-gate-input-wrap">
+                    <input :type="showPinText ? 'tel' : 'password'" class="pin-gate-input"
+                           x-model="pinInput"
+                           placeholder="PIN"
+                           maxlength="4"
+                           pattern="[0-9]*"
+                           autocomplete="off"
+                           inputmode="numeric"
+                           x-ref="pinGateInput"
+                           @input="if (pinInput.length >= 4) submitPin()">
+                    <button type="button" class="pin-gate-show-toggle"
+                            @click="showPinText = !showPinText"
+                            :title="showPinText ? 'Hide PIN' : 'Show PIN'"
+                            tabindex="-1">
+                        <span x-show="!showPinText">&#128065;</span>
+                        <span x-show="showPinText">&#128064;</span>
+                    </button>
+                </div>
+                <p class="pin-gate-error" x-show="pinError" x-text="pinError"></p>
+                <button type="submit" class="pin-gate-submit">Unlock</button>
+            </form>
+            <button class="pin-gate-back" @click="window.location.href = '/'">Back to menu</button>
+        </div>
+    </div>
+
+    <!-- Icon Picker Drawer (standalone component) -->
+    <div x-data="iconPicker">
+        <div class="drawer-backdrop"
+             x-show="open"
+             x-transition:enter.opacity.duration.200ms
+             x-transition:leave.opacity.duration.200ms
+             @click="close()"
+             style="z-index:1001;">
+        </div>
+        <div class="icon-picker-drawer"
+             x-show="open" x-trap.noscroll="open"
+             role="dialog" aria-modal="true" aria-labelledby="icon-picker-title"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="transform translate-x-full"
+             x-transition:enter-end="transform translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="transform translate-x-0"
+             x-transition:leave-end="transform translate-x-full">
+            <div class="drawer-header">
+                <h3 id="icon-picker-title" style="margin:0;">Choose Icon</h3>
+                <button class="drawer-close" @click="close()">&times;</button>
+            </div>
+            <div style="padding:0.5rem 1rem;">
+                <input type="text" x-model="searchQuery" placeholder="Search icons..."
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border-color, #333); border-radius:4px; background:var(--surface-color, #1a1a1a); color:var(--text-color, #e0e0e0); font-size:0.85rem;">
+            </div>
+            <div class="icon-picker-tabs" x-show="!isSearching">
+                <template x-for="tab in tabs" :key="tab">
+                    <button type="button" class="icon-picker-tab"
+                            :class="{ active: activeTab === tab }"
+                            @click="activeTab = tab"
+                            x-text="tab"></button>
+                </template>
+            </div>
+            <div class="icon-picker-body">
+                <button type="button" class="icon-picker-clear" @click="pick('')">Clear</button>
+                <!-- Search results -->
+                <template x-if="isSearching">
+                    <div class="icon-picker-grid">
+                        <template x-for="k in filteredIcons" :key="k">
+                            <button type="button" class="icon-picker-item"
+                                    :class="{ active: currentIcon === k }"
+                                    :title="k"
+                                    @click="pick(k)">
+                                <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                <span class="icon-picker-item-label" x-text="k"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+                <!-- Tab groups (hidden when searching) -->
+                <template x-if="!isSearching && activeTab !== 'Custom'">
+                    <div>
+                        <template x-for="group in tabGroupEntries" :key="group.name">
+                            <div class="icon-picker-group">
+                                <div class="icon-picker-group-label" x-show="!group.solo" x-text="group.name"></div>
+                                <div class="icon-picker-grid">
+                                    <template x-for="k in group.icons" :key="k">
+                                        <button type="button" class="icon-picker-item"
+                                                :class="{ active: currentIcon === k }"
+                                                :title="k"
+                                                @click="pick(k)">
+                                            <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                            <span class="icon-picker-item-label" x-text="k"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <!-- Custom tab -->
+                <template x-if="!isSearching && activeTab === 'Custom'">
+                    <div>
+                        <div style="margin-bottom:0.75rem;">
+                            <input type="file" accept=".svg" @change="uploadIcon($event)" id="custom-icon-upload" style="display:none;">
+                            <label for="custom-icon-upload" class="btn btn-sm" style="cursor:pointer; border:1px dashed var(--border-color, #333); padding:0.4rem 0.8rem; border-radius:4px; font-size:0.8rem;">+ Upload SVG</label>
+                        </div>
+                        <div class="icon-picker-grid">
+                            <template x-for="k in customIcons.map(c => c.key)" :key="k">
+                                <div style="position:relative; display:inline-block;">
+                                    <button type="button" class="icon-picker-item"
+                                            :class="{ active: currentIcon === k }"
+                                            :title="k"
+                                            @click="pick(k)">
+                                        <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                        <span class="icon-picker-item-label" x-text="k.replace('custom:','')"></span>
+                                    </button>
+                                    <button type="button" @click.stop="deleteCustomIcon(k)"
+                                            style="position:absolute; top:-4px; right:-4px; width:16px; height:16px; border-radius:50%; border:none; background:var(--danger-color, #dc3545); color:#fff; font-size:10px; line-height:1; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;"
+                                            title="Delete">&times;</button>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="customIcons.length === 0" style="color:var(--text-muted, #999); font-size:0.85rem; padding:1rem 0;">
+                            No custom icons yet. Upload an SVG file to get started.
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reload prompt toast -->
+    <div class="reload-toast"
+         role="alert" aria-live="assertive" aria-atomic="true"
+         x-show="_reloadToastShow"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-4"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0 transform translate-y-4"
+         style="position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); z-index:1100; background:var(--card-bg, #1a1a1a); border:1px solid var(--border-color, #333); border-radius:8px; padding:0.75rem 1rem; display:flex; align-items:center; gap:0.75rem; box-shadow:0 4px 12px rgba(0,0,0,0.4); max-width:90vw;">
+        <span x-text="_reloadToastMsg" style="font-size:0.9rem;"></span>
+        <button class="btn-generate" @click="window.location.reload()" style="height:28px; font-size:0.8rem; padding:0 0.75rem; white-space:nowrap;">Reload</button>
+        <button @click="dismissReloadPrompt()" aria-label="Dismiss" style="background:none; border:none; color:var(--text-muted, #999); cursor:pointer; font-size:1.2rem; padding:0 0.25rem;">&times;</button>
+    </div>
+
+    <!-- Error toast -->
+    <div class="reload-toast"
+         role="alert" aria-live="assertive" aria-atomic="true"
+         x-show="_errorShow"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-4"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0 transform translate-y-4"
+         style="position:fixed; bottom:4.5rem; left:50%; transform:translateX(-50%); z-index:1100; background:var(--card-bg, #1a1a1a); border:1px solid #dc3545; border-radius:8px; padding:0.75rem 1rem; display:flex; align-items:center; gap:0.75rem; box-shadow:0 4px 12px rgba(0,0,0,0.4); max-width:90vw;">
+        <span x-text="_errorMsg" style="font-size:0.9rem; color:#dc3545;"></span>
+        <button @click="dismissError()" aria-label="Dismiss error" style="background:none; border:none; color:var(--text-muted, #999); cursor:pointer; font-size:1.2rem; padding:0 0.25rem;">&times;</button>
+    </div>
+
+    <!-- day.js -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/plugin/relativeTime.js"></script>
+    <script>dayjs.extend(dayjs_plugin_relativeTime);</script>
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.14.8/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script src="/js/theme-registry.js"></script>
+    <script src="/js/shared.js"></script>
+    <script src="/js/constants.js"></script>
+    <script src="/js/icons.js"></script>
+    <script src="/js/icon-picker.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

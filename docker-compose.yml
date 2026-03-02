@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8321:8321"
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped

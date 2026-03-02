@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - Morsl</title>
+
+    <meta name="theme-color" content="#7a8b9a">
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Theme CSS -->
+    <link id="theme-css" rel="stylesheet" href="/css/theme-cast-iron.css">
+
+    <!-- Shared styles (drawer, icon picker) -->
+    <link rel="stylesheet" href="/css/admin.css">
+
+    <!-- Setup styles -->
+    <link rel="stylesheet" href="/css/setup.css">
+</head>
+<body>
+    <div class="setup-page" x-data="setupApp" x-init="init()">
+        <div class="setup-container">
+
+            <!-- Progress bar (hidden in add-profile mode) -->
+            <div class="setup-progress" x-show="!_addProfileMode">
+                <template x-for="s in [1,2,3,4,5,6]" :key="s">
+                    <div class="setup-progress-step">
+                        <div class="setup-progress-dot"
+                             :class="{ active: step === s, done: step > s }"
+                             x-text="step > s ? '\u2713' : s"></div>
+                        <div class="setup-progress-line"
+                             :class="{ done: step > s }"
+                             x-show="s < 6"></div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Step 1: Connect to Tandoor -->
+            <div class="setup-step-content" x-show="step === 1"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <h2 class="setup-title">Connect to Tandoor</h2>
+                <p class="setup-subtitle">Enter your Tandoor instance URL and API token to get started.</p>
+
+                <div class="setup-field">
+                    <label class="setup-label" for="setup-url">Tandoor URL</label>
+                    <input id="setup-url" type="url" class="setup-input"
+                           x-model="url"
+                           placeholder="https://tandoor.example.com"
+                           @keydown.enter="testConnection()">
+                </div>
+
+                <div class="setup-field">
+                    <label class="setup-label" for="setup-token">API Token</label>
+                    <input id="setup-token" type="password" class="setup-input"
+                           x-model="token"
+                           placeholder="Your Tandoor API token"
+                           @keydown.enter="testConnection()">
+                    <span class="setup-hint">Found in Tandoor under Settings &rarr; API Tokens</span>
+                </div>
+
+                <div x-show="testResult" class="setup-test-result" role="alert"
+                     :class="{ success: testResult?.success, error: !testResult?.success }">
+                    <template x-if="testResult?.success">
+                        <span>&#10003; Connection successful</span>
+                    </template>
+                    <template x-if="testResult && !testResult.success">
+                        <span>&#10007; <span x-text="testResult.error || 'Connection failed'"></span></span>
+                    </template>
+                </div>
+
+                <p x-show="error" x-text="error" class="setup-test-result error" role="alert"></p>
+
+                <div class="setup-actions">
+                    <button class="setup-btn setup-btn-secondary"
+                            :disabled="!url || !token || testing"
+                            @click="testConnection()">
+                        <span x-show="!testing">Test Connection</span>
+                        <span x-show="testing">Testing...</span>
+                    </button>
+                    <button class="setup-btn setup-btn-primary"
+                            :disabled="!testResult?.success || saving"
+                            @click="saveCredentials()">
+                        <span x-show="!saving">Save &amp; Continue</span>
+                        <span x-show="saving">Saving...</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Choose Profiles -->
+            <div class="setup-step-content" x-show="step === 2"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <h2 class="setup-title">Set Up Your Meal Plans</h2>
+                <p class="setup-subtitle">Each profile tells the app what kind of meals to plan for you &mdash; like breakfasts, weeknight dinners, or weekend cooking projects. Pick a few presets to get started, or create your own.</p>
+
+                <div class="setup-card-grid">
+                    <template x-for="preset in presets" :key="preset.key">
+                        <div class="setup-preset-card"
+                             :class="{ selected: preset.selected }"
+                             role="checkbox" tabindex="0"
+                             :aria-checked="preset.selected"
+                             @click="togglePreset(preset)"
+                             @keydown.enter="togglePreset(preset)"
+                             @keydown.space.prevent="togglePreset(preset)">
+                            <span class="card-check">&#10003;</span>
+                            <span class="card-icon" x-html="resolveIcon(preset.icon)"></span>
+                            <div class="card-name" x-text="preset.name"></div>
+                            <div class="card-subtitle" x-text="preset.subtitle"></div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Custom profiles -->
+                <template x-for="(cp, cpIdx) in customProfiles" :key="cp._id">
+                    <div class="setup-custom-row">
+                        <span style="flex:1; font-size:0.9rem;" x-text="cp.name"></span>
+                        <button class="setup-btn setup-btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;"
+                                @click="removeCustomProfile(cpIdx)">&times; Remove</button>
+                    </div>
+                </template>
+
+                <div class="setup-custom-row">
+                    <input class="setup-input" type="text"
+                           x-model="customProfileName"
+                           placeholder="Custom profile name"
+                           @keydown.enter="addCustomProfile()">
+                    <button class="setup-btn setup-btn-secondary" style="padding:0.4rem 0.8rem; white-space:nowrap;"
+                            @click="addCustomProfile()"
+                            :disabled="!customProfileName.trim()">+ Add</button>
+                </div>
+
+                <div class="setup-actions">
+                    <button class="setup-btn setup-btn-secondary" @click="_addProfileMode ? (window.location.href = '/admin') : (step = 1)">Back</button>
+                    <button class="setup-btn setup-btn-secondary" x-show="!_addProfileMode" @click="profileQueue = []; step = 4">Skip Profiles</button>
+                    <button class="setup-btn setup-btn-primary"
+                            :disabled="!hasProfileSelections"
+                            @click="buildProfileQueue()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Configure Profile -->
+            <template x-if="step === 3 && currentProfile">
+            <div class="setup-step-content"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <!-- Profile progress indicator -->
+                <div class="setup-profile-indicator" x-show="profileQueue.length > 1">
+                    <span>Profile <strong x-text="profileIndex + 1"></strong> of <strong x-text="profileQueue.length"></strong></span>
+                    <div class="setup-profile-dots">
+                        <template x-for="(_, pi) in profileQueue" :key="pi">
+                            <span class="setup-profile-dot" :class="{ active: pi === profileIndex }"></span>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Sub-page A: Basics -->
+                <div x-show="profileSubPage === 'basics'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title" x-text="_addProfileMode ? 'New Profile' : ('Configure: ' + (currentProfile?.name || ''))"></h2>
+                    <p class="setup-subtitle" x-text="_addProfileMode ? 'Give your profile a name and set the basics.' : 'Set up the basics for this profile. You can always change these later in the admin panel.'"></p>
+
+                    <div class="setup-field">
+                        <label class="setup-label">Profile Name</label>
+                        <input type="text" class="setup-input"
+                               x-model="currentProfile.name"
+                               placeholder="Profile name">
+                    </div>
+
+                    <div class="setup-field">
+                        <label class="setup-label">Description</label>
+                        <textarea class="setup-input"
+                                  x-model="currentProfile.description"
+                                  placeholder="What kind of recipes is this profile for?"
+                                  rows="2"></textarea>
+                        <span class="setup-hint">Optional — helps you remember the purpose of this profile</span>
+                    </div>
+
+                    <div class="setup-field">
+                        <label class="setup-label">Icon</label>
+                        <div style="display:flex; align-items:center; gap:0.75rem;">
+                            <span style="width:28px; height:28px; display:inline-flex; color:var(--accent-color);"
+                                  x-html="resolveIcon(currentProfile?.icon || 'chef-hat')"></span>
+                            <button class="setup-btn setup-btn-secondary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"
+                                    @click="openIconPicker()">Change Icon</button>
+                        </div>
+                    </div>
+
+                    <div class="setup-field" x-show="availableCategories.length > 0">
+                        <label class="setup-label">Category</label>
+                        <select class="setup-input" x-model="currentProfile.category">
+                            <option value="">No category</option>
+                            <template x-for="cat in availableCategories" :key="cat.id">
+                                <option :value="cat.id" x-text="cat.display_name"></option>
+                            </template>
+                        </select>
+                        <span class="setup-hint">Which tab this profile appears under on the menu page</span>
+                    </div>
+
+                    <div class="setup-field">
+                        <label class="setup-label">Number of Recipes</label>
+                        <div class="setup-range-row">
+                            <span>Between</span>
+                            <div class="setup-number-control">
+                                <button @click="decrementMin()" :disabled="(currentProfile?.min_choices || 1) <= 1">&minus;</button>
+                                <input type="number" :value="currentProfile?.min_choices || currentProfile?.choices" @input="currentProfile.min_choices = Math.max(1, +$event.target.value)" min="1" max="50">
+                                <button @click="incrementMin()" :disabled="(currentProfile?.min_choices || currentProfile?.choices) >= currentProfile?.choices">+</button>
+                            </div>
+                            <span>and</span>
+                            <div class="setup-number-control">
+                                <button @click="decrementChoices()" :disabled="currentProfile?.choices <= (currentProfile?.min_choices || 1)">&minus;</button>
+                                <input type="number" x-model.number="currentProfile.choices" min="1" max="50">
+                                <button @click="incrementChoices()" :disabled="currentProfile?.choices >= 50">+</button>
+                            </div>
+                            <span>recipes</span>
+                        </div>
+                        <span class="setup-hint">The solver will pick a number of recipes in this range</span>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page dots -->
+                <div class="setup-sub-dots"
+                     x-show="profileSubPage !== 'basics'"
+                     :aria-label="'Step ' + (subPageIndex + 1) + ' of ' + subPageCount + ': ' + profileSubPage">
+                    <template x-for="(pg, pi) in RULE_PAGES" :key="pg">
+                        <span class="setup-sub-dot"
+                              :class="{ active: pi === subPageIndex, done: pi < subPageIndex }"></span>
+                    </template>
+                </div>
+
+                <!-- Sub-page 3B: Keywords -->
+                <div x-show="profileSubPage === 'keywords'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">What kind of recipes should <em x-text="currentProfile?.name || 'this profile'"></em> pick?</h2>
+                    <p class="setup-subtitle">Keywords in Tandoor describe your recipes — things like "Breakfast," "Lunch," "Main Course," or "Vegetarian."</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Keyword preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.tagsInclude.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.tagsInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.tagsInclude.active = false"
+                             @keydown.enter="currentProfile.rules.tagsInclude.active = false"
+                             @keydown.space.prevent="currentProfile.rules.tagsInclude.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Any recipe is fine</div>
+                                <div class="setup-choice-desc">Don't limit by keywords. This profile will choose from all your recipes.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.tagsInclude.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.tagsInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.tagsInclude.active = true"
+                             @keydown.enter="currentProfile.rules.tagsInclude.active = true"
+                             @keydown.space.prevent="currentProfile.rules.tagsInclude.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Use keywords</div>
+                                <div class="setup-choice-desc">Focus on a theme, balance your mix, or both.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keyword sub-sections (visible when active) -->
+                    <div x-show="currentProfile?.rules.tagsInclude.active" x-transition>
+
+                        <!-- Theme sub-section -->
+                        <div class="setup-section-label">Theme or Style</div>
+                        <p class="setup-hint" style="margin-bottom: 0.5rem; font-style: normal;">Focus all recipes on a theme — like Italian, or Quick and Easy.</p>
+
+                        <div class="setup-chips" x-show="currentProfile?.rules.tagsInclude.theme.length">
+                            <template x-for="(tag, tagIdx) in currentProfile?.rules.tagsInclude.theme || []" :key="tag.id">
+                                <span class="setup-chip">
+                                    <span x-text="tag.name"></span>
+                                    <button @click="removeThemeKeyword(tagIdx)" :aria-label="'Remove ' + tag.name">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search keywords..."
+                                   aria-label="Search theme keywords"
+                                   :value="themeSearch"
+                                   @input="searchThemeKeywords($event.target.value)"
+                                   @focus="keywordResults = []">
+                            <div class="setup-search-results" x-show="themeResults.length > 0">
+                                <template x-for="kw in themeResults" :key="kw.id">
+                                    <button @click="addThemeKeyword(kw)" x-text="kw.name"></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="setup-sentence" x-show="currentProfile?.rules.tagsInclude.theme.length">
+                            <span>All <strong x-text="currentProfile?.choices"></strong> recipes will match at least one of these keywords.</span>
+                        </div>
+
+                        <!-- Balance sub-section -->
+                        <div class="setup-section-label">Balance the Mix</div>
+                        <p class="setup-hint" style="margin-bottom: 0.5rem; font-style: normal;">Set how many recipes come from each keyword.</p>
+
+                        <div x-show="currentProfile?.rules.tagsInclude.balance.length">
+                            <template x-for="(tag, tagIdx) in currentProfile?.rules.tagsInclude.balance || []" :key="tag.id">
+                                <div class="setup-keyword-row">
+                                    <span class="setup-chip">
+                                        <span x-text="tag.name"></span>
+                                        <button @click="removeBalanceKeyword(tagIdx)" :aria-label="'Remove ' + tag.name">&times;</button>
+                                    </span>
+                                    <span class="setup-keyword-row-sentence">at least</span>
+                                    <input type="number" x-model.number="tag.count" min="1"
+                                           :max="currentProfile.choices"
+                                           class="setup-count-inline"
+                                           :aria-label="'Count for ' + tag.name">
+                                    <span class="setup-keyword-row-sentence" x-text="tag.count === 1 ? 'recipe' : 'recipes'"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search keywords..."
+                                   aria-label="Search balance keywords"
+                                   :value="keywordSearch"
+                                   @input="searchKeywords($event.target.value)"
+                                   @focus="themeResults = []">
+                            <div class="setup-search-results" x-show="keywordResults.length > 0">
+                                <template x-for="kw in keywordResults" :key="kw.id">
+                                    <button @click="addBalanceKeyword(kw)" x-text="kw.name"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Progress indicator -->
+                        <div class="setup-balance-progress"
+                             :class="{ complete: balanceComplete }"
+                             x-show="currentProfile?.rules.tagsInclude.balance.length > 0"
+                             role="progressbar"
+                             :aria-valuenow="balanceAssigned"
+                             :aria-valuemax="currentProfile?.choices">
+                            <span x-text="balanceAssigned + ' of ' + currentProfile?.choices + ' recipes assigned'"></span>
+                            <template x-if="balanceComplete">
+                                <span>&#10003;</span>
+                            </template>
+                            <template x-if="!balanceComplete">
+                                <span>— add more keywords to fill your plan</span>
+                            </template>
+                        </div>
+
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3C: Ingredients -->
+                <div x-show="profileSubPage === 'ingredients'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Prefer certain ingredients?</h2>
+                    <p class="setup-subtitle">If you want this profile to favor recipes with specific ingredients — like chicken, tofu, or seasonal produce — add them here.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Ingredient preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.foodsInclude.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.foodsInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.foodsInclude.active = false"
+                             @keydown.enter="currentProfile.rules.foodsInclude.active = false"
+                             @keydown.space.prevent="currentProfile.rules.foodsInclude.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">No ingredient preference</div>
+                                <div class="setup-choice-desc">Any ingredients are fine.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.foodsInclude.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.foodsInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.foodsInclude.active = true"
+                             @keydown.enter="currentProfile.rules.foodsInclude.active = true"
+                             @keydown.space.prevent="currentProfile.rules.foodsInclude.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Favor specific ingredients</div>
+                                <div class="setup-choice-desc">Pick recipes that use certain ingredients.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.foodsInclude.active" x-transition>
+                        <div class="setup-chips" x-show="currentProfile?.rules.foodsInclude.items.length">
+                            <template x-for="(food, foodIdx) in currentProfile?.rules.foodsInclude.items || []" :key="food.id">
+                                <span class="setup-chip">
+                                    <span x-text="food.name"></span>
+                                    <button @click="removeIncludeFood(foodIdx)" :aria-label="'Remove ' + food.name">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search ingredients..."
+                                   aria-label="Search ingredients"
+                                   :value="foodSearch"
+                                   @input="searchFoods($event.target.value)">
+                            <div class="setup-search-results" x-show="foodResults.length > 0">
+                                <template x-for="f in foodResults" :key="f.id">
+                                    <button @click="addIncludeFood(f)" x-text="f.name"></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="setup-sentence" x-show="currentProfile?.rules.foodsInclude.items.length">
+                            <span>Pick <strong>at least</strong></span>
+                            <input type="number" x-model.number="currentProfile.rules.foodsInclude.count" min="1">
+                            <span>recipes with any of these ingredients</span>
+                        </div>
+
+                        <!-- Exception foods -->
+                        <div class="setup-section-label" x-show="currentProfile?.rules.foodsInclude.items.length" style="margin-top:1.25rem;">But not:</div>
+                        <div x-show="currentProfile?.rules.foodsInclude.items.length">
+                            <div class="setup-chips" x-show="currentProfile?.rules.foodsInclude.except.length">
+                                <template x-for="(exc, excIdx) in currentProfile?.rules.foodsInclude.except || []" :key="exc.id">
+                                    <span class="setup-chip exclude">
+                                        <span x-text="exc.name"></span>
+                                        <button @click="removeFoodException(excIdx)" :aria-label="'Remove ' + exc.name">&times;</button>
+                                    </span>
+                                </template>
+                            </div>
+                            <div class="setup-search-box">
+                                <input type="text" placeholder="Search ingredients to exclude..."
+                                       aria-label="Search ingredients to exclude"
+                                       :value="exceptFoodSearch"
+                                       @input="searchExceptFoods($event.target.value)">
+                                <div class="setup-search-results" x-show="exceptFoodResults.length > 0">
+                                    <template x-for="f in exceptFoodResults" :key="f.id">
+                                        <button @click="addFoodException(f)" x-text="f.name"></button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3D: Books -->
+                <div x-show="profileSubPage === 'books'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Pick from a recipe book?</h2>
+                    <p class="setup-subtitle">Tandoor lets you organize recipes into books — like curated collections. You can tell this profile to only pick from specific books.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Book preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.booksInclude.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.booksInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.booksInclude.active = false"
+                             @keydown.enter="currentProfile.rules.booksInclude.active = false"
+                             @keydown.space.prevent="currentProfile.rules.booksInclude.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">All recipes</div>
+                                <div class="setup-choice-desc">Don't limit by book. Choose from your entire collection.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.booksInclude.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.booksInclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.booksInclude.active = true"
+                             @keydown.enter="currentProfile.rules.booksInclude.active = true"
+                             @keydown.space.prevent="currentProfile.rules.booksInclude.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Pick from specific books</div>
+                                <div class="setup-choice-desc">Only use recipes from certain books.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.booksInclude.active" x-transition>
+                        <div class="setup-chips" x-show="currentProfile?.rules.booksInclude.items.length">
+                            <template x-for="(book, bookIdx) in currentProfile?.rules.booksInclude.items || []" :key="book.id">
+                                <span class="setup-chip">
+                                    <span x-text="book.name"></span>
+                                    <button @click="removeBook(bookIdx)" :aria-label="'Remove ' + book.name">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search books..."
+                                   aria-label="Search books"
+                                   :value="bookSearch"
+                                   @input="searchBooks($event.target.value)">
+                            <div class="setup-search-results" x-show="bookResults.length > 0">
+                                <template x-for="b in bookResults" :key="b.id">
+                                    <button @click="addBook(b)" x-text="b.name"></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="setup-sentence" x-show="currentProfile?.rules.booksInclude.items.length">
+                            <span>Pick <strong>at least</strong></span>
+                            <input type="number" x-model.number="currentProfile.rules.booksInclude.count" min="1">
+                            <span>recipes from any of these books</span>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3E: Avoid -->
+                <div x-show="profileSubPage === 'avoid'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Anything you want to avoid?</h2>
+                    <p class="setup-subtitle">If there are keywords or ingredients you never want this profile to pick, list them here. Great for allergies, dietary restrictions, or categories you want to skip.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Avoidance preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.tagsExclude.active && !currentProfile?.rules.foodsExclude.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.tagsExclude.active && !currentProfile?.rules.foodsExclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.tagsExclude.active = false; currentProfile.rules.foodsExclude.active = false"
+                             @keydown.enter="currentProfile.rules.tagsExclude.active = false; currentProfile.rules.foodsExclude.active = false"
+                             @keydown.space.prevent="currentProfile.rules.tagsExclude.active = false; currentProfile.rules.foodsExclude.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">No restrictions</div>
+                                <div class="setup-choice-desc">Any recipe is fair game.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.tagsExclude.active || currentProfile?.rules.foodsExclude.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.tagsExclude.active || currentProfile?.rules.foodsExclude.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.tagsExclude.active = true; currentProfile.rules.foodsExclude.active = true"
+                             @keydown.enter="currentProfile.rules.tagsExclude.active = true; currentProfile.rules.foodsExclude.active = true"
+                             @keydown.space.prevent="currentProfile.rules.tagsExclude.active = true; currentProfile.rules.foodsExclude.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Avoid certain keywords or ingredients</div>
+                                <div class="setup-choice-desc">Keep specific things out of this profile's picks.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.tagsExclude.active || currentProfile?.rules.foodsExclude.active" x-transition>
+                        <!-- Exclude keywords -->
+                        <div class="setup-section-label">Keywords to exclude:</div>
+                        <div class="setup-chips" x-show="currentProfile?.rules.tagsExclude.items.length">
+                            <template x-for="(tag, tagIdx) in currentProfile?.rules.tagsExclude.items || []" :key="tag.id">
+                                <span class="setup-chip exclude">
+                                    <span x-text="tag.name"></span>
+                                    <button @click="removeExcludeKeyword(tagIdx)" :aria-label="'Remove ' + tag.name">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search keywords to avoid..."
+                                   aria-label="Search keywords to avoid"
+                                   :value="excludeKeywordSearch"
+                                   @input="searchExcludeKeywords($event.target.value)">
+                            <div class="setup-search-results" x-show="excludeKeywordResults.length > 0">
+                                <template x-for="kw in excludeKeywordResults" :key="kw.id">
+                                    <button @click="addExcludeKeyword(kw)" x-text="kw.name"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Exclude foods -->
+                        <div class="setup-section-label">Ingredients to exclude:</div>
+                        <div class="setup-chips" x-show="currentProfile?.rules.foodsExclude.items.length">
+                            <template x-for="(food, foodIdx) in currentProfile?.rules.foodsExclude.items || []" :key="food.id">
+                                <span class="setup-chip exclude">
+                                    <span x-text="food.name"></span>
+                                    <button @click="removeExcludeFood(foodIdx)" :aria-label="'Remove ' + food.name">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="setup-search-box">
+                            <input type="text" placeholder="Search ingredients to avoid..."
+                                   aria-label="Search ingredients to avoid"
+                                   :value="excludeFoodSearch"
+                                   @input="searchExcludeFoods($event.target.value)">
+                            <div class="setup-search-results" x-show="excludeFoodResults.length > 0">
+                                <template x-for="f in excludeFoodResults" :key="f.id">
+                                    <button @click="addExcludeFood(f)" x-text="f.name"></button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3F: Rating -->
+                <div x-show="profileSubPage === 'rating'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Only the good stuff?</h2>
+                    <p class="setup-subtitle">If you rate recipes in Tandoor, you can tell this profile to skip low-rated ones. Unrated recipes are always included — this only filters out recipes you've explicitly rated below the threshold.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Rating preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.rating.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.rating.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.rating.active = false"
+                             @keydown.enter="currentProfile.rules.rating.active = false"
+                             @keydown.space.prevent="currentProfile.rules.rating.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Include all ratings</div>
+                                <div class="setup-choice-desc">Don't filter by rating. Even lower-rated recipes can appear.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.rating.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.rating.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.rating.active = true"
+                             @keydown.enter="currentProfile.rules.rating.active = true"
+                             @keydown.space.prevent="currentProfile.rules.rating.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Set a minimum rating</div>
+                                <div class="setup-choice-desc">Only pick recipes rated above a threshold.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.rating.active" x-transition>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">Minimum rating:</span>
+                        <div class="setup-star-row" role="radiogroup" aria-label="Minimum star rating">
+                            <template x-for="s in [1,2,3,4,5]" :key="s">
+                                <span class="setup-star"
+                                      role="radio"
+                                      tabindex="0"
+                                      :aria-checked="s <= (currentProfile?.rules.rating.min || 0)"
+                                      :aria-label="s + ' star' + (s > 1 ? 's' : '')"
+                                      :class="{ filled: s <= (currentProfile?.rules.rating.min || 0) }"
+                                      @click="setRating(s)"
+                                      @keydown.enter="setRating(s)"
+                                      @keydown.space.prevent="setRating(s)">&#9733;</span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3G: Freshness -->
+                <div x-show="profileSubPage === 'freshness'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Keep things fresh?</h2>
+                    <p class="setup-subtitle">If you log when you cook in Tandoor, this profile can avoid picking things you've made recently. Great for keeping your meal plans varied from week to week.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="Freshness preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.avoidRecent.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.avoidRecent.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.avoidRecent.active = false"
+                             @keydown.enter="currentProfile.rules.avoidRecent.active = false"
+                             @keydown.space.prevent="currentProfile.rules.avoidRecent.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Repeats are fine</div>
+                                <div class="setup-choice-desc">Don't worry about what I've cooked recently.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.avoidRecent.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.avoidRecent.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.avoidRecent.active = true"
+                             @keydown.enter="currentProfile.rules.avoidRecent.active = true"
+                             @keydown.space.prevent="currentProfile.rules.avoidRecent.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Avoid recent repeats</div>
+                                <div class="setup-choice-desc">Skip recipes I've made in the last...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.avoidRecent.active" x-transition>
+                        <div class="setup-day-presets">
+                            <template x-for="d in [7, 14, 21, 30]" :key="d">
+                                <button :class="{ active: currentProfile?.rules.avoidRecent.days === d }"
+                                        @click="setAvoidDays(d)"
+                                        :aria-label="d + ' days'"
+                                        x-text="d"></button>
+                            </template>
+                            <button :class="{ active: !avoidDaysIsPreset }"
+                                    @click="setAvoidDays(10)" aria-label="Custom days">Custom</button>
+                        </div>
+                        <div class="setup-custom-days" x-show="!avoidDaysIsPreset">
+                            <input type="number" x-model.number="currentProfile.rules.avoidRecent.days" min="1" max="365">
+                            <span>days</span>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3H: New Recipes -->
+                <div x-show="profileSubPage === 'new-recipes'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Try new recipes?</h2>
+                    <p class="setup-subtitle">When you add new recipes to Tandoor, this profile can make sure some of them show up in your meal plans. Keeps new finds from getting buried.</p>
+
+                    <div class="setup-choice-group" role="radiogroup" aria-label="New recipe preference">
+                        <div class="setup-choice-card" :class="{ selected: !currentProfile?.rules.includeNew.active }"
+                             role="radio" :aria-checked="!currentProfile?.rules.includeNew.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.includeNew.active = false"
+                             @keydown.enter="currentProfile.rules.includeNew.active = false"
+                             @keydown.space.prevent="currentProfile.rules.includeNew.active = false">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">All recipes are equal</div>
+                                <div class="setup-choice-desc">New recipes have the same chance as old ones.</div>
+                            </div>
+                        </div>
+                        <div class="setup-choice-card" :class="{ selected: currentProfile?.rules.includeNew.active }"
+                             role="radio" :aria-checked="currentProfile?.rules.includeNew.active"
+                             tabindex="0"
+                             @click="currentProfile.rules.includeNew.active = true"
+                             @keydown.enter="currentProfile.rules.includeNew.active = true"
+                             @keydown.space.prevent="currentProfile.rules.includeNew.active = true">
+                            <div class="setup-choice-radio"><div class="setup-choice-radio-dot"></div></div>
+                            <div class="setup-choice-content">
+                                <div class="setup-choice-label">Include some new additions</div>
+                                <div class="setup-choice-desc">Guarantee recently added recipes get picked.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-config-section" x-show="currentProfile?.rules.includeNew.active" x-transition>
+                        <div class="setup-sentence">
+                            <span>Include at least</span>
+                            <input type="number" x-model.number="currentProfile.rules.includeNew.count" min="1">
+                            <span>recipe(s) added in the last</span>
+                            <input type="number" x-model.number="currentProfile.rules.includeNew.days" min="1">
+                            <span>days</span>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary" @click="nextSubPage()">Next</button>
+                    </div>
+                </div>
+
+                <!-- Sub-page 3I: Review -->
+                <div x-show="profileSubPage === 'review'"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100">
+
+                    <h2 class="setup-title">Review: <em x-text="currentProfile?.name || ''"></em></h2>
+                    <p class="setup-subtitle">Here's what this profile will do. You can always fine-tune it later in the admin panel.</p>
+
+                    <div class="setup-review-card">
+                        <div class="setup-review-header">
+                            <span class="setup-review-icon" x-html="resolveIcon(currentProfile?.icon || 'chef-hat')"></span>
+                            <div>
+                                <div class="setup-review-name" x-text="currentProfile?.name || ''"></div>
+                                <div class="setup-review-meta">
+                                    <span x-text="(currentProfile?.min_choices && currentProfile.min_choices !== currentProfile.choices) ? (currentProfile.min_choices + '–' + currentProfile.choices + ' recipes') : (currentProfile?.choices + ' recipes')"></span>
+                                    <template x-if="currentProfile?.description">
+                                        <span> &mdash; <span x-text="currentProfile.description"></span></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <ul class="setup-review-rules" x-show="ruleSummary.length > 0">
+                            <template x-for="(line, li) in ruleSummary" :key="li">
+                                <li class="setup-review-line" tabindex="0"
+                                    @click="goToSubPage(line.page)"
+                                    @keydown.enter="goToSubPage(line.page)"
+                                    x-text="line.text"></li>
+                            </template>
+                        </ul>
+                        <div class="setup-review-empty" x-show="ruleSummary.length === 0">
+                            No rules — picks from all your recipes.
+                        </div>
+                    </div>
+
+                    <p x-show="error" x-text="error" class="setup-test-result error" role="alert"></p>
+
+                    <div class="setup-actions">
+                        <button class="setup-btn setup-btn-secondary" @click="skipProfile()">Skip</button>
+                        <button class="setup-btn setup-btn-secondary" @click="prevSubPage()">Back</button>
+                        <button class="setup-btn setup-btn-primary"
+                                :disabled="saving || !currentProfile?.name?.trim() || !hasActiveConstraint"
+                                @click="createCurrentProfile()">
+                            <span x-show="!saving">Create Profile</span>
+                            <span x-show="saving">Creating...</span>
+                        </button>
+                    </div>
+                    <p class="setup-hint" x-show="!hasActiveConstraint" style="text-align:center;margin-top:0.5rem;">Add at least one constraint to continue</p>
+                </div>
+            </div>
+            </template>
+
+            <!-- Step 4: Categories -->
+            <div class="setup-step-content" x-show="step === 4"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <h2 class="setup-title">Configure Categories</h2>
+                <p class="setup-subtitle">Categories group your profiles into tabs on the menu page. Pick some presets or add your own.</p>
+
+                <div class="setup-category-list">
+                    <template x-for="(preset, idx) in categoryPresets" :key="preset.key">
+                        <div class="setup-category-card"
+                             :class="{ selected: preset.selected }"
+                             role="checkbox" tabindex="0"
+                             :aria-checked="preset.selected"
+                             @click="toggleCategory(preset)"
+                             @keydown.enter="toggleCategory(preset)"
+                             @keydown.space.prevent="toggleCategory(preset)">
+                            <span class="cat-icon" x-html="resolveIcon(preset.icon)"></span>
+                            <div class="cat-info">
+                                <div class="cat-name" x-text="preset.display_name"></div>
+                                <div class="cat-sub" x-text="preset.subtitle"></div>
+                            </div>
+                            <span class="cat-check">&#10003;</span>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Custom categories -->
+                <template x-for="(custom, cidx) in customCategories" :key="custom._id">
+                    <div class="setup-custom-row" style="margin-bottom:0.5rem;">
+                        <span style="flex:1; font-size:0.9rem;" x-text="custom.display_name"></span>
+                        <button class="setup-btn setup-btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.8rem;"
+                                @click="removeCustomCategory(cidx)">&times; Remove</button>
+                    </div>
+                </template>
+
+                <div class="setup-custom-row">
+                    <input class="setup-input" type="text"
+                           x-model="customCatName"
+                           placeholder="Custom category name"
+                           @keydown.enter="addCustomCategory()">
+                    <button class="setup-btn setup-btn-secondary" style="padding:0.4rem 0.8rem; white-space:nowrap;"
+                            @click="addCustomCategory()"
+                            :disabled="!customCatName.trim()">+ Add</button>
+                </div>
+
+                <p x-show="error" x-text="error" class="setup-test-result error" role="alert"></p>
+
+                <div class="setup-actions">
+                    <button class="setup-btn setup-btn-secondary" @click="step = profileQueue.length > 0 ? 3 : 2">Back</button>
+                    <button class="setup-btn setup-btn-secondary" @click="step = 5">Skip</button>
+                    <button class="setup-btn setup-btn-primary"
+                            :disabled="saving"
+                            @click="createCategories()">
+                        <span x-show="!saving">Create Categories</span>
+                        <span x-show="saving">Creating...</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 5: Assign profiles to categories -->
+            <div class="setup-step-content" x-show="step === 5"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <h2 class="setup-title">Organize Your Profiles</h2>
+                <p class="setup-subtitle">Assign each profile to a category. This controls which tab it appears under on the menu page.</p>
+
+                <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:1.25rem;">
+                    <template x-for="pa in profileAssignments" :key="pa.name">
+                        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.75rem; background:var(--input-bg, rgba(255,255,255,0.05)); border:1px solid var(--card-border-color, rgba(255,255,255,0.12)); border-radius:8px;">
+                            <span style="flex:1; font-size:0.9rem; font-weight:600;" x-text="pa.name"></span>
+                            <select class="setup-input" style="width:auto; min-width:140px; flex:0;"
+                                    x-model="pa.category">
+                                <option value="">No category</option>
+                                <template x-for="cat in createdCategories" :key="cat.id">
+                                    <option :value="cat.id" x-text="cat.display_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="setup-actions">
+                    <button class="setup-btn setup-btn-secondary" @click="step = 4">Back</button>
+                    <button class="setup-btn setup-btn-secondary" @click="step = 6">Skip</button>
+                    <button class="setup-btn setup-btn-primary"
+                            :disabled="saving"
+                            @click="saveAssignments()">
+                        <span x-show="!saving">Save & Finish</span>
+                        <span x-show="saving">Saving...</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 6: All Set -->
+            <div class="setup-step-content" x-show="step === 6"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform translate-x-4"
+                 x-transition:enter-end="opacity-100 transform translate-x-0">
+
+                <div class="setup-finish">
+                    <div class="setup-finish-icon">&#127881;</div>
+                    <h2 class="setup-title">All Set!</h2>
+                    <p class="setup-subtitle">Your meal plan generator is ready. Let's see what's on the menu.</p>
+
+                    <div class="setup-actions" style="justify-content:center;">
+                        <button class="setup-btn setup-btn-primary" @click="finishSetup()">Show Me the Menu</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Icon Picker Drawer (shared component) -->
+    <div x-data="iconPicker">
+        <div class="drawer-backdrop"
+             x-show="open"
+             x-transition:enter.opacity.duration.200ms
+             x-transition:leave.opacity.duration.200ms
+             @click="close()"
+             style="z-index:1001;">
+        </div>
+        <div class="icon-picker-drawer"
+             x-show="open" x-trap.noscroll="open"
+             role="dialog" aria-modal="true" aria-labelledby="icon-picker-title"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="transform translate-x-full"
+             x-transition:enter-end="transform translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="transform translate-x-0"
+             x-transition:leave-end="transform translate-x-full">
+            <div class="drawer-header">
+                <h3 id="icon-picker-title" style="margin:0;">Choose Icon</h3>
+                <button class="drawer-close" @click="close()">&times;</button>
+            </div>
+            <div style="padding:0.5rem 1rem;">
+                <input type="text" x-model="searchQuery" placeholder="Search icons..."
+                       style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border-color, #333); border-radius:4px; background:var(--surface-color, #1a1a1a); color:var(--text-color, #e0e0e0); font-size:0.85rem;">
+            </div>
+            <div class="icon-picker-tabs" x-show="!isSearching">
+                <template x-for="tab in tabs" :key="tab">
+                    <button type="button" class="icon-picker-tab"
+                            :class="{ active: activeTab === tab }"
+                            @click="activeTab = tab"
+                            x-text="tab"></button>
+                </template>
+            </div>
+            <div class="icon-picker-body">
+                <button type="button" class="icon-picker-clear" @click="pick('')">Clear</button>
+                <template x-if="isSearching">
+                    <div class="icon-picker-grid">
+                        <template x-for="k in filteredIcons" :key="k">
+                            <button type="button" class="icon-picker-item"
+                                    :class="{ active: currentIcon === k }"
+                                    :title="k"
+                                    @click="pick(k)">
+                                <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                <span class="icon-picker-item-label" x-text="k"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!isSearching && activeTab !== 'Custom'">
+                    <div>
+                        <template x-for="group in tabGroupEntries" :key="group.name">
+                            <div class="icon-picker-group">
+                                <div class="icon-picker-group-label" x-show="!group.solo" x-text="group.name"></div>
+                                <div class="icon-picker-grid">
+                                    <template x-for="k in group.icons" :key="k">
+                                        <button type="button" class="icon-picker-item"
+                                                :class="{ active: currentIcon === k }"
+                                                :title="k"
+                                                @click="pick(k)">
+                                            <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                            <span class="icon-picker-item-label" x-text="k"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!isSearching && activeTab === 'Custom'">
+                    <div>
+                        <div class="icon-picker-grid">
+                            <template x-for="k in customIcons.map(c => c.key)" :key="k">
+                                <button type="button" class="icon-picker-item"
+                                        :class="{ active: currentIcon === k }"
+                                        :title="k"
+                                        @click="pick(k)">
+                                    <span x-html="getIconByKey(k)" style="width:32px; height:32px; display:inline-flex;"></span>
+                                    <span class="icon-picker-item-label" x-text="k.replace('custom:','')"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <div x-show="customIcons.length === 0" style="color:var(--text-muted, #999); font-size:0.85rem; padding:1rem 0;">
+                            No custom icons yet.
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.14.8/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script src="/js/constants.js"></script>
+    <script src="/js/theme-registry.js"></script>
+    <script src="/js/shared.js"></script>
+    <script src="/js/icons.js"></script>
+    <script src="/js/icon-picker.js"></script>
+    <script src="/js/setup.js"></script>
+</body>
+</html>

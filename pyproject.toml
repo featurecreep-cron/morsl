@@ -1,0 +1,86 @@
+[project]
+name = "morsl"
+version = "0.1.0"
+description = "Autocreate menus from Tandoor API"
+requires-python = ">=3.12"
+dependencies = [
+    "requests==2.31.0",
+    "pulp==2.7.0",
+    "tzlocal==5.1",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic-settings>=2.1",
+    "python-multipart>=0.0.6",
+    "apscheduler>=3.10,<4",
+    "defusedxml>=0.7",
+    "Pillow>=10.0,<11",
+    "cairosvg>=2.7,<3",
+    "python-slugify>=8.0",
+    "cachetools>=5.3",
+    "py-svg-hush>=0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.8.3",  # linter, formatter, import sort
+    "mypy==1.13.0",
+    "pre-commit==4.0.1",
+    "colorlog==6.9.0",
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "httpx>=0.27",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+include = ["*"]  # This includes all Python packages
+
+[tool.ruff]
+fix = true
+line-length = 179
+target-version = "py312"
+
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear,
+    "ANN", # flake8 type annotations
+    "RUF", # ruff-specific rules
+]
+ignore = ["ANN002", "ANN003", "ANN204", "ANN202", "RUF012"]
+# logger-objects = ["logging_setup.logger"]  # needs setup 
+fixable=["ALL"]
+extend-select = ["E501"]
+
+[tool.ruff.lint.flake8-annotations]
+suppress-dummy-args = true
+mypy-init-return = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = ["-v", "--strict-markers", "--tb=short"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests that require live Tandoor API",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[lint]
+select = ["I002", "TCH004"]
+
+[lint.isort]
+required-imports = ["from __future__ import annotations"]
