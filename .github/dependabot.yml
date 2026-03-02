@@ -3,11 +3,21 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
-      dependencies:
-        patterns:
-          - "*"
+      pip-patches:
+        update-types: ["patch"]
+      pip-minors:
+        update-types: ["minor"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
 
   - package-ecosystem: github-actions
     directory: /
@@ -15,5 +25,20 @@ updates:
       interval: weekly
     groups:
       actions:
-        patterns:
-          - "*"
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
