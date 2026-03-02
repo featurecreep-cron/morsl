@@ -27,7 +27,6 @@ COPY services/ services/
 COPY scripts/ scripts/
 COPY web/ web/
 COPY models.py tandoor_api.py utils.py solver.py constants.py ./
-COPY data/categories.json data/categories.json
 
 # Create writable dirs for runtime data
 RUN mkdir -p data/branding data/custom-icons data/profiles data/templates data/weekly_plans web/icons
