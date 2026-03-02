@@ -1,5 +1,10 @@
 FROM python:3.12-slim
 
+LABEL org.opencontainers.image.source="https://github.com/FeatureCreep-dev/morsl" \
+      org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/FeatureCreep-dev/morsl"
+
 # System deps for cairosvg / Pillow
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

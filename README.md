@@ -1,8 +1,10 @@
 # Morsl
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-192%20passing-brightgreen.svg)](#testing)
+[![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
+[![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FFeatureCreep-dev%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 A menu generator for [Tandoor Recipes](https://github.com/TandoorRecipes/recipes). Define constraints (keywords, ratings, foods, dates) and Morsl uses linear programming to pick recipes that satisfy them all.
 
@@ -102,7 +104,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-192 tests covering the solver, services, API routes, models, and utilities. Integration tests that require a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
+214 tests covering the solver, services, API routes, models, and utilities. Integration tests that require a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
 
 ## Tech stack
 
