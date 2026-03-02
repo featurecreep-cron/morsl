@@ -8,6 +8,9 @@ updates:
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
+    ignore:
+      - dependency-name: pulp
+        update-types: ["version-update:semver-major"]
     groups:
       pip-patches:
         update-types: ["patch"]
@@ -26,7 +29,6 @@ updates:
     groups:
       actions:
         patterns: ["*"]
-        update-types: ["patch", "minor"]
     commit-message:
       prefix: chore
       include: scope
@@ -37,6 +39,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: chore
       include: scope
