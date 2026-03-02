@@ -128,8 +128,7 @@ def verify_pin(
 ) -> Dict[str, Any]:
     """Verify admin/kiosk PIN. Returns valid=true and a session token on success."""
     settings = svc.get_all()
-    if not (settings.get("admin_pin_enabled") or
-            (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))):
+    if not (settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))):
         return {"valid": True}
     stored_pin = settings.get("kiosk_pin", "")
     if not stored_pin:
@@ -159,7 +158,6 @@ def get_setup_status(
         "has_profiles": has_profiles,
         "has_categories": has_categories,
     }
-
 
 
 @router.post("/test-connection", dependencies=[Depends(require_admin_or_first_run)])
@@ -272,6 +270,7 @@ def upload_favicon(
     source_path = UPLOADS_DIR / url.split("/")[-1]
     try:
         from services.icon_service import generate_icons
+
         generate_icons(source_path, ICONS_DIR)
         logger.info("Regenerated icons from %s", source_path)
     except Exception as e:
@@ -293,6 +292,7 @@ def remove_favicon(
     if default_svg.exists():
         try:
             from services.icon_service import generate_icons
+
             generate_icons(default_svg, ICONS_DIR)
         except Exception as e:
             logger.warning("Default icon regeneration failed: %s", e)
@@ -334,14 +334,13 @@ def reset_branding(
     if DEFAULT_FAVICON_PATH.exists():
         try:
             from services.icon_service import generate_icons
+
             generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
         except Exception as e:
             logger.warning("Default icon regeneration failed: %s", e)
 
     # Reset branding settings to defaults
-    branding_keys = ["app_name", "slogan_header", "slogan_footer",
-                     "logo_url", "favicon_url", "loading_icon_url",
-                     "favicon_use_logo", "loading_icon_use_logo", "show_logo"]
+    branding_keys = ["app_name", "slogan_header", "slogan_footer", "logo_url", "favicon_url", "loading_icon_url", "favicon_use_logo", "loading_icon_use_logo", "show_logo"]
     updates = {k: DEFAULTS[k] for k in branding_keys}
     return svc.update(updates)
 
@@ -418,6 +417,7 @@ def factory_reset(
     if DEFAULT_FAVICON_PATH.exists():
         try:
             from services.icon_service import generate_icons
+
             generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
         except Exception as e:
             logger.warning("Default icon regeneration failed: %s", e)

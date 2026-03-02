@@ -31,9 +31,7 @@ class HistoryService:
             self._entries = self._entries[: self.MAX_ENTRIES]
             self._save()
 
-    def list_entries(
-        self, limit: int = 50, offset: int = 0
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    def list_entries(self, limit: int = 50, offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
         """Return paginated entries (newest first) and total count."""
         with self._lock:
             total = len(self._entries)
@@ -74,9 +72,7 @@ class HistoryService:
             for rc in entry.get("relaxed_constraints", []):
                 label = rc.get("label", "")
                 relaxed_counter[label] += 1
-                slack_totals[label] = slack_totals.get(label, 0) + rc.get(
-                    "slack_value", 0
-                )
+                slack_totals[label] = slack_totals.get(label, 0) + rc.get("slack_value", 0)
 
         most_relaxed = sorted(
             [
@@ -123,7 +119,5 @@ class HistoryService:
                 else:
                     self._entries = []
             except (json.JSONDecodeError, OSError):
-                logger.warning(
-                    "Corrupt generation_history.json — starting fresh"
-                )
+                logger.warning("Corrupt generation_history.json — starting fresh")
                 self._entries = []

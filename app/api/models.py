@@ -87,6 +87,7 @@ class GenerationStatusResponse(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Custom generation request with inline constraints (v2 format)."""
+
     choices: int = 5
     min_choices: Optional[int] = None
     cache: int = API_CACHE_TTL_MINUTES
@@ -115,6 +116,7 @@ class ProfileResponse(BaseModel):
 
 class ProfileCreateRequest(BaseModel):
     """Full profile shape for create/update (v2 format)."""
+
     name: str
     description: str = ""
     icon: str = ""

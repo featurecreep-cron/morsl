@@ -62,8 +62,7 @@ class TandoorAPI:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
         adapter = HTTPAdapter(
-            max_retries=Retry(total=HTTP_MAX_RETRIES, backoff_factor=HTTP_BACKOFF_FACTOR,
-                              status_forcelist=HTTP_RETRY_STATUS_CODES),
+            max_retries=Retry(total=HTTP_MAX_RETRIES, backoff_factor=HTTP_BACKOFF_FACTOR, status_forcelist=HTTP_RETRY_STATUS_CODES),
             pool_connections=HTTP_POOL_CONNECTIONS,
             pool_maxsize=HTTP_POOL_MAXSIZE,
         )
@@ -352,9 +351,7 @@ class TandoorAPI:
         max_order = max((mt.get("order", 0) for mt in meal_types), default=-1)
         return self.create_meal_type(name, color, order=max_order + 1)
 
-    def get_meal_plans_by_type(
-        self, meal_type_id: int, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, **kwargs
-    ) -> List[Dict[str, Any]]:
+    def get_meal_plans_by_type(self, meal_type_id: int, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, **kwargs) -> List[Dict[str, Any]]:
         """Fetch meal plans filtered by meal type."""
         if from_date is None:
             from_date = now()
@@ -378,6 +375,7 @@ class TandoorAPI:
     def cleanup_uncooked_meal_plans(self, meal_plan_type: int, days: int) -> int:
         """Delete meal plans older than `days` that have no matching cook log. Returns count deleted."""
         from datetime import timedelta
+
         to_date = (now() - timedelta(days=1)).strftime("%Y-%m-%d")
         from_date = (now() - timedelta(days=days)).strftime("%Y-%m-%d")
 

@@ -22,7 +22,17 @@ def list_profiles(
     """List available generation profiles."""
     profiles = config_service.list_profiles()
     return [
-        ProfileResponse(name=p.name, choices=p.choices, constraint_count=p.constraint_count, description=p.description, icon=p.icon, category=p.category, default=p.default, show_on_menu=p.show_on_menu, item_noun=p.item_noun)
+        ProfileResponse(
+            name=p.name,
+            choices=p.choices,
+            constraint_count=p.constraint_count,
+            description=p.description,
+            icon=p.icon,
+            category=p.category,
+            default=p.default,
+            show_on_menu=p.show_on_menu,
+            item_noun=p.item_noun,
+        )
         for p in profiles
     ]
 

@@ -115,8 +115,14 @@ class WeeklyGenerationService:
             loop = asyncio.get_running_loop()
             self._current_task = loop.create_task(
                 self._run_generation(
-                    template_name, template_service, config_service,
-                    url, token, app_logger, week_start, settings_service,
+                    template_name,
+                    template_service,
+                    config_service,
+                    url,
+                    token,
+                    app_logger,
+                    week_start,
+                    settings_service,
                 )
             )
             return request_id
@@ -138,8 +144,14 @@ class WeeklyGenerationService:
             result = await loop.run_in_executor(
                 None,
                 self._sync_generate,
-                template_name, template_service, config_service,
-                url, token, app_logger, week_start, settings_service,
+                template_name,
+                template_service,
+                config_service,
+                url,
+                token,
+                app_logger,
+                week_start,
+                settings_service,
             )
 
             self._save_plan(template_name, result)
@@ -217,15 +229,13 @@ class WeeklyGenerationService:
                 if len(service.recipes) < original_count:
                     app_logger.info(
                         "Dedup: filtered %d recipes from pool for profile '%s'",
-                        original_count - len(service.recipes), profile_name,
+                        original_count - len(service.recipes),
+                        profile_name,
                     )
 
             # Check if enough recipes
             if len(service.recipes) < total_needed:
-                msg = (
-                    f"Profile '{profile_name}': only {len(service.recipes)} recipes "
-                    f"available, {total_needed} requested"
-                )
+                msg = f"Profile '{profile_name}': only {len(service.recipes)} recipes " f"available, {total_needed} requested"
                 all_warnings.append(msg)
                 if service.min_choices and len(service.recipes) >= service.min_choices:
                     service.choices = len(service.recipes)
@@ -270,9 +280,7 @@ class WeeklyGenerationService:
         # Build per-profile queues (solver output order)
         profile_queues: Dict[str, deque] = {}
         for profile_name, recipes in profile_recipes.items():
-            profile_queues[profile_name] = deque(
-                detail_map[r.id] for r in recipes if r.id in detail_map
-            )
+            profile_queues[profile_name] = deque(detail_map[r.id] for r in recipes if r.id in detail_map)
 
         for date_str in sorted(expanded.keys()):
             day_of_week = _DAY_NAMES[date.fromisoformat(date_str).weekday()]
@@ -360,8 +368,14 @@ class WeeklyGenerationService:
         new_recipes = await loop.run_in_executor(
             None,
             self._sync_regenerate_slot,
-            profile_name, recipes_per_day, exclude_ids,
-            config_service, url, token, app_logger, cache_minutes,
+            profile_name,
+            recipes_per_day,
+            exclude_ids,
+            config_service,
+            url,
+            token,
+            app_logger,
+            cache_minutes,
         )
 
         # Swap into plan and save
@@ -412,9 +426,7 @@ class WeeklyGenerationService:
         if self._current_task and not self._current_task.done():
             self._current_task.cancel()
             try:
-                await asyncio.wait_for(
-                    asyncio.shield(self._current_task), timeout=timeout
-                )
+                await asyncio.wait_for(asyncio.shield(self._current_task), timeout=timeout)
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._status.state = GenerationState.IDLE

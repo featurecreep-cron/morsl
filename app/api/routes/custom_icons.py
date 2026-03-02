@@ -12,6 +12,7 @@ from services.custom_icon_service import CustomIconService
 class IconRenameRequest(BaseModel):
     name: str
 
+
 router = APIRouter(prefix="/custom-icons", tags=["custom-icons"])
 
 

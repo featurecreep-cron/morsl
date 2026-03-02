@@ -52,10 +52,13 @@ select = [
     "ANN", # flake8 type annotations
     "RUF", # ruff-specific rules
 ]
-ignore = ["ANN002", "ANN003", "ANN204", "ANN202", "RUF012"]
+ignore = ["ANN001", "ANN002", "ANN003", "ANN201", "ANN204", "ANN202", "ANN401", "RUF012", "B008", "B904", "C901"]
 # logger-objects = ["logging_setup.logger"]  # needs setup 
 fixable=["ALL"]
 extend-select = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
 
 [tool.ruff.lint.flake8-annotations]
 suppress-dummy-args = true

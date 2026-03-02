@@ -24,7 +24,7 @@ class RecipePicker:
     def _build_problem(self):
         """Build (or rebuild) the LP problem with all stored constraints."""
         self.solver = LpProblem("RecipePicker", LpMaximize)
-        self.recipe_vars = LpVariable.dicts("Recipe", [r.id for r in self.recipes], cat='Binary')
+        self.recipe_vars = LpVariable.dicts("Recipe", [r.id for r in self.recipes], cat="Binary")
         self.solver += lpSum(self.recipe_vars.values()) == self.numrecipes
 
         # Soft constraint tracking
@@ -35,8 +35,7 @@ class RecipePicker:
         for spec in self._constraint_specs:
             self._apply_constraint(**spec)
 
-    def _apply_constraint(self, found_recipe_ids, count, operator, exclude, intersect_pool,
-                          label, upper_bound, weight):
+    def _apply_constraint(self, found_recipe_ids, count, operator, exclude, intersect_pool, label, upper_bound, weight):
         """Apply a single constraint to the current solver problem."""
         # Reconstruct recipe list from IDs
         id_set = set(found_recipe_ids)
@@ -50,10 +49,7 @@ class RecipePicker:
         expr = lpSum(self.recipe_vars[i] for i in [r.id for r in found_recipes])
 
         if operator == "!=":
-            raise ValueError(
-                f"'!=' operator is not supported by linear programming solvers. "
-                f"Use exclude=True with '>=' or '<=' instead. (constraint: {label})"
-            )
+            raise ValueError(f"'!=' operator is not supported by linear programming solvers. " f"Use exclude=True with '>=' or '<=' instead. (constraint: {label})")
 
         if weight > 0:
             self._add_soft_constraint(expr, count, operator, weight, label, upper_bound)
@@ -75,7 +71,7 @@ class RecipePicker:
             self.solver += expr >= count
             self.solver += expr <= upper_bound
         else:
-            raise ValueError(f'Invalid constraint operator: {operator}')
+            raise ValueError(f"Invalid constraint operator: {operator}")
 
     def _add_soft_constraint(self, expr, count, operator, weight, label, upper_bound):
         if operator == ">=":
@@ -102,10 +98,9 @@ class RecipePicker:
             self.soft_constraints.append((slack_lo, weight, label))
             self.soft_constraints.append((slack_hi, weight, label))
         else:
-            raise ValueError(f'Invalid constraint operator: {operator}')
+            raise ValueError(f"Invalid constraint operator: {operator}")
 
-    def add_constraint(self, found_recipes, count, operator, *, exclude=False,
-                       intersect_pool=False, label="constraint", upper_bound=None, weight=0):
+    def add_constraint(self, found_recipes, count, operator, *, exclude=False, intersect_pool=False, label="constraint", upper_bound=None, weight=0):
         """Generic method to add a constraint to the solver.
 
         Args:
@@ -119,37 +114,38 @@ class RecipePicker:
             weight: 0 for hard constraint; >0 for soft constraint (penalty weight).
         """
         found_recipe_ids = [r.id for r in found_recipes]
-        spec = dict(found_recipe_ids=found_recipe_ids, count=count, operator=operator,
-                    exclude=exclude, intersect_pool=intersect_pool, label=label,
-                    upper_bound=upper_bound, weight=weight)
+        spec = {
+            "found_recipe_ids": found_recipe_ids,
+            "count": count,
+            "operator": operator,
+            "exclude": exclude,
+            "intersect_pool": intersect_pool,
+            "label": label,
+            "upper_bound": upper_bound,
+            "weight": weight,
+        }
         self._constraint_specs.append(spec)
         self._apply_constraint(**spec)
 
-        self.logger.debug(f'Added {label} constraint {operator} {count}.  Found {len(found_recipes)} matching recipes.')
+        self.logger.debug(f"Added {label} constraint {operator} {count}.  Found {len(found_recipes)} matching recipes.")
 
     def add_food_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            intersect_pool=True, label="food", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, intersect_pool=True, label="food", **kwargs)
 
     def add_book_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            intersect_pool=True, label="book", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, intersect_pool=True, label="book", **kwargs)
 
     def add_keyword_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            label="keyword", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, label="keyword", **kwargs)
 
     def add_rating_constraints(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            label="rating", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, label="rating", **kwargs)
 
     def add_createdon_constraints(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            label="createdon", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, label="createdon", **kwargs)
 
     def add_cookedon_constraints(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude,
-                            label="cookedon", **kwargs)
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, label="cookedon", **kwargs)
 
     def _build_objective(self):
         """Build objective: maximize variety + penalize soft constraint violations."""
@@ -159,7 +155,7 @@ class RecipePicker:
         self.solver += obj
 
     def solve(self) -> SolverResult:
-        self.logger.debug(f'Solving to choose {self.numrecipes} with {self.numcriteria} unique criteria.')
+        self.logger.debug(f"Solving to choose {self.numrecipes} with {self.numcriteria} unique criteria.")
         debug = self.logger.loglevel == 10
 
         warnings = []
@@ -177,17 +173,15 @@ class RecipePicker:
 
             if self.numrecipes > self.min_choices:
                 self.numrecipes -= 1
-                self.logger.info(f'Infeasible at {self.numrecipes + 1} recipes, trying {self.numrecipes}...')
+                self.logger.info(f"Infeasible at {self.numrecipes + 1} recipes, trying {self.numrecipes}...")
             else:
-                self.logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                self.logger.info('No solution found, adjustment of criteria required.')
-                self.logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                raise RuntimeError('No solution found.')
+                self.logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                self.logger.info("No solution found, adjustment of criteria required.")
+                self.logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                raise RuntimeError("No solution found.")
 
         if self.numrecipes < original_n:
-            warnings.append(
-                f"Reduced from {original_n} to {self.numrecipes} recipes to find a feasible solution."
-            )
+            warnings.append(f"Reduced from {original_n} to {self.numrecipes} recipes to find a feasible solution.")
 
         # Collect relaxed constraints
         relaxed = []

@@ -13,15 +13,9 @@ from utils import format_date
 def _apply_date_filters(recipes: List[Recipe], constraint: Dict[str, Any]) -> List[Recipe]:
     """Apply cooked_date and created_date filters from a parsed constraint."""
     if cooked_date := constraint.get("cooked_date"):
-        recipes = Recipe.recipesWithDate(
-            recipes, "cookedon", cooked_date,
-            after=constraint.get("cooked_after", False)
-        )
+        recipes = Recipe.recipesWithDate(recipes, "cookedon", cooked_date, after=constraint.get("cooked_after", False))
     if created_date := constraint.get("created_date"):
-        recipes = Recipe.recipesWithDate(
-            recipes, "createdon", created_date,
-            after=constraint.get("created_after", False)
-        )
+        recipes = Recipe.recipesWithDate(recipes, "createdon", created_date, after=constraint.get("created_after", False))
     return recipes
 
 
@@ -138,10 +132,7 @@ class MenuService:
         constraint["foods"] = food_list
 
         # Find recipes with these foods
-        params: Dict[str, List[int]] = {
-            "foods_or": item_ids,
-            "foods_or_not": except_ids
-        }
+        params: Dict[str, List[int]] = {"foods_or": item_ids, "foods_or_not": except_ids}
         found_recipes: List[Recipe] = []
         for r in self.tandoor.get_recipes(params=params):
             found_recipes.append(Recipe(r))
@@ -173,10 +164,7 @@ class MenuService:
 
     def select_recipes(self) -> SolverResult:
         """Run the solver with all constraints."""
-        self.recipe_picker = RecipePicker(
-            self.recipes, self.choices,
-            logger=self.logger, min_choices=self.min_choices
-        )
+        self.recipe_picker = RecipePicker(self.recipes, self.choices, logger=self.logger, min_choices=self.min_choices)
 
         for c in self.constraints:
             ctype = c.get("type")
@@ -187,25 +175,13 @@ class MenuService:
             if ctype == "keyword":
                 found_recipes = Recipe.recipesWithKeyword(self.recipes, c.get("keywords", []))
                 found_recipes = _apply_date_filters(found_recipes, c)
-                self.recipe_picker.add_keyword_constraint(
-                    found_recipes, c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_keyword_constraint(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "food":
-                self.recipe_picker.add_food_constraint(
-                    c.get("matching_recipes", []), c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_food_constraint(c.get("matching_recipes", []), c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "book":
-                self.recipe_picker.add_book_constraint(
-                    c.get("matching_recipes", []), c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_book_constraint(c.get("matching_recipes", []), c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "rating":
                 found_recipes = _apply_date_filters(list(self.recipes), c)
@@ -227,11 +203,7 @@ class MenuService:
                     rating_condition = None
 
                 found_recipes = Recipe.recipesWithRating(found_recipes, rating_condition)
-                self.recipe_picker.add_rating_constraints(
-                    found_recipes, c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_rating_constraints(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "cookedon":
                 within_days = c.get("within_days")
@@ -248,11 +220,7 @@ class MenuService:
 
                 found_recipes = _apply_date_filters(found_recipes, c)
 
-                self.recipe_picker.add_cookedon_constraints(
-                    found_recipes, c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_cookedon_constraints(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "createdon":
                 within_days = c.get("within_days")
@@ -269,11 +237,6 @@ class MenuService:
 
                 found_recipes = _apply_date_filters(found_recipes, c)
 
-                self.recipe_picker.add_createdon_constraints(
-                    found_recipes, c["count"], c["operator"],
-                    exclude=exclude, weight=weight,
-                    upper_bound=c.get("upper_bound")
-                )
+                self.recipe_picker.add_createdon_constraints(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
         return self.recipe_picker.solve()
-

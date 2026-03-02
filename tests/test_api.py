@@ -104,8 +104,7 @@ def client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger
 
 
 @pytest.fixture
-def settings_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger,
-                    mock_settings_service, mock_order_service):
+def settings_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger, mock_settings_service, mock_order_service):
     app.dependency_overrides[get_settings] = lambda: mock_settings
     app.dependency_overrides[get_generation_service] = lambda: mock_gen_service
     app.dependency_overrides[get_config_service] = lambda: mock_config_service
@@ -218,9 +217,7 @@ class TestSettingsEnforcement:
 
     async def test_order_disabled_returns_403(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {"orders_enabled": False}
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
         assert response.status_code == 403
         assert "disabled" in response.json()["detail"]
 
@@ -229,9 +226,7 @@ class TestSettingsEnforcement:
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
         assert response.status_code == 200
         data = response.json()
         assert data["meal_plan_id"] is None
@@ -244,35 +239,25 @@ class TestSettingsEnforcement:
             "orders_enabled": True,
             "save_orders_to_tandoor": True,
         }
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Bob"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Bob"})
         assert response.status_code == 200
-        mock_order_service.place_order.assert_called_once_with(
-            recipe_id=1, recipe_name="Martini", servings=1, customer_name="Bob", meal_type_id=None
-        )
+        mock_order_service.place_order.assert_called_once_with(recipe_id=1, recipe_name="Martini", servings=1, customer_name="Bob", meal_type_id=None)
 
     async def test_order_without_customer_name(self, settings_client, mock_settings_service, mock_order_service):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": True,
         }
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
         assert response.status_code == 200
-        mock_order_service.place_order.assert_called_once_with(
-            recipe_id=1, recipe_name="Martini", servings=1, customer_name=None, meal_type_id=None
-        )
+        mock_order_service.place_order.assert_called_once_with(recipe_id=1, recipe_name="Martini", servings=1, customer_name=None, meal_type_id=None)
 
     async def test_order_local_includes_customer_name(self, settings_client, mock_settings_service, mock_order_service):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Eve"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Eve"})
         assert response.status_code == 200
         data = response.json()
         assert data["customer_name"] == "Eve"
@@ -280,9 +265,7 @@ class TestSettingsEnforcement:
 
     async def test_rating_disabled_returns_403(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {"ratings_enabled": False}
-        response = await settings_client.patch(
-            "/api/recipe/5/rating", json={"rating": 4.5}
-        )
+        response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
         assert response.status_code == 403
         assert "disabled" in response.json()["detail"]
 
@@ -291,9 +274,7 @@ class TestSettingsEnforcement:
             "ratings_enabled": True,
             "save_ratings_to_tandoor": False,
         }
-        response = await settings_client.patch(
-            "/api/recipe/5/rating", json={"rating": 4.5}
-        )
+        response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
@@ -310,11 +291,11 @@ class TestSettingsEnforcement:
         mock_response.json.return_value = {"rating": 4.5}
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
-        with patch("app.api.routes.proxy.requests.patch", return_value=mock_response) as mock_patch, \
-             patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post:
-            response = await settings_client.patch(
-                "/api/recipe/5/rating", json={"rating": 4.5}
-            )
+        with (
+            patch("app.api.routes.proxy.requests.patch", return_value=mock_response) as mock_patch,
+            patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
+        ):
+            response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
             assert response.status_code == 200
             mock_patch.assert_called_once()
             # Cook log entry created
@@ -331,11 +312,8 @@ class TestSettingsEnforcement:
         mock_response.json.return_value = {"rating": 3.0}
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
-        with patch("app.api.routes.proxy.requests.patch", return_value=mock_response), \
-             patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post:
-            response = await settings_client.patch(
-                "/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"}
-            )
+        with patch("app.api.routes.proxy.requests.patch", return_value=mock_response), patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post:
+            response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"})
             assert response.status_code == 200
             # Verify cook log includes the customer name in comment
             call_kwargs = mock_post.call_args
@@ -380,9 +358,7 @@ class TestOrderServerStorage:
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post(
-            "/api/orders", json={"recipe_id": 1, "recipe_name": "Negroni", "customer_name": "Alice"}
-        )
+        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Negroni", "customer_name": "Alice"})
         assert response.status_code == 200
         data = response.json()
         assert data["id"].startswith("local-")
@@ -402,9 +378,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": True,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "1234"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "1234"})
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
@@ -416,9 +390,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": True,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "9999"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "9999"})
         assert response.status_code == 200
         assert response.json() == {"valid": False}
 
@@ -428,9 +400,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": True,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "wrong"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         assert response.status_code == 200
         assert response.json() == {"valid": True}
 
@@ -440,9 +410,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": False,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "wrong"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         assert response.status_code == 200
         assert response.json() == {"valid": True}
 
@@ -452,9 +420,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": True,
             "kiosk_pin": "",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "anything"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "anything"})
         assert response.status_code == 200
         assert response.json() == {"valid": True}
 
@@ -465,9 +431,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": False,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "1234"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "1234"})
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
@@ -480,9 +444,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": False,
             "kiosk_pin": "",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "anything"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "anything"})
         assert response.status_code == 200
         assert response.json() == {"valid": True}
 
@@ -493,9 +455,7 @@ class TestVerifyPin:
             "kiosk_pin_enabled": True,
             "kiosk_pin": "5678",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "5678"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "5678"})
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
@@ -528,7 +488,8 @@ class TestAdminAuth:
             "kiosk_pin_enabled": False,
         }
         response = await settings_client.get(
-            "/api/settings", headers={"X-Admin-Token": "bad-token"},
+            "/api/settings",
+            headers={"X-Admin-Token": "bad-token"},
         )
         assert response.status_code == 401
 
@@ -540,7 +501,8 @@ class TestAdminAuth:
             "theme": "cast-iron",
         }
         response = await settings_client.get(
-            "/api/settings", headers={"X-Admin-Token": token},
+            "/api/settings",
+            headers={"X-Admin-Token": token},
         )
         assert response.status_code == 200
 
@@ -581,7 +543,8 @@ class TestAdminAuth:
             "theme": "cast-iron",
         }
         response = await settings_client.put(
-            "/api/settings", json={"theme": "cast-iron"},
+            "/api/settings",
+            json={"theme": "cast-iron"},
         )
         data = response.json()
         assert "kiosk_pin" not in data
@@ -593,7 +556,8 @@ class TestAdminAuth:
         mock_settings_service.get_all.return_value = {"kiosk_pin": "old-pin"}
         mock_settings_service.update.return_value = {"kiosk_pin": "new-pin"}
         await settings_client.put(
-            "/api/settings", json={"kiosk_pin": "new-pin"},
+            "/api/settings",
+            json={"kiosk_pin": "new-pin"},
         )
         assert token not in _admin_tokens
 
@@ -602,7 +566,8 @@ class TestAdminAuth:
         mock_settings_service.get_all.return_value = {"kiosk_pin": "1234"}
         mock_settings_service.update.return_value = {"kiosk_pin": "1234"}
         await settings_client.put(
-            "/api/settings", json={"kiosk_pin": "1234"},
+            "/api/settings",
+            json={"kiosk_pin": "1234"},
         )
         assert token in _admin_tokens
 
@@ -613,13 +578,12 @@ class TestAdminAuth:
             "theme": "cast-iron",
         }
         # Get token via verify-pin
-        pin_res = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "9999"}
-        )
+        pin_res = await settings_client.post("/api/settings/verify-pin", json={"pin": "9999"})
         token = pin_res.json()["token"]
         # Use token to access admin route
         response = await settings_client.get(
-            "/api/settings", headers={"X-Admin-Token": token},
+            "/api/settings",
+            headers={"X-Admin-Token": token},
         )
         assert response.status_code == 200
 
@@ -628,9 +592,7 @@ class TestAdminAuth:
             "admin_pin_enabled": True,
             "kiosk_pin": "1234",
         }
-        response = await settings_client.post(
-            "/api/settings/verify-pin", json={"pin": "wrong"}
-        )
+        response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         data = response.json()
         assert data["valid"] is False
         assert "token" not in data
@@ -711,8 +673,7 @@ def mock_meal_plan_service():
 
 
 @pytest.fixture
-def meal_plan_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger,
-                     mock_settings_service, mock_meal_plan_service):
+def meal_plan_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger, mock_settings_service, mock_meal_plan_service):
     mock_settings_service.get_all.return_value = {"meal_plan_enabled": True}
     app.dependency_overrides[get_settings] = lambda: mock_settings
     app.dependency_overrides[get_generation_service] = lambda: mock_gen_service

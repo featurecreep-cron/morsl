@@ -103,10 +103,8 @@ class TestOrderService:
     def test_get_orders_parses_customer_name(self, order_service, mock_api):
         order_service._api = mock_api
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito",
-             "from_date": "2024-01-01T12:00:00", "servings": 1, "note": "Ordered by Alice at 12:00:00"},
-            {"id": 11, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri",
-             "from_date": "2024-01-01T12:30:00", "servings": 1, "note": "Ordered at 12:30:00"},
+            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01T12:00:00", "servings": 1, "note": "Ordered by Alice at 12:00:00"},
+            {"id": 11, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri", "from_date": "2024-01-01T12:30:00", "servings": 1, "note": "Ordered at 12:30:00"},
         ]
 
         orders = order_service.get_orders()
@@ -169,15 +167,17 @@ class TestServerOrderStorage:
 
     def test_delete_server_order(self, order_service):
         today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        order_service.store_order({
-            "id": "local-2000",
-            "recipe_id": 1,
-            "recipe_name": "Daiquiri",
-            "timestamp": today,
-            "servings": 1,
-            "meal_plan_id": None,
-            "customer_name": None,
-        })
+        order_service.store_order(
+            {
+                "id": "local-2000",
+                "recipe_id": 1,
+                "recipe_name": "Daiquiri",
+                "timestamp": today,
+                "servings": 1,
+                "meal_plan_id": None,
+                "customer_name": None,
+            }
+        )
         assert len(order_service._server_orders) == 1
         order_service.delete_server_order("local-2000")
         assert len(order_service._server_orders) == 0
@@ -189,15 +189,17 @@ class TestServerOrderStorage:
     def test_clear_server_orders(self, order_service):
         today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         for i in range(3):
-            order_service.store_order({
-                "id": f"local-{3000 + i}",
-                "recipe_id": i,
-                "recipe_name": f"Drink {i}",
-                "timestamp": today,
-                "servings": 1,
-                "meal_plan_id": None,
-                "customer_name": None,
-            })
+            order_service.store_order(
+                {
+                    "id": f"local-{3000 + i}",
+                    "recipe_id": i,
+                    "recipe_name": f"Drink {i}",
+                    "timestamp": today,
+                    "servings": 1,
+                    "meal_plan_id": None,
+                    "customer_name": None,
+                }
+            )
         count = order_service.clear_server_orders()
         assert count == 3
         assert len(order_service._server_orders) == 0
@@ -207,18 +209,19 @@ class TestServerOrderStorage:
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%dT%H:%M:%S")
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito",
-             "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": "Ordered at 12:00:00"},
+            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": "Ordered at 12:00:00"},
         ]
-        order_service.store_order({
-            "id": "local-4000",
-            "recipe_id": 2,
-            "recipe_name": "Daiquiri",
-            "timestamp": today_str,
-            "servings": 1,
-            "meal_plan_id": None,
-            "customer_name": None,
-        })
+        order_service.store_order(
+            {
+                "id": "local-4000",
+                "recipe_id": 2,
+                "recipe_name": "Daiquiri",
+                "timestamp": today_str,
+                "servings": 1,
+                "meal_plan_id": None,
+                "customer_name": None,
+            }
+        )
         orders = order_service.get_orders()
         assert len(orders) == 2
         recipe_names = {o["recipe_name"] for o in orders}
@@ -227,15 +230,17 @@ class TestServerOrderStorage:
 
     def test_delete_order_routes_local_to_server_store(self, order_service):
         today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        order_service.store_order({
-            "id": "local-5000",
-            "recipe_id": 1,
-            "recipe_name": "Negroni",
-            "timestamp": today,
-            "servings": 1,
-            "meal_plan_id": None,
-            "customer_name": None,
-        })
+        order_service.store_order(
+            {
+                "id": "local-5000",
+                "recipe_id": 1,
+                "recipe_name": "Negroni",
+                "timestamp": today,
+                "servings": 1,
+                "meal_plan_id": None,
+                "customer_name": None,
+            }
+        )
         order_service.delete_order("local-5000")
         assert len(order_service._server_orders) == 0
 
@@ -249,18 +254,19 @@ class TestServerOrderStorage:
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%dT%H:%M:%S")
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito",
-             "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": ""},
+            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": ""},
         ]
-        order_service.store_order({
-            "id": "local-6000",
-            "recipe_id": 2,
-            "recipe_name": "Daiquiri",
-            "timestamp": today_str,
-            "servings": 1,
-            "meal_plan_id": None,
-            "customer_name": None,
-        })
+        order_service.store_order(
+            {
+                "id": "local-6000",
+                "recipe_id": 2,
+                "recipe_name": "Daiquiri",
+                "timestamp": today_str,
+                "servings": 1,
+                "meal_plan_id": None,
+                "customer_name": None,
+            }
+        )
         count = order_service.clear_orders()
         assert count == 2
         assert len(order_service._server_orders) == 0

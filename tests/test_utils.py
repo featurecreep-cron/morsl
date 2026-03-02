@@ -83,6 +83,7 @@ class TestSetupLogging:
     def setup_method(self):
         """Remove the CreateMenu logger handlers before each test."""
         import logging
+
         logger = logging.getLogger("morsl")
         logger.handlers.clear()
         if hasattr(logger, "loglevel"):

@@ -27,7 +27,7 @@ class ProfileInfo:
     item_noun: str = ""
 
 
-_PROFILE_NAME_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9 _-]*$')
+_PROFILE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _-]*$")
 
 
 def _validate_profile_name(name: str) -> None:
@@ -131,17 +131,19 @@ class ConfigService:
                 choices = int(config.get("choices", DEFAULT_CHOICES))
                 constraint_count = len(config.get("constraints", []))
                 description = config.get("description", "")
-                profiles.append(ProfileInfo(
-                    name=name,
-                    choices=choices,
-                    constraint_count=constraint_count,
-                    description=description,
-                    icon=config.get("icon", ""),
-                    category=config.get("category", ""),
-                    default=is_default,
-                    show_on_menu=config.get("show_on_menu", True),
-                    item_noun=config.get("item_noun", ""),
-                ))
+                profiles.append(
+                    ProfileInfo(
+                        name=name,
+                        choices=choices,
+                        constraint_count=constraint_count,
+                        description=description,
+                        icon=config.get("icon", ""),
+                        category=config.get("category", ""),
+                        default=is_default,
+                        show_on_menu=config.get("show_on_menu", True),
+                        item_noun=config.get("item_noun", ""),
+                    )
+                )
             except (json.JSONDecodeError, KeyError, ValueError, OSError) as e:
                 logger.warning(f"Skipping profile '{name}': {e}")
                 continue

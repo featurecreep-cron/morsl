@@ -78,11 +78,19 @@ class TestExcludeAndIntersect:
 
     def test_intersect_pool_food(self, sample_recipes, mock_logger):
         # food/book constraints intersect with the recipe pool first
-        extra_recipe = Recipe({
-            "id": 999, "name": "Unknown", "description": "", "new": False,
-            "servings": 1, "keywords": [], "rating": 0, "last_cooked": None,
-            "created_at": "2024-01-01T12:00:00+00:00",
-        })
+        extra_recipe = Recipe(
+            {
+                "id": 999,
+                "name": "Unknown",
+                "description": "",
+                "new": False,
+                "servings": 1,
+                "keywords": [],
+                "rating": 0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            }
+        )
         picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
         # extra_recipe is NOT in the picker pool, so intersect removes it
         picker.add_food_constraint([extra_recipe] + sample_recipes[:2], 1, ">=")

@@ -26,9 +26,7 @@ from services.weekly_generation_service import WeeklyGenerationService
 from utils import setup_logging
 
 # Admin token store — bounded size + auto-expiry (24h TTL)
-_admin_tokens: cachetools.TTLCache = cachetools.TTLCache(
-    maxsize=ADMIN_TOKEN_CACHE_MAXSIZE, ttl=ADMIN_TOKEN_CACHE_TTL_SECONDS
-)
+_admin_tokens: cachetools.TTLCache = cachetools.TTLCache(maxsize=ADMIN_TOKEN_CACHE_MAXSIZE, ttl=ADMIN_TOKEN_CACHE_TTL_SECONDS)
 _admin_tokens_lock = threading.Lock()
 
 
@@ -80,9 +78,7 @@ def get_generation_service(settings: Settings = Depends(get_settings)) -> Genera
     global _generation_service
     if _generation_service is None:
         history_svc = get_history_service(settings)
-        _generation_service = GenerationService(
-            data_dir=settings.data_dir, history_service=history_svc
-        )
+        _generation_service = GenerationService(data_dir=settings.data_dir, history_service=history_svc)
     return _generation_service
 
 
@@ -195,9 +191,7 @@ def require_admin(
     all requests are allowed through without a token.
     """
     settings = svc.get_all()
-    pin_active = settings.get("admin_pin_enabled") or (
-        settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled")
-    )
+    pin_active = settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))
     if not pin_active:
         return  # No PIN configured — allow all
 

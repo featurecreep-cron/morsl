@@ -198,12 +198,14 @@ app = FastAPI(
 
 app.add_middleware(GZipMiddleware, minimum_size=GZIP_MIN_SIZE)
 
+
 @app.middleware("http")
 async def no_cache_static_assets(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.endswith((".css", ".js", ".html")) or request.url.path in ("/", "/admin", "/setup"):
         response.headers["Cache-Control"] = "no-cache"
     return response
+
 
 app.include_router(api_router)
 

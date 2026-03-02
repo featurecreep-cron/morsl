@@ -38,9 +38,7 @@ def _render_svg(svg_path: Path, size: int) -> Image.Image:
     """Render SVG to a PIL Image at the given size."""
     import cairosvg
 
-    png_data = cairosvg.svg2png(
-        url=str(svg_path), output_width=size, output_height=size
-    )
+    png_data = cairosvg.svg2png(url=str(svg_path), output_width=size, output_height=size)
     return Image.open(io.BytesIO(png_data)).convert("RGBA")
 
 
@@ -78,9 +76,7 @@ def _build_ico(images: dict[int, Image.Image], output: Path) -> None:
         png_data = buf.getvalue()
         w = 0 if size >= 256 else size
         h = 0 if size >= 256 else size
-        dir_entries.append(
-            struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(png_data), dir_offset)
-        )
+        dir_entries.append(struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(png_data), dir_offset))
         image_datas.append(png_data)
         dir_offset += len(png_data)
 
@@ -130,7 +126,7 @@ def generate_icons(source: Path, output_dir: Path) -> None:
             'width="32" height="32" viewBox="0 0 32 32">\n'
             f'  <image width="32" height="32" '
             f'xlink:href="data:image/png;base64,{b64}"/>\n'
-            '</svg>\n'
+            "</svg>\n"
         )
         favicon_svg.write_text(svg_content)
 

@@ -109,9 +109,12 @@ class TestCategoryServiceMigration:
         (tmp_path / "categories.json").write_text(json.dumps(cats))
 
     def test_migrate_old_cuisine_to_spirit(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "Italian, Thai...", "icon": "food", "sort_order": 0},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "Italian, Thai...", "icon": "food", "sort_order": 0},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         cats = svc.list_categories()
         assert len(cats) == 1
@@ -120,9 +123,12 @@ class TestCategoryServiceMigration:
         assert cats[0]["subtitle"] == "Whiskey, Gin, Rum..."
 
     def test_migrate_old_meal_to_style(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "Dinner, Lunch...", "icon": "plate", "sort_order": 1},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "Dinner, Lunch...", "icon": "plate", "sort_order": 1},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         cats = svc.list_categories()
         assert cats[0]["id"] == "by-style"
@@ -130,28 +136,37 @@ class TestCategoryServiceMigration:
         assert cats[0]["subtitle"] == "Martini, Negroni, Sour..."
 
     def test_migrate_fixes_display_name_on_already_renamed(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "by-spirit": {"id": "by-spirit", "display_name": "By Cuisine", "subtitle": "Old subtitle", "icon": "old", "sort_order": 0},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "by-spirit": {"id": "by-spirit", "display_name": "By Cuisine", "subtitle": "Old subtitle", "icon": "old", "sort_order": 0},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         cat = svc.list_categories()[0]
         assert cat["display_name"] == "By Spirit"
         assert cat["subtitle"] == "Whiskey, Gin, Rum..."
 
     def test_migrate_skips_if_target_exists(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
-            "by-spirit": {"id": "by-spirit", "display_name": "By Spirit", "subtitle": "Already here", "icon": "bowl", "sort_order": 1},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
+                "by-spirit": {"id": "by-spirit", "display_name": "By Spirit", "subtitle": "Already here", "icon": "bowl", "sort_order": 1},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         cats = {c["id"]: c for c in svc.list_categories()}
         assert "by-cuisine" in cats
         assert cats["by-spirit"]["subtitle"] == "Already here"
 
     def test_migrate_fixes_blank_house_menu_subtitle(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "house-menu": {"id": "house-menu", "display_name": "House Menu", "subtitle": "", "icon": "", "sort_order": 0},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "house-menu": {"id": "house-menu", "display_name": "House Menu", "subtitle": "", "icon": "", "sort_order": 0},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         cat = svc.list_categories()[0]
         assert cat["subtitle"] == "Random cocktails"
@@ -163,17 +178,20 @@ class TestCategoryServiceMigration:
             "house-menu": {"id": "house-menu", "display_name": "House Menu", "subtitle": "Random cocktails", "icon": "", "sort_order": 2},
         }
         self._write_categories(tmp_path, already_migrated)
-        svc = CategoryService(data_dir=str(tmp_path))
+        CategoryService(data_dir=str(tmp_path))
         # Re-read from disk to verify no unnecessary write
         with open(tmp_path / "categories.json") as f:
             on_disk = json.load(f)
         assert on_disk == already_migrated
 
     def test_migrate_both_old_ids_simultaneously(self, tmp_path):
-        self._write_categories(tmp_path, {
-            "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
-            "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "", "icon": "", "sort_order": 1},
-        })
+        self._write_categories(
+            tmp_path,
+            {
+                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
+                "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "", "icon": "", "sort_order": 1},
+            },
+        )
         svc = CategoryService(data_dir=str(tmp_path))
         ids = {c["id"] for c in svc.list_categories()}
         assert ids == {"by-spirit", "by-style"}

@@ -44,12 +44,14 @@ class TemplateService:
             name = Path(filename).stem
             try:
                 tpl = self._read(name)
-                templates.append({
-                    "name": name,
-                    "description": tpl.get("description", ""),
-                    "slot_count": len(tpl.get("slots", [])),
-                    "deduplicate": tpl.get("deduplicate", True),
-                })
+                templates.append(
+                    {
+                        "name": name,
+                        "description": tpl.get("description", ""),
+                        "slot_count": len(tpl.get("slots", [])),
+                        "deduplicate": tpl.get("deduplicate", True),
+                    }
+                )
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Skipping template '%s': %s", name, e)
         return templates
@@ -90,9 +92,7 @@ class TemplateService:
 
     # ---- Validation ----
 
-    def validate_template(
-        self, config: Dict[str, Any], config_service: Any
-    ) -> List[str]:
+    def validate_template(self, config: Dict[str, Any], config_service: Any) -> List[str]:
         """Validate a template config. Returns list of error strings (empty = valid)."""
         errors: List[str] = []
         slots = config.get("slots")
@@ -127,9 +127,7 @@ class TemplateService:
 
     # ---- Expansion ----
 
-    def expand_slots(
-        self, template: Dict[str, Any], week_start: date
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    def expand_slots(self, template: Dict[str, Any], week_start: date) -> Dict[str, List[Dict[str, Any]]]:
         """Resolve day names to calendar dates.
 
         week_start must be a Monday. Returns {date_str: [SlotAssignment, ...]}

@@ -1,5 +1,6 @@
 """Smoke test: run each JSON profile through the solver.
 Validates that all profiles can successfully select recipes."""
+
 from __future__ import annotations
 
 import os
@@ -85,9 +86,7 @@ def test_profile_generates_recipes(profile_name, credentials, config_service):
     # Verify results
     assert result.status == "optimal", f"Solver failed for {profile_name}: {result.status}"
     assert len(result.recipes) > 0, f"No recipes selected for {profile_name}"
-    assert len(result.recipes) <= config.get(
-        "choices", 7
-    ), f"Too many recipes for {profile_name}"
+    assert len(result.recipes) <= config.get("choices", 7), f"Too many recipes for {profile_name}"
 
 
 @pytest.mark.parametrize("profile_name", get_profile_names())

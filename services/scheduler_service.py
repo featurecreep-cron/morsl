@@ -106,8 +106,7 @@ class SchedulerService:
 
         # Validate on a copy before mutating the live schedule
         candidate = dict(schedule)
-        for key in ("profile", "template", "day_of_week", "hour", "minute", "enabled",
-                     "clear_before_generate", "create_meal_plan", "meal_plan_type", "cleanup_uncooked_days"):
+        for key in ("profile", "template", "day_of_week", "hour", "minute", "enabled", "clear_before_generate", "create_meal_plan", "meal_plan_type", "cleanup_uncooked_days"):
             if key in config:
                 candidate[key] = config[key]
 
@@ -184,10 +183,13 @@ class SchedulerService:
         mp_type = schedule.get("meal_plan_type")
         if cleanup_days > 0 and mp_type and self._meal_plan_callback:
             try:
-                await self._meal_plan_callback("cleanup", {
-                    "meal_plan_type": mp_type,
-                    "cleanup_days": cleanup_days,
-                })
+                await self._meal_plan_callback(
+                    "cleanup",
+                    {
+                        "meal_plan_type": mp_type,
+                        "cleanup_days": cleanup_days,
+                    },
+                )
             except Exception as e:
                 _logger.warning(f"Scheduled cleanup failed (non-fatal): {e}")
 
@@ -198,6 +200,7 @@ class SchedulerService:
         if is_weekly:
             # Compute week_start as next Monday from now
             from datetime import date, timedelta
+
             today = date.today()
             days_ahead = 7 - today.weekday()  # next Monday
             if days_ahead == 7:
@@ -217,9 +220,12 @@ class SchedulerService:
             # Step 4: Create meal plans from generated menu (profile mode)
             if schedule.get("create_meal_plan") and mp_type and self._meal_plan_callback:
                 try:
-                    await self._meal_plan_callback("create", {
-                        "meal_plan_type": mp_type,
-                    })
+                    await self._meal_plan_callback(
+                        "create",
+                        {
+                            "meal_plan_type": mp_type,
+                        },
+                    )
                 except Exception as e:
                     _logger.warning(f"Scheduled meal plan creation failed (non-fatal): {e}")
 

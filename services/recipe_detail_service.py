@@ -1,4 +1,5 @@
 """Shared recipe detail fetching — used by GenerationService and WeeklyGenerationService."""
+
 from __future__ import annotations
 
 import random
@@ -19,6 +20,7 @@ def fetch_recipe_details(
     Uses a thread pool for parallel API calls. Each recipe gets on-hand
     food substitution when available.
     """
+
     def _fetch_one(r) -> Dict[str, Any]:
         recipe_data: Dict[str, Any] = {
             "id": r.id,
@@ -27,7 +29,7 @@ def fetch_recipe_details(
             "rating": r.rating,
             "image": None,
             "ingredients": [],
-            "keywords": [{"id": kid, "name": getattr(r, 'keyword_names', {}).get(kid, "")} for kid in r.keywords],
+            "keywords": [{"id": kid, "name": getattr(r, "keyword_names", {}).get(kid, "")} for kid in r.keywords],
             "steps": [],
             "working_time": None,
             "cooking_time": None,
@@ -57,19 +59,23 @@ def fetch_recipe_details(
                             logger.debug(f"Substitute lookup failed for food {food_obj.get('id')}: {e}")
                         except Exception as e:
                             logger.warning(f"Unexpected error in substitute lookup for food {food_obj.get('id')}: {e}")
-                    recipe_data["ingredients"].append({
-                        "amount": ing.get("amount"),
-                        "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
-                        "food": food_obj["name"],
-                    })
+                    recipe_data["ingredients"].append(
+                        {
+                            "amount": ing.get("amount"),
+                            "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
+                            "food": food_obj["name"],
+                        }
+                    )
                 instruction = step.get("instruction", "").strip()
                 if instruction:
-                    recipe_data["steps"].append({
-                        "name": step.get("name", ""),
-                        "instruction": instruction,
-                        "time": step.get("time", 0),
-                        "order": step.get("order", 0),
-                    })
+                    recipe_data["steps"].append(
+                        {
+                            "name": step.get("name", ""),
+                            "instruction": instruction,
+                            "time": step.get("time", 0),
+                            "order": step.get("order", 0),
+                        }
+                    )
         except Exception as e:
             logger.warning(f"Failed to fetch details for recipe {r.id}: {e}")
         return recipe_data

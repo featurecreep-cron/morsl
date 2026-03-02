@@ -16,9 +16,7 @@ from tzlocal import get_localzone
 from constants import API_CACHE_MAXSIZE, API_CACHE_TTL_MINUTES
 
 # Global API cache: default 512 entries, 240-minute TTL
-_api_cache: cachetools.TTLCache = cachetools.TTLCache(
-    maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60
-)
+_api_cache: cachetools.TTLCache = cachetools.TTLCache(maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60)
 _api_cache_lock = threading.Lock()
 
 
@@ -164,13 +162,11 @@ def format_date(string: str, future: bool = False) -> tuple[datetime, bool]:
     return now() - offset, after
 
 
-
-
 def cached(func: FuncType) -> FuncType:
     """Cache method results in the global API TTL cache (thread-safe)."""
 
     @wraps(func)
-    def wrapper(self, *args, **kwargs):  # noqa
+    def wrapper(self, *args, **kwargs):
         ttl: Optional[int] = kwargs.pop("ttl", None)
         if ttl is None:
             try:

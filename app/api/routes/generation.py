@@ -41,9 +41,7 @@ async def generate_custom(
 
     config = request.model_dump()
     url, token = credentials
-    request_id = await gen_service.start_generation(
-        config=config, url=url, token=token, logger=logger, profile_name="custom"
-    )
+    request_id = await gen_service.start_generation(config=config, url=url, token=token, logger=logger, profile_name="custom")
     return GenerateResponse(request_id=request_id, status="generating")
 
 
@@ -81,7 +79,5 @@ async def _start_generation(
     config["cache"] = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
     url, token = credentials
-    request_id = await gen_service.start_generation(
-        config=config, url=url, token=token, logger=logger, profile_name=profile_name
-    )
+    request_id = await gen_service.start_generation(config=config, url=url, token=token, logger=logger, profile_name=profile_name)
     return GenerateResponse(request_id=request_id, status="generating")

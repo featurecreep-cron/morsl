@@ -78,9 +78,7 @@ class OrderService:
         self.logger.info(f"Using first available meal type: {mt['id']} - {mt['name']}")
         return self._cached_meal_type
 
-    def place_order(self, recipe_id: int, recipe_name: str, servings: int = 1,
-                    customer_name: Optional[str] = None,
-                    meal_type_id: Optional[int] = None) -> Dict[str, Any]:
+    def place_order(self, recipe_id: int, recipe_name: str, servings: int = 1, customer_name: Optional[str] = None, meal_type_id: Optional[int] = None) -> Dict[str, Any]:
         """Record an order as a Tandoor meal plan entry and notify SSE subscribers."""
         api = self._get_api()
         meal_type = self._get_meal_type(meal_type_id)
@@ -165,14 +163,10 @@ class OrderService:
 
         with self._lock:
             before_count = len(self._server_orders)
-            self._server_orders = [
-                o for o in self._server_orders
-                if not (from_str <= o.get("timestamp", "")[:10] <= to_str)
-            ]
+            self._server_orders = [o for o in self._server_orders if not (from_str <= o.get("timestamp", "")[:10] <= to_str)]
             return before_count - len(self._server_orders)
 
-    def get_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None,
-                   meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Return all orders for date range, newest first.
 
         Merges Tandoor meal plan orders with server-stored orders.
@@ -194,8 +188,7 @@ class OrderService:
         all_orders.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         return all_orders
 
-    def _get_tandoor_orders(self, from_date: datetime, to_date: datetime,
-                            meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def _get_tandoor_orders(self, from_date: datetime, to_date: datetime, meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Fetch orders from Tandoor meal plans."""
         api = self._get_api()
         meal_type = self._get_meal_type(meal_type_id)
@@ -212,21 +205,22 @@ class OrderService:
             note = mp.get("note", "")
             customer_name = self._parse_customer_name(note)
             timestamp = self._build_timestamp(mp.get("from_date", ""), note)
-            orders.append({
-                "id": str(mp["id"]),
-                "recipe_id": recipe.get("id"),
-                "recipe_name": mp.get("title") or recipe.get("name", "Unknown"),
-                "timestamp": timestamp,
-                "servings": mp.get("servings", 1),
-                "meal_plan_id": mp["id"],
-                "note": note,
-                "customer_name": customer_name,
-            })
+            orders.append(
+                {
+                    "id": str(mp["id"]),
+                    "recipe_id": recipe.get("id"),
+                    "recipe_name": mp.get("title") or recipe.get("name", "Unknown"),
+                    "timestamp": timestamp,
+                    "servings": mp.get("servings", 1),
+                    "meal_plan_id": mp["id"],
+                    "note": note,
+                    "customer_name": customer_name,
+                }
+            )
 
         return orders
 
-    def get_order_counts(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None,
-                         meal_type_id: Optional[int] = None) -> Dict[int, Dict[str, Any]]:
+    def get_order_counts(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, meal_type_id: Optional[int] = None) -> Dict[int, Dict[str, Any]]:
         """Per-recipe order counts for date range."""
         orders = self.get_orders(from_date, to_date, meal_type_id=meal_type_id)
         counts: Dict[int, Dict[str, Any]] = {}
@@ -289,7 +283,7 @@ class OrderService:
         """
         # Extract time from note (always at the end after " at ")
         at_pos = note.rfind(" at ")
-        time_str = note[at_pos + 4:].strip() if at_pos >= 0 else ""
+        time_str = note[at_pos + 4 :].strip() if at_pos >= 0 else ""
         if not time_str:
             return from_date
         # Extract just the date part from from_date (may be ISO with timezone)
@@ -312,7 +306,7 @@ class OrderService:
         at_pos = note.rfind(" at ")
         if at_pos <= len("Ordered by "):
             return None
-        return note[len("Ordered by "):at_pos]
+        return note[len("Ordered by ") : at_pos]
 
     def _notify(self, order: Dict[str, Any]) -> None:
         """Push order to all subscribers (non-blocking)."""

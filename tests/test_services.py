@@ -42,7 +42,7 @@ class TestMenuService:
             "constraints": [
                 {"type": "keyword", "items": [{"id": 1, "name": "Test"}], "count": 3, "operator": ">="},
                 {"type": "food", "items": [{"id": 10, "name": "Whiskey"}], "count": 2, "operator": ">="},
-            ]
+            ],
         }
         with patch("services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
@@ -60,14 +60,8 @@ class TestMenuService:
             "choices": 5,
             "cache": 0,
             "constraints": [
-                {
-                    "type": "food",
-                    "items": [{"id": 1, "name": "Syrup"}],
-                    "except": [{"id": 2, "name": "Sugar Syrup"}],
-                    "count": 2,
-                    "operator": ">="
-                },
-            ]
+                {"type": "food", "items": [{"id": 1, "name": "Syrup"}], "except": [{"id": 2, "name": "Sugar Syrup"}], "count": 2, "operator": ">="},
+            ],
         }
         with patch("services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
@@ -83,8 +77,7 @@ class TestMenuService:
     def test_prepare_recipes_all(self, mock_logger):
         config = {"choices": 2, "cache": 0, "constraints": []}
         mock_recipe_data = [
-            {"id": 1, "name": "R1", "description": "", "new": False, "servings": 4,
-             "keywords": [], "rating": 3.0, "last_cooked": None, "created_at": "2024-01-01T12:00:00+00:00"},
+            {"id": 1, "name": "R1", "description": "", "new": False, "servings": 4, "keywords": [], "rating": 3.0, "last_cooked": None, "created_at": "2024-01-01T12:00:00+00:00"},
         ]
         with patch("services.menu_service.TandoorAPI") as MockAPI:
             api = MockAPI.return_value
@@ -100,17 +93,10 @@ class TestConfigService:
         """Test loading a v2 JSON profile."""
         profiles_dir = tmp_path / "profiles"
         profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(json.dumps({
-            "cache": 120,
-            "choices": 3,
-            "constraints": []
-        }))
-        (profiles_dir / "test.json").write_text(json.dumps({
-            "choices": 7,
-            "constraints": [
-                {"type": "keyword", "items": [{"id": 1, "name": "Test"}], "count": 7, "operator": "=="}
-            ]
-        }))
+        (profiles_dir / "base.json").write_text(json.dumps({"cache": 120, "choices": 3, "constraints": []}))
+        (profiles_dir / "test.json").write_text(
+            json.dumps({"choices": 7, "constraints": [{"type": "keyword", "items": [{"id": 1, "name": "Test"}], "count": 7, "operator": "=="}]})
+        )
 
         svc = ConfigService(profiles_dir=str(profiles_dir))
         config = svc.load_profile("test")
@@ -138,14 +124,8 @@ class TestConfigService:
         profiles_dir = tmp_path / "profiles"
         profiles_dir.mkdir()
         (profiles_dir / "base.json").write_text(json.dumps({"choices": 5}))
-        (profiles_dir / "weekday.json").write_text(json.dumps({
-            "choices": 5,
-            "constraints": [{"type": "keyword", "items": [], "count": 1, "operator": ">="}]
-        }))
-        (profiles_dir / "weekend.json").write_text(json.dumps({
-            "choices": 3,
-            "constraints": []
-        }))
+        (profiles_dir / "weekday.json").write_text(json.dumps({"choices": 5, "constraints": [{"type": "keyword", "items": [], "count": 1, "operator": ">="}]}))
+        (profiles_dir / "weekend.json").write_text(json.dumps({"choices": 3, "constraints": []}))
 
         svc = ConfigService(profiles_dir=str(profiles_dir))
         profiles = svc.list_profiles()
@@ -172,19 +152,12 @@ class TestConfigService:
         """Test that constraints from base and profile are concatenated."""
         profiles_dir = tmp_path / "profiles"
         profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(json.dumps({
-            "cache": API_CACHE_TTL_MINUTES,
-            "choices": 5,
-            "constraints": [
-                {"type": "keyword", "items": [{"id": 1, "name": "Base KW"}], "count": 1, "operator": ">="}
-            ]
-        }))
-        (profiles_dir / "custom.json").write_text(json.dumps({
-            "choices": 3,
-            "constraints": [
-                {"type": "food", "items": [{"id": 10, "name": "Whiskey"}], "count": 2, "operator": ">="}
-            ]
-        }))
+        (profiles_dir / "base.json").write_text(
+            json.dumps({"cache": API_CACHE_TTL_MINUTES, "choices": 5, "constraints": [{"type": "keyword", "items": [{"id": 1, "name": "Base KW"}], "count": 1, "operator": ">="}]})
+        )
+        (profiles_dir / "custom.json").write_text(
+            json.dumps({"choices": 3, "constraints": [{"type": "food", "items": [{"id": 10, "name": "Whiskey"}], "count": 2, "operator": ">="}]})
+        )
 
         svc = ConfigService(profiles_dir=str(profiles_dir))
         config = svc.load_profile("custom")
@@ -255,13 +228,16 @@ class TestConfigService:
         assert raw["choices"] == 8
         assert "cache" not in raw  # Not merged with base
 
-    @pytest.mark.parametrize("name", [
-        "../../settings",
-        "../secret",
-        "foo/bar",
-        "",
-        ".hidden",
-    ])
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "../../settings",
+            "../secret",
+            "foo/bar",
+            "",
+            ".hidden",
+        ],
+    )
     def test_path_traversal_blocked(self, tmp_path, name):
         """Profile names with path separators or leading dots are rejected."""
         svc = ConfigService(profiles_dir=str(tmp_path))
@@ -281,11 +257,20 @@ class TestOnHandSubstitution:
 
     def _make_solver_result(self):
         from models import Recipe, SolverResult
-        r = Recipe({
-            "id": 1, "name": "Mojito", "description": "Minty", "new": False,
-            "servings": 1, "keywords": [], "rating": 4.0,
-            "last_cooked": None, "created_at": "2024-01-01T12:00:00+00:00",
-        })
+
+        r = Recipe(
+            {
+                "id": 1,
+                "name": "Mojito",
+                "description": "Minty",
+                "new": False,
+                "servings": 1,
+                "keywords": [],
+                "rating": 4.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            }
+        )
         return SolverResult(recipes=[r], requested_count=1, constraint_count=0)
 
     def _make_details(self, food_onhand=False):
@@ -293,17 +278,21 @@ class TestOnHandSubstitution:
             "image": "http://img/mojito.jpg",
             "working_time": 5,
             "cooking_time": 0,
-            "steps": [{
-                "name": "Mix",
-                "instruction": "Muddle mint and lime.",
-                "time": 5,
-                "order": 0,
-                "ingredients": [{
-                    "amount": 2,
-                    "unit": {"name": "oz"},
-                    "food": {"id": 100, "name": "Lime Juice", "food_onhand": food_onhand},
-                }],
-            }],
+            "steps": [
+                {
+                    "name": "Mix",
+                    "instruction": "Muddle mint and lime.",
+                    "time": 5,
+                    "order": 0,
+                    "ingredients": [
+                        {
+                            "amount": 2,
+                            "unit": {"name": "oz"},
+                            "food": {"id": 100, "name": "Lime Juice", "food_onhand": food_onhand},
+                        }
+                    ],
+                }
+            ],
         }
 
     def test_substitution_when_not_onhand(self, mock_logger):
@@ -319,9 +308,7 @@ class TestOnHandSubstitution:
             ms.tandoor.get_food_substitutes.return_value = [{"id": 200}]
             ms.tandoor.get_food.return_value = {"id": 200, "name": "Lemon Juice", "food_onhand": True}
 
-            result = GenerationService._sync_generate(
-                {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
-            )
+            result = GenerationService._sync_generate({"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger)
 
         assert len(result["recipes"]) == 1
         assert result["recipes"][0]["ingredients"][0]["food"] == "Lemon Juice"
@@ -338,9 +325,7 @@ class TestOnHandSubstitution:
             ms.tandoor = MagicMock()
             ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=True)
 
-            result = GenerationService._sync_generate(
-                {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
-            )
+            result = GenerationService._sync_generate({"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger)
 
         assert result["recipes"][0]["ingredients"][0]["food"] == "Lime Juice"
         ms.tandoor.get_food_substitutes.assert_not_called()
@@ -356,9 +341,7 @@ class TestOnHandSubstitution:
             ms.tandoor = MagicMock()
             ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=True)
 
-            result = GenerationService._sync_generate(
-                {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
-            )
+            result = GenerationService._sync_generate({"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger)
 
         recipe = result["recipes"][0]
         assert recipe["working_time"] == 5
@@ -381,9 +364,7 @@ class TestOnHandSubstitution:
             ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=False)
             ms.tandoor.get_food_substitutes.return_value = []
 
-            result = GenerationService._sync_generate(
-                {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
-            )
+            result = GenerationService._sync_generate({"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger)
 
         assert result["recipes"][0]["ingredients"][0]["food"] == "Lime Juice"
 
@@ -423,27 +404,27 @@ class TestGenerationService:
         loop = asyncio.new_event_loop()
         try:
             # We mock _sync_generate to avoid actual solver execution
-            with patch.object(svc, "_sync_generate", return_value={
-                "recipes": [{"id": 1, "name": "Test", "description": "", "rating": 3.0}],
-                "generated_at": "2024-01-01T00:00:00",
-                "requested_count": 5,
-                "constraint_count": 0,
-                "status": "optimal",
-                "warnings": [],
-                "relaxed_constraints": [],
-            }):
-                request_id = loop.run_until_complete(
-                    self._async_start(svc, config, mock_logger)
-                )
+            with patch.object(
+                svc,
+                "_sync_generate",
+                return_value={
+                    "recipes": [{"id": 1, "name": "Test", "description": "", "rating": 3.0}],
+                    "generated_at": "2024-01-01T00:00:00",
+                    "requested_count": 5,
+                    "constraint_count": 0,
+                    "status": "optimal",
+                    "warnings": [],
+                    "relaxed_constraints": [],
+                },
+            ):
+                request_id = loop.run_until_complete(self._async_start(svc, config, mock_logger))
             assert request_id is not None
             assert len(request_id) == 36  # UUID format
         finally:
             loop.close()
 
     async def _async_start(self, svc, config, logger):
-        request_id = await svc.start_generation(
-            config=config, url="http://localhost", token="test", logger=logger
-        )
+        request_id = await svc.start_generation(config=config, url="http://localhost", token="test", logger=logger)
         # Wait for task to complete
         if svc._current_task:
             await svc._current_task
@@ -456,8 +437,6 @@ class TestGenerationService:
             # Must run in event loop context
             loop = asyncio.new_event_loop()
             try:
-                loop.run_until_complete(
-                    self._async_start(svc, {}, mock_logger)
-                )
+                loop.run_until_complete(self._async_start(svc, {}, mock_logger))
             finally:
                 loop.close()

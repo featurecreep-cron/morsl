@@ -20,12 +20,14 @@ class TestSchedulerService:
         assert scheduler_service._generation_callback is None
 
     def test_create_schedule(self, scheduler_service):
-        schedule = scheduler_service.create_schedule({
-            "profile": "gin",
-            "day_of_week": "mon-fri",
-            "hour": 16,
-            "minute": 30,
-        })
+        schedule = scheduler_service.create_schedule(
+            {
+                "profile": "gin",
+                "day_of_week": "mon-fri",
+                "hour": 16,
+                "minute": 30,
+            }
+        )
         assert schedule["profile"] == "gin"
         assert schedule["day_of_week"] == "mon-fri"
         assert schedule["hour"] == 16
@@ -79,7 +81,7 @@ class TestSchedulerService:
     def test_load_persisted_schedules(self, tmp_path):
         # Create a schedule, then create a new service pointing to same dir
         svc1 = SchedulerService(data_dir=str(tmp_path))
-        s = svc1.create_schedule({"profile": "whiskey", "hour": 9})
+        svc1.create_schedule({"profile": "whiskey", "hour": 9})
 
         svc2 = SchedulerService(data_dir=str(tmp_path))
         schedules = svc2.list_schedules()
