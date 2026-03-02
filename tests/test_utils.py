@@ -27,7 +27,7 @@ class TestStringToDate:
         assert after is False
 
     def test_invalid_month(self):
-        date, after = string_to_date("2024-13-01")
+        date, _after = string_to_date("2024-13-01")
         assert date is False
 
 
@@ -39,7 +39,7 @@ class TestSplitOffset:
         assert interval == "days"
 
     def test_negative_offset(self):
-        after, offset, interval = split_offset("-14days")
+        after, offset, _interval = split_offset("-14days")
         assert after is False
         assert offset == 14
 
@@ -50,7 +50,7 @@ class TestSplitOffset:
         assert interval == ""
 
     def test_case_insensitive(self):
-        after, offset, interval = split_offset("7Days")
+        _after, offset, interval = split_offset("7Days")
         assert offset == 7
         assert interval == "days"
 
@@ -74,7 +74,7 @@ class TestFormatDate:
         assert after is True
 
     def test_future_offset(self):
-        date, after = format_date("7days", future=True)
+        date, _after = format_date("7days", future=True)
         assert isinstance(date, datetime)
         assert date > datetime.now(date.tzinfo)
 

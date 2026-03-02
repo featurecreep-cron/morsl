@@ -93,7 +93,7 @@ class TestExcludeAndIntersect:
         )
         picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
         # extra_recipe is NOT in the picker pool, so intersect removes it
-        picker.add_food_constraint([extra_recipe] + sample_recipes[:2], 1, ">=")
+        picker.add_food_constraint([extra_recipe, *sample_recipes[:2]], 1, ">=")
         result = picker.solve()
         assert len(result.recipes) == 5
 

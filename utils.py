@@ -154,7 +154,7 @@ def format_date(string: str, future: bool = False) -> tuple[datetime, bool]:
     if date:
         return date, after
 
-    after, offset, interval = split_offset(string)
+    after, offset, _interval = split_offset(string)
     # TODO support more time intervals that days
     offset: timedelta = timedelta(days=offset)
     if future:
