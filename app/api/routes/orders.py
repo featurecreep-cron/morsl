@@ -93,7 +93,7 @@ def delete_order(
     try:
         order_service.delete_order(order_id)
     except RuntimeError:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(status_code=404, detail="Order not found") from None
 
 
 @router.delete("/orders", status_code=200, dependencies=[Depends(require_admin)])

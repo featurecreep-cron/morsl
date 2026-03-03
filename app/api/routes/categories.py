@@ -29,7 +29,7 @@ def create_category(
     try:
         category = svc.create_category(body.model_dump())
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from None
     return CategoryResponse(**category)
 
 
@@ -52,7 +52,7 @@ def update_category(
     try:
         category = svc.update_category(cat_id, body.model_dump())
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Category not found: {cat_id}")
+        raise HTTPException(status_code=404, detail=f"Category not found: {cat_id}") from None
     return CategoryResponse(**category)
 
 
@@ -66,7 +66,7 @@ def delete_category(
     try:
         svc.delete_category(cat_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Category not found: {cat_id}")
+        raise HTTPException(status_code=404, detail=f"Category not found: {cat_id}") from None
     # Clear category field on affected profiles
     for p in config_svc.list_profiles():
         if p.category == cat_id:

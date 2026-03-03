@@ -39,7 +39,7 @@ def update_schedule(
     try:
         schedule = scheduler.update_schedule(schedule_id, body.model_dump())
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Schedule not found: {schedule_id}")
+        raise HTTPException(status_code=404, detail=f"Schedule not found: {schedule_id}") from None
     return ScheduleResponse(**schedule)
 
 
@@ -52,4 +52,4 @@ def delete_schedule(
     try:
         scheduler.delete_schedule(schedule_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Schedule not found: {schedule_id}")
+        raise HTTPException(status_code=404, detail=f"Schedule not found: {schedule_id}") from None

@@ -49,7 +49,7 @@ class RecipePicker:
         expr = lpSum(self.recipe_vars[i] for i in [r.id for r in found_recipes])
 
         if operator == "!=":
-            raise ValueError(f"'!=' operator is not supported by linear programming solvers. " f"Use exclude=True with '>=' or '<=' instead. (constraint: {label})")
+            raise ValueError(f"'!=' operator is not supported by linear programming solvers. Use exclude=True with '>=' or '<=' instead. (constraint: {label})")
 
         if weight > 0:
             self._add_soft_constraint(expr, count, operator, weight, label, upper_bound)

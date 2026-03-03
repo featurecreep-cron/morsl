@@ -275,7 +275,7 @@ def upload_favicon(
         logger.info("Regenerated icons from %s", source_path)
     except Exception as e:
         logger.error("Icon generation failed: %s", e)
-        raise HTTPException(500, f"Icon generation failed: {e}")
+        raise HTTPException(500, f"Icon generation failed: {e}") from None
 
     return svc.update({"favicon_url": url})
 

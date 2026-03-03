@@ -235,7 +235,7 @@ class WeeklyGenerationService:
 
             # Check if enough recipes
             if len(service.recipes) < total_needed:
-                msg = f"Profile '{profile_name}': only {len(service.recipes)} recipes " f"available, {total_needed} requested"
+                msg = f"Profile '{profile_name}': only {len(service.recipes)} recipes available, {total_needed} requested"
                 all_warnings.append(msg)
                 if service.min_choices and len(service.recipes) >= service.min_choices:
                     service.choices = len(service.recipes)

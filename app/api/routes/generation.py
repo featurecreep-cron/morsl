@@ -72,7 +72,7 @@ async def _start_generation(
     try:
         config = config_service.load_profile(profile_name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found")
+        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found") from None
 
     # Use global cache setting instead of per-profile value
     app_settings = settings_svc.get_all()

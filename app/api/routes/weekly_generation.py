@@ -51,7 +51,7 @@ async def generate_weekly(
     try:
         tpl = template_svc.get_template(template)
     except (ValueError, FileNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     errors = template_svc.validate_template(tpl, config_svc)
     if errors:
@@ -66,7 +66,7 @@ async def generate_weekly(
         try:
             week_start = date.fromisoformat(request.week_start)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid week_start date format (use YYYY-MM-DD)")
+            raise HTTPException(status_code=400, detail="Invalid week_start date format (use YYYY-MM-DD)") from None
 
     url, token = credentials
     try:
@@ -82,7 +82,7 @@ async def generate_weekly(
             settings_service=settings_svc,
         )
     except RuntimeError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from None
 
     return GenerateResponse(request_id=request_id, status="generating")
 
@@ -114,7 +114,7 @@ def get_weekly_plan(
     try:
         plan = weekly_svc.get_plan(template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
     if not plan:
         raise HTTPException(status_code=404, detail=f"No plan found for template '{template}'")
     return plan
@@ -129,7 +129,7 @@ def delete_weekly_plan(
     try:
         removed = weekly_svc.clear_plan(template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
     if not removed:
         raise HTTPException(status_code=404, detail=f"No plan found for template '{template}'")
 
@@ -162,9 +162,9 @@ async def regenerate_slot(
             settings_service=settings_svc,
         )
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
     return GenerateResponse(request_id="", status="complete")
 
@@ -179,7 +179,7 @@ def save_weekly_plan(
     try:
         plan = weekly_svc.get_plan(request.template)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
     if not plan:
         raise HTTPException(status_code=404, detail=f"No plan found for template '{request.template}'")
 

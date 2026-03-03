@@ -46,7 +46,7 @@ def get_profile(
     try:
         config = config_service.get_profile_raw(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
+        raise HTTPException(status_code=404, detail=f"Profile not found: {name}") from None
     if not config:
         raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
     return ProfileDetailResponse(name=name, config=config)
@@ -61,9 +61,9 @@ def create_profile(
     try:
         config = config_service.create_profile(request.name, request.to_config_dict())
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
     except FileExistsError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from None
     if request.default:
         config_service.set_default_profile(request.name)
     return ProfileDetailResponse(name=request.name, config=config)
@@ -79,7 +79,7 @@ def update_profile(
     try:
         config = config_service.update_profile(name, request.to_config_dict())
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
+        raise HTTPException(status_code=404, detail=f"Profile not found: {name}") from None
     if request.default:
         config_service.set_default_profile(name)
     else:
@@ -97,7 +97,7 @@ def set_profile_category(
     try:
         config = config_service.get_profile_raw(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
+        raise HTTPException(status_code=404, detail=f"Profile not found: {name}") from None
     if not config:
         raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
     config["category"] = body.get("category", "")
@@ -114,7 +114,7 @@ def delete_profile(
     try:
         config_service.delete_profile(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile not found: {name}")
+        raise HTTPException(status_code=404, detail=f"Profile not found: {name}") from None
 
 
 @router.post("/profiles/preview", dependencies=[Depends(require_admin)])
@@ -141,4 +141,4 @@ def preview_profile(
         }
     except Exception as e:
         logger.warning(f"Preview failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None

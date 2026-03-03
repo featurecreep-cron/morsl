@@ -34,7 +34,7 @@ async def upload_custom_icon(
     try:
         result = svc.save_icon(file.filename, content)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid SVG: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid SVG: {e}") from None
     return result
 
 
@@ -51,7 +51,7 @@ def get_custom_icon_svg(
     try:
         svg = svc.get_svg(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Icon not found")
+        raise HTTPException(status_code=404, detail="Icon not found") from None
     return Response(content=svg, media_type="image/svg+xml")
 
 
@@ -67,9 +67,9 @@ def rename_custom_icon(
     try:
         return svc.rename_icon(name, new_name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Icon not found")
+        raise HTTPException(status_code=404, detail="Icon not found") from None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
 
 @router.delete("/{name}", dependencies=[Depends(require_admin)])
@@ -80,5 +80,5 @@ def delete_custom_icon(
     try:
         svc.delete_icon(name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Icon not found")
+        raise HTTPException(status_code=404, detail="Icon not found") from None
     return {"status": "deleted"}

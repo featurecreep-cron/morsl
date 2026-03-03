@@ -211,7 +211,7 @@ class TandoorAPI:
         url = f"{self.url}food/"
         food = self.get_unpaged_results(url, food_id, **kwargs)
 
-        self.logger.debug(f'Returning food {food["id"]}: {food["name"]}.')
+        self.logger.debug(f"Returning food {food['id']}: {food['name']}.")
         return food
 
     def get_book(self, book_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
@@ -220,7 +220,7 @@ class TandoorAPI:
         url = f"{self.url}recipe-book/"
         book = self.get_unpaged_results(url, book_id, **kwargs)
 
-        self.logger.debug(f'Returning book {book["id"]}: {book["name"]}.')
+        self.logger.debug(f"Returning book {book['id']}: {book['name']}.")
         return book
 
     @cached
@@ -291,7 +291,7 @@ class TandoorAPI:
             },
         )
 
-        self.logger.debug(f'Succesfully created meal plan {plan["id"]}: {title} with type {type}')
+        self.logger.debug(f"Succesfully created meal plan {plan['id']}: {title} with type {type}")
 
         return plan
 
@@ -319,7 +319,7 @@ class TandoorAPI:
         """Fetch a single meal type by ID."""
         url = f"{self.url}meal-type/"
         mt = self.get_unpaged_results(url, meal_type_id, **kwargs)
-        self.logger.debug(f'Returning meal type {mt["id"]}: {mt["name"]}.')
+        self.logger.debug(f"Returning meal type {mt['id']}: {mt['name']}.")
         return mt
 
     def get_meal_types(self, **kwargs) -> List[Dict[str, Any]]:
