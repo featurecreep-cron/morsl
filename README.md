@@ -2,9 +2,12 @@
 
 [![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FeatureCreep-dev/morsl/badge)](https://scorecard.dev/viewer/?uri=github.com/FeatureCreep-dev/morsl)
 [![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
 [![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FFeatureCreep-dev%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![GHCR](https://img.shields.io/badge/ghcr.io-morsl-blue?logo=docker)](https://github.com/FeatureCreep-dev/morsl/pkgs/container/morsl)
+[![Sponsor](https://img.shields.io/badge/sponsor-FeatureCreep-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/FeatureCreep-dev)
 
 A menu generator for [Tandoor Recipes](https://github.com/TandoorRecipes/recipes). Define constraints (keywords, ratings, foods, dates) and Morsl uses linear programming to pick recipes that satisfy them all.
 
