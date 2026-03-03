@@ -4,89 +4,64 @@ Target: a workable Docker container that a first user can pull, configure, and r
 
 ---
 
-## Phase 1: Code Fixes (from code review) — COMPLETE (Mar 2, 2026)
+## Phase 1: Code Fixes — COMPLETE (Mar 2, 2026)
 
-All findings from the adversarial review addressed. 212 tests passing, 2 skipped (integration).
-Post-review fixes: restored missing `import json` in category_service.py, added 21 CategoryService tests,
-removed dead `_parse_date_filter` method.
+All findings from the adversarial code review addressed. 214 tests passing, 2 skipped (integration).
 
 ---
 
-## Phase 2: Repo & CI Foundation
+## Phase 2: Repo & CI Foundation — COMPLETE (Mar 2, 2026)
 
-Get the repo on GitHub with live CI, real badges, and a clean build.
-
-- [ ] **Create GitHub repo** — `FeatureCreep-dev/morsl`, push initial commit
-- [ ] **Create `.dockerignore`** — exclude tests/, .git/, __pycache__/, *.md (except LICENSE), .github/, .env, .claude/, dev scripts
-- [ ] **Add OCI labels to Dockerfile** — `org.opencontainers.image.source`, `.version`, `.description`, `.licenses`
-- [ ] **Live README badges** — replace all static badges with dynamic ones:
-  - CI status (GitHub Actions workflow badge)
-  - Coverage % (pytest-cov → Codecov)
-  - License (shields.io from GitHub API)
-  - Python version (shields.io from pyproject.toml)
-  - Code style: ruff (static convention badge)
-- [ ] **Add coverage to CI** — `pytest --cov` + upload to Codecov + coverage badge
-- [ ] **Add `ruff format --check .` to CI** — formatting enforcement
-- [ ] **CI concurrency control** — `concurrency: { group: ..., cancel-in-progress: true }`
-- [ ] **CI dependency caching** — `pip cache` to speed up runs
-- [ ] **Docker build test in CI** — verify `docker build .` succeeds on PRs
-- [ ] **Configure Dependabot** — `.github/dependabot.yml` for pip + GitHub Actions ecosystems. Grouped updates.
-- [ ] **SECURITY.md** — standard file pointing to GitHub Security Advisories
+- [x] GitHub repo (`FeatureCreep-dev/morsl`), signed commits, GPG key on GitHub
+- [x] `.dockerignore`, OCI labels on Dockerfile
+- [x] CI decomposed: `ci.yml` (reusable), `push.yml` (main branch), `dependabot-automerge.yml`
+- [x] Lint (ruff check + format), test with coverage, Docker build test
+- [x] Concurrency control, pip caching
+- [x] Dependabot: pip (daily, grouped by semver), GitHub Actions (weekly), Docker (weekly)
+- [x] Dependabot auto-merge: PRs auto-approved + merged after CI passes
+- [x] Branch protection: lint/test/docker required status checks
+- [x] `SECURITY.md`, OpenSSF Scorecard workflow + badge
+- [x] Live README badges: CI, Codecov, OpenSSF Scorecard, License, Python, Ruff, GHCR, Sponsor
 
 ---
 
 ## Phase 3: Ship-Ready Container
 
-The minimum for `docker pull ghcr.io/FeatureCreep-dev/morsl:latest` to work.
+The minimum for `docker pull ghcr.io/featurecreep-dev/morsl:latest` to work.
 
-- [ ] **Create user-facing `docker-compose.yml`** — references published image (`ghcr.io/...`), not `build: .`. Rename current to `docker-compose.dev.yml`.
-- [ ] **Create release workflow** — `.github/workflows/release.yml`: trigger on tag push → build Docker image → push to GHCR
-- [ ] **Multi-arch builds** — amd64 + arm64 in release workflow (Raspberry Pi / ARM homelab users)
-- [ ] **Container scanning (Trivy)** — in release workflow, uploads findings to GitHub Security tab
+- [ ] **Release workflow** — `.github/workflows/release.yml`: tag push → build multi-arch image (amd64 + arm64) → push to GHCR
+- [ ] **Container scanning (Trivy)** — in release workflow, upload findings to GitHub Security tab
+- [ ] **User-facing `docker-compose.yml`** — references published GHCR image. Rename current to `docker-compose.dev.yml`
 - [ ] **Tag v0.1.0** — first GitHub release with release notes
-- [ ] **CHANGELOG.md** — start manually with v0.1.0
+- [ ] **CHANGELOG.md** — start with v0.1.0
 
 ---
 
-## Phase 4: CI Hardening & Community
+## Phase 4: Quality & Community
 
-Additional confidence signals and contributor infrastructure.
-
-- [ ] **Add mypy to CI** — already in dev deps with `strict = true`, just needs a CI step. May need baseline for existing errors.
-- [ ] **Add CodeQL workflow** — `.github/workflows/codeql.yml`. Free SAST for public repos.
-- [ ] **Add OpenSSF Scorecard workflow** — `.github/workflows/scorecard.yml` + badge.
-- [ ] **Repo topics** — `gh repo edit --add-topic tandoor,meal-planner,menu-generator,docker,selfhosted,fastapi,python,linear-programming`
+- [ ] **Codecov setup** — Chris: create account, add `CODECOV_TOKEN` repo secret
+- [ ] **GitHub Sponsors** — Chris: enable at github.com/sponsors (bank/Stripe setup)
+- [ ] **OpenSSF Best Practices** — self-assessment at bestpractices.coreinfrastructure.org
+- [ ] **CodeQL workflow** — `.github/workflows/codeql.yml`, free SAST for public repos
+- [ ] **Repo topics** — tandoor, meal-planner, menu-generator, docker, selfhosted, fastapi, python, linear-programming
 - [ ] **Issue templates** — `.github/ISSUE_TEMPLATE/bug_report.yml`
 - [ ] **PR template** — `.github/pull_request_template.md`
 - [ ] **CONTRIBUTING.md** — dev setup, testing, PR process, code style
-- [ ] **`.pre-commit-config.yaml`** — ruff check, ruff format, trailing-whitespace, detect-private-key, check-yaml
+- [ ] **Fix B904 (raise from)** — 37 instances, deferred from Phase 2 lint cleanup
+- [ ] **Fix C901 (complexity)** — 8 functions over threshold, deferred from Phase 2
 
 ---
 
-## Phase 5: Community Infrastructure
+## Phase 5: Documentation & Polish
 
-- [ ] **Repo topics** — `gh repo edit --add-topic tandoor,meal-planner,menu-generator,docker,selfhosted,fastapi,python,linear-programming`
-- [ ] **Issue templates** — `.github/ISSUE_TEMPLATE/bug_report.yml` (YAML form: version, environment, steps to reproduce, expected vs actual)
-- [ ] **PR template** — `.github/pull_request_template.md` (checklist: tests pass, description, breaking changes)
-- [ ] **CONTRIBUTING.md** — dev setup, testing, PR process, code style
-- [ ] **`.pre-commit-config.yaml`** — ruff check, ruff format, trailing-whitespace, detect-private-key, check-yaml
-- [ ] **Container scanning (Trivy)** — in release workflow, uploads findings to GitHub Security tab
-
----
-
-## Phase 6: Documentation & Polish
-
-- [ ] **OpenAPI docs** — verify `/docs` and `/redoc` are accessible, mention in README
+- [ ] **OpenAPI docs** — verify `/docs` and `/redoc` accessible, mention in README
 - [ ] **`.editorconfig`** — consistent formatting for contributors
 - [ ] **CODE_OF_CONDUCT.md** — standard boilerplate
-- [ ] **Docs site (MkDocs Material)** — when user-facing docs exceed ~3 pages. Not yet.
-- [ ] **CII Best Practices badge** — self-assessment at bestpractices.coreinfrastructure.org. After Phases 1-5 are done.
 
 ---
 
 ## Later (post-1.0)
 
-- [ ] **Recipe manager abstraction** — `RecipeSource` protocol to support Mealie, Grocy, etc. Real refactor (~2-3 days). Ship Tandoor-only first, abstract if demand exists.
-- [ ] **Devcontainer** — for contributor onboarding
+- [ ] **Recipe manager abstraction** — `RecipeSource` protocol for Mealie, Grocy, etc.
+- [ ] **Devcontainer** — contributor onboarding
 - [ ] **Stale issue bot** — when external contributors exist
-- [ ] **Auto-labeler on PRs** — when PR volume justifies it
