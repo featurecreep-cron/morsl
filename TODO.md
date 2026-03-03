@@ -44,7 +44,7 @@ All findings from the adversarial code review addressed. 214 tests passing, 2 sk
 - [ ] **Codecov setup** — Chris: create account, add `CODECOV_TOKEN` repo secret
 - [ ] **GitHub Sponsors** — Chris: enable at github.com/sponsors (bank/Stripe setup)
 - [ ] **OpenSSF Best Practices** — self-assessment at bestpractices.coreinfrastructure.org (needs GitHub OAuth)
-- [ ] **Fix B904 (raise from)** — 37 instances, deferred from Phase 2 lint cleanup
+- [x] **Fix B904 (raise from)** — 37 instances, all fixed with `from None`
 - [ ] **Fix C901 (complexity)** — 8 functions over threshold, deferred from Phase 2
 
 ---
