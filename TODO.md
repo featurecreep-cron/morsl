@@ -25,28 +25,25 @@ All findings from the adversarial code review addressed. 214 tests passing, 2 sk
 
 ---
 
-## Phase 3: Ship-Ready Container
+## Phase 3: Ship-Ready Container — COMPLETE (Mar 3, 2026)
 
-The minimum for `docker pull ghcr.io/featurecreep-dev/morsl:latest` to work.
-
-- [ ] **Release workflow** — `.github/workflows/release.yml`: tag push → build multi-arch image (amd64 + arm64) → push to GHCR
-- [ ] **Container scanning (Trivy)** — in release workflow, upload findings to GitHub Security tab
-- [ ] **User-facing `docker-compose.yml`** — references published GHCR image. Rename current to `docker-compose.dev.yml`
-- [ ] **Tag v0.1.0** — first GitHub release with release notes
-- [ ] **CHANGELOG.md** — start with v0.1.0
+- [x] **Release workflow** — tag push → CI → multi-arch build (amd64 + arm64) → GHCR push → Trivy scan → GitHub Release
+- [x] **Container scanning (Trivy)** — in release workflow, uploads SARIF to GitHub Security tab
+- [x] **User-facing `docker-compose.yml`** — references `ghcr.io/featurecreep-dev/morsl:latest`. Dev version at `docker-compose.dev.yml`
+- [x] **Tag v0.1.0** — GitHub release with auto-generated notes: https://github.com/FeatureCreep-dev/morsl/releases/tag/v0.1.0
+- [x] **CHANGELOG.md** — v0.1.0 initial release
+- [x] **CodeQL workflow** — Python SAST, runs on push/PR and weekly schedule
+- [x] **Community infra** — issue templates, PR template, CONTRIBUTING.md
+- [x] **Repo topics** — set on GitHub
 
 ---
 
 ## Phase 4: Quality & Community
 
+- [ ] **GHCR package visibility** — Chris: make package public at github.com/orgs/FeatureCreep-dev/packages
 - [ ] **Codecov setup** — Chris: create account, add `CODECOV_TOKEN` repo secret
 - [ ] **GitHub Sponsors** — Chris: enable at github.com/sponsors (bank/Stripe setup)
-- [ ] **OpenSSF Best Practices** — self-assessment at bestpractices.coreinfrastructure.org
-- [ ] **CodeQL workflow** — `.github/workflows/codeql.yml`, free SAST for public repos
-- [ ] **Repo topics** — tandoor, meal-planner, menu-generator, docker, selfhosted, fastapi, python, linear-programming
-- [ ] **Issue templates** — `.github/ISSUE_TEMPLATE/bug_report.yml`
-- [ ] **PR template** — `.github/pull_request_template.md`
-- [ ] **CONTRIBUTING.md** — dev setup, testing, PR process, code style
+- [ ] **OpenSSF Best Practices** — self-assessment at bestpractices.coreinfrastructure.org (needs GitHub OAuth)
 - [ ] **Fix B904 (raise from)** — 37 instances, deferred from Phase 2 lint cleanup
 - [ ] **Fix C901 (complexity)** — 8 functions over threshold, deferred from Phase 2
 
