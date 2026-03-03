@@ -22,7 +22,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://localhost:8321` for the menu, `http://localhost:8321/admin` for configuration.
+Open `http://localhost:8321` for the menu, `http://localhost:8321/admin` for configuration, and `http://localhost:8321/docs` for the interactive API reference.
 
 If you skip the `.env` file, the setup wizard at `/setup` will walk you through connecting to Tandoor.
 

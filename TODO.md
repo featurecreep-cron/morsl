@@ -51,9 +51,9 @@ All findings from the adversarial code review addressed. 214 tests passing, 2 sk
 
 ## Phase 5: Documentation & Polish
 
-- [ ] **OpenAPI docs** — verify `/docs` and `/redoc` accessible, mention in README
-- [ ] **`.editorconfig`** — consistent formatting for contributors
-- [ ] **CODE_OF_CONDUCT.md** — standard boilerplate
+- [x] **OpenAPI docs** — FastAPI default `/docs` and `/redoc` endpoints, mentioned in README
+- [x] **`.editorconfig`** — consistent formatting for contributors
+- [ ] **CODE_OF_CONDUCT.md** — standard boilerplate (add when external contributors exist)
 
 ---
 
