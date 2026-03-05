@@ -60,10 +60,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_OUTPUT"
+
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.31.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
+          image-ref: ${{ steps.image.outputs.name }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
