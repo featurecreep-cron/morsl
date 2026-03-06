@@ -88,7 +88,7 @@ DEFAULTS: Dict[str, Any] = {
     "qr_menu_url": "",
     "qr_wifi_ssid": "",
     "qr_wifi_password": "",
-    "qr_wifi_encryption": "WPA",
+    "qr_wifi_encryption": "",
     "qr_wifi_string": "",
     "qr_show_on_menu": False,
     "tandoor_url": "",

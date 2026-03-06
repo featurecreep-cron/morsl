@@ -1807,8 +1807,8 @@ body {
 }
 .footer-qr-row {
     display: flex;
-    justify-content: center;
-    gap: 1.25rem;
+    justify-content: flex-start;
+    gap: 1rem;
     margin-bottom: 0.35rem;
 }
 .footer-qr {
