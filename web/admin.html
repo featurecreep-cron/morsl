@@ -1457,7 +1457,8 @@
                 </small>
             </div>
 
-            <div class="drawer-section">
+            <!-- Advanced: Default Profile / Show on Menu -->
+            <div class="drawer-section" x-show="tierVisible('standard')">
                 <div class="settings-row">
                     <div class="settings-label">Default Profile<small>This profile will be pre-selected when generating and shown first on the menu page</small></div>
                     <label class="toggle-switch">
@@ -1480,7 +1481,8 @@
                        class="drawer-input" placeholder="Optional description">
             </div>
 
-            <div class="drawer-section">
+            <!-- Advanced: Item Noun -->
+            <div class="drawer-section" x-show="tierVisible('standard')">
                 <label class="drawer-label">Item Noun</label>
                 <input type="text" x-model="profileEditor.item_noun"
                        class="drawer-input" placeholder="recipe">
@@ -1497,7 +1499,8 @@
                 </button>
             </div>
 
-            <div class="drawer-section">
+            <!-- Advanced: Category -->
+            <div class="drawer-section" x-show="tierVisible('standard')">
                 <label class="drawer-label">Category</label>
                 <select x-model="profileEditor.category" class="drawer-input">
                     <option value="">None</option>
@@ -1515,7 +1518,8 @@
                            x-model.number="profileEditor.choices" min="1" max="20"
                            title="Target number of recipes to select">
                 </div>
-                <div>
+                <!-- Advanced: Min Recipes -->
+                <div x-show="tierVisible('standard')">
                     <label class="drawer-label">Min</label>
                     <input type="number" class="drawer-input drawer-input--small"
                            x-model.number="profileEditor.min_choices" min="0" max="20"
@@ -1525,7 +1529,7 @@
             </div>
             <small class="drawer-help">
                 <strong>Recipes:</strong> How many recipes to pick.
-                <strong>Min:</strong> Accept fewer if rules are too strict.
+                <span x-show="tierVisible('standard')"><strong>Min:</strong> Accept fewer if rules are too strict.</span>
             </small>
 
             <!-- Constraints List (v2 format) -->
@@ -1751,10 +1755,10 @@
         </div>
 
         <div class="drawer-footer">
-            <button class="btn-generate btn-secondary" @click="previewProfile()" :disabled="profilePreviewing" style="flex:0 0 auto; padding:0 1rem;">
+            <button class="btn-generate btn-secondary" x-show="tierVisible('standard')" @click="previewProfile()" :disabled="profilePreviewing" style="flex:0 0 auto; padding:0 1rem;">
                 <span x-text="profilePreviewing ? '...' : 'Test Profile'"></span>
             </button>
-            <span class="preview-result" x-show="previewResult !== null" x-text="typeof previewResult === 'number' ? previewResult + ' recipes match' : previewResult"></span>
+            <span class="preview-result" x-show="tierVisible('standard') && previewResult !== null" x-text="typeof previewResult === 'number' ? previewResult + ' recipes match' : previewResult"></span>
             <button class="btn-generate" @click="saveProfile()" :disabled="profileSaving" style="margin-left:auto;">
                 <span x-text="profileSaving ? 'Saving...' : 'Save Profile'"></span>
             </button>
