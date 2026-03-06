@@ -59,7 +59,7 @@
             <div style="display:contents">
                 <!-- Virtual _all category: show profile chips directly -->
                 <template x-if="category.id === '_all'">
-                    <div class="category-group-chips" style="display:flex;flex-wrap:wrap;gap:0.5rem;padding:0.25rem;">
+                    <div class="category-group-chips">
                         <template x-for="profile in (categorizedProfiles['_all'] || [])" :key="profile.name">
                             <button class="category-chip category-chip--with-icon"
                                     :class="{ active: profile.name === activeProfile }"
@@ -92,7 +92,7 @@
         </template>
         <!-- Uncategorized profiles: shown as direct chips when categories are defined -->
         <template x-if="categorizedProfiles['_uncategorized']">
-            <div class="category-group-chips" style="display:flex;flex-wrap:wrap;gap:0.5rem;padding:0.25rem;">
+            <div class="category-group-chips" style="display:contents;">
                 <template x-for="profile in (categorizedProfiles['_uncategorized'] || [])" :key="'unc-' + profile.name">
                     <button class="category-chip category-chip--with-icon"
                             :class="{ active: profile.name === activeProfile }"

@@ -173,6 +173,16 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+@media (max-width: 480px) {
+    .explore-btn {
+        width: 95px;
+        height: 80px;
+    }
+    .explore-btn-icon {
+        width: 40px;
+        height: 40px;
+    }
+}
 
 /* UX: Icons should be the visual focus - large and prominent */
 .explore-btn-icon {
@@ -247,9 +257,7 @@ body {
 }
 
 .category-group-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    display: contents;
 }
 
 .category-chip {
@@ -1268,15 +1276,15 @@ body {
 
 /* ---- Order Button (modal) ---- */
 .btn-order {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.875rem 1.5rem;
-    margin-top: 1rem;
+    gap: 0.35rem;
+    width: auto;
+    padding: 0.5rem 1.25rem;
+    margin-top: 0.75rem;
     font-family: var(--heading-font);
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -1810,6 +1818,9 @@ body {
     justify-content: flex-start;
     gap: 1rem;
     margin-bottom: 0.35rem;
+}
+@media (max-width: 600px) {
+    .footer-qr-row { display: none; }
 }
 .footer-qr {
     display: flex;
