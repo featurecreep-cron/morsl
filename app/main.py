@@ -297,7 +297,7 @@ def dynamic_manifest() -> JSONResponse:
 try:
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads/branding", StaticFiles(directory=str(UPLOADS_DIR)), name="branding")
-except (FileNotFoundError, RuntimeError):
+except (FileNotFoundError, RuntimeError, PermissionError):
     logger.info("data/branding/ mount skipped — directory not available")
 
 # Mount static files for future frontend — API routes take priority

@@ -27,6 +27,7 @@ COPY services/ services/
 COPY scripts/ scripts/
 COPY web/ web/
 COPY models.py tandoor_api.py utils.py solver.py constants.py ./
+COPY docker-entrypoint.sh /usr/local/bin/
 
 # Create writable dirs for runtime data
 RUN mkdir -p data/branding data/custom-icons data/profiles data/templates data/weekly_plans web/icons
@@ -42,6 +43,8 @@ USER appuser
 ENV LOG_TO_STDOUT=1
 
 EXPOSE 8321
+
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8321/health || exit 1
