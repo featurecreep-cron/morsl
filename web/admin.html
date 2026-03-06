@@ -156,7 +156,7 @@
                     </div>
                 </div>
                 <small class="section-help" x-show="scheduleForm.mode === 'profile'" style="padding:0.25rem 0.75rem;">Generate a menu from one profile, repeated on the days you select.</small>
-                <small class="section-help" x-show="scheduleForm.mode === 'template'" style="padding:0.25rem 0.75rem;">Repeat a weekly template to automatically create multi-day meal plans.</small>
+                <small class="section-help" x-show="scheduleForm.mode === 'template'" style="padding:0.25rem 0.75rem;">Repeat a weekly template to automatically create multi-day meal plans. Create and edit templates on the Weekly tab.</small>
                 <div class="settings-row" x-show="scheduleForm.mode === 'profile'">
                     <div class="settings-label">Profile</div>
                     <select class="drawer-select" x-model="scheduleForm.profile">
@@ -457,7 +457,7 @@
             <h2 class="section-title">
                 Categories
             </h2>
-            <small class="section-help">Organize profiles into tabs that appear on the menu page.</small>
+            <small class="section-help">Organize profiles into tabs on the menu page. Without categories, all profiles appear as buttons. With categories, profiles are grouped under labeled tabs.</small>
             <button class="btn-generate btn-secondary" @click="startNewCategory()"
                     style="margin-bottom:0.75rem; height:30px; font-size:0.85rem;">
                 + Add Category
@@ -558,7 +558,7 @@
         <!-- Templates -->
         <section class="admin-section">
             <h2 class="section-title">Meal Plan Templates</h2>
-            <small class="section-help">Templates define multi-day meal plans — which profiles, days, and meal types. Generate one manually below, or set up automatic scheduling on the Generate tab.</small>
+            <small class="section-help">Templates define multi-day meal plans — which profiles, days, and meal types. Generate one manually below. To auto-generate weekly plans on a schedule, create a schedule on the Generate tab and choose "Template" mode.</small>
             <button class="btn-generate btn-secondary" @click="startNewTemplate()"
                     style="margin-bottom:0.75rem; height:30px; font-size:0.85rem;">
                 + New Template
@@ -1181,12 +1181,27 @@
                 <div class="settings-row">
                     <div class="settings-label">
                         API Cache
-                        <small>How long (in minutes) to cache data from Tandoor. Lower values show fresher data but make more requests.</small>
+                        <small>How long to cache data from Tandoor. Lower values show fresher data but make more requests.</small>
                     </div>
-                    <input type="number" class="drawer-input drawer-input--small"
-                           :value="settings.api_cache_minutes ?? 240" min="0"
-                           @change="toggleSetting('api_cache_minutes', Number($event.target.value))"
-                           style="width:80px;">
+                    <!-- Preset dropdown (Standard/Advanced) -->
+                    <select x-show="!tierVisible('advanced')" class="drawer-input"
+                            :value="settings.api_cache_minutes ?? 240"
+                            @change="toggleSetting('api_cache_minutes', Number($event.target.value))"
+                            style="width:140px;">
+                        <option value="15">15 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="240">4 hours</option>
+                        <option value="720">12 hours</option>
+                        <option value="1440">24 hours</option>
+                    </select>
+                    <!-- Raw number (Expert) -->
+                    <div x-show="tierVisible('advanced')" style="display:flex; align-items:center; gap:0.4rem;">
+                        <input type="number" class="drawer-input drawer-input--small"
+                               :value="settings.api_cache_minutes ?? 240" min="0"
+                               @change="toggleSetting('api_cache_minutes', Number($event.target.value))"
+                               style="width:80px;">
+                        <span style="font-size:0.8rem; color:var(--text-muted);">min</span>
+                    </div>
                 </div>
                 <div class="settings-row">
                     <div class="settings-label">
