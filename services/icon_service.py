@@ -110,10 +110,24 @@ def generate_icons(source: Path, output_dir: Path) -> None:
 
     _build_ico(rendered, output_dir / "favicon.ico")
 
-    # Write favicon.svg so browser tab and inline icons stay in sync
+    # Write favicon.svg so browser tab and inline icons stay in sync.
+    # For browser tabs we need a visible background — white-on-transparent
+    # SVGs are invisible on light browser chrome.
     favicon_svg = output_dir / "favicon.svg"
     if is_svg:
-        shutil.copy2(source, favicon_svg)
+        import cairosvg
+
+        # Render icon at 24px and embed with dark background for tab visibility
+        png_24 = cairosvg.svg2png(url=str(source), output_width=24, output_height=24)
+        b64_24 = base64.b64encode(png_24).decode()
+        bg_hex = "#{:02x}{:02x}{:02x}".format(*BG_COLOR[:3])
+        favicon_svg.write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">\n'
+            f'  <rect width="32" height="32" rx="6" fill="{bg_hex}"/>\n'
+            f'  <image width="24" height="24" x="4" y="4" href="data:image/png;base64,{b64_24}"/>\n'
+            '</svg>\n'
+        )
     else:
         # Raster source: embed 32x32 PNG as base64 data-URI in a minimal SVG
         buf = io.BytesIO()
