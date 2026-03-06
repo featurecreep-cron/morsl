@@ -91,13 +91,13 @@ class TestRecipesWithRating:
 
     def test_none_rating_excluded(self, sample_recipes, recipe_factory):
         unrated = recipe_factory(99, "Unrated Dish", rating=None)
-        recipes = sample_recipes + [unrated]
+        recipes = [*sample_recipes, unrated]
         result = Recipe.recipes_with_rating(recipes, 3)
         assert unrated not in result
 
     def test_none_rating_negative_excluded(self, sample_recipes, recipe_factory):
         unrated = recipe_factory(99, "Unrated Dish", rating=None)
-        recipes = sample_recipes + [unrated]
+        recipes = [*sample_recipes, unrated]
         result = Recipe.recipes_with_rating(recipes, -3)
         assert unrated not in result
 
