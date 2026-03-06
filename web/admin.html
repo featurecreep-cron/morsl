@@ -41,20 +41,24 @@
     <header class="admin-header" x-show="adminReady" x-cloak>
         <h1 style="margin-left: 2.5rem;" x-text="settings.app_name || 'Morsl'"></h1>
         <div class="header-right">
-            <div class="tier-selector" role="radiogroup" aria-label="Admin complexity tier">
+            <div class="tier-selector" role="radiogroup" aria-label="Admin complexity tier"
+                 title="Controls which settings are visible. Standard: essentials only. Advanced: display, integration, and tuning. Expert: all features including branding.">
                 <button class="tier-pill" role="radio"
                         :aria-checked="adminTier === 'essential'"
-                        @click="setTier('essential')">
+                        @click="setTier('essential')"
+                        title="Essential settings for everyday use">
                     <span class="tier-label-full">Standard</span><span class="tier-label-short">S</span>
                 </button>
                 <button class="tier-pill" role="radio"
                         :aria-checked="adminTier === 'standard'"
-                        @click="setTier('standard')">
+                        @click="setTier('standard')"
+                        title="Display, integration, and tuning options">
                     <span class="tier-label-full">Advanced</span><span class="tier-label-short">A</span>
                 </button>
                 <button class="tier-pill" role="radio"
                         :aria-checked="adminTier === 'advanced'"
-                        @click="setTier('advanced')">
+                        @click="setTier('advanced')"
+                        title="All features including branding and custom icons">
                     <span class="tier-label-full">Expert</span><span class="tier-label-short">E</span>
                 </button>
             </div>
@@ -569,8 +573,8 @@
             </template>
         </section>
 
-        <!-- Weekly Generation -->
-        <section class="admin-section">
+        <!-- Weekly Generation (only shown when templates exist) -->
+        <section class="admin-section" x-show="templates.length > 0" x-transition>
             <h2 class="section-title">Generate Weekly Plan</h2>
             <small class="section-help">Generate a multi-day meal plan from a template.</small>
             <div class="generate-row" style="margin-bottom:0.75rem;">

@@ -65,6 +65,15 @@
                            placeholder="Your Tandoor API token"
                            @keydown.enter="testConnection()">
                     <span class="setup-hint">Found in Tandoor under Settings &rarr; API Tokens</span>
+                    <details class="setup-details">
+                        <summary>How do I get a token?</summary>
+                        <ol class="setup-help-steps">
+                            <li>Open your Tandoor instance in a browser</li>
+                            <li>Click the user icon (top right) &rarr; <strong>Settings</strong></li>
+                            <li>Scroll down to <strong>API Tokens</strong></li>
+                            <li>Click <strong>Create</strong>, give it a name (e.g. "morsl"), and copy the token</li>
+                        </ol>
+                    </details>
                 </div>
 
                 <div x-show="testResult" class="setup-test-result" role="alert"
@@ -954,7 +963,8 @@
                     <p class="setup-subtitle">Your meal plan generator is ready. Let's see what's on the menu.</p>
 
                     <div class="setup-actions" style="justify-content:center;">
-                        <button class="setup-btn setup-btn-primary" @click="finishSetup()">Show Me the Menu</button>
+                        <a class="setup-btn setup-btn-primary" href="/admin#generate">Generate First Menu</a>
+                        <button class="setup-btn setup-btn-secondary" @click="finishSetup()">Show Me the Menu</button>
                     </div>
                 </div>
             </div>

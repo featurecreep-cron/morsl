@@ -914,3 +914,25 @@ textarea.setup-input {
         text-align: center;
     }
 }
+
+/* Collapsible help sections */
+.setup-details {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted, rgba(255,255,255,0.5));
+}
+.setup-details summary {
+    cursor: pointer;
+    color: var(--accent-color, #7a8b9a);
+}
+.setup-details summary:hover {
+    text-decoration: underline;
+}
+.setup-help-steps {
+    margin: 0.5rem 0 0 1.25rem;
+    padding: 0;
+    line-height: 1.6;
+}
+.setup-help-steps li {
+    margin-bottom: 0.25rem;
+}
