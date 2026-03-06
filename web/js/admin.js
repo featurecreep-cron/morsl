@@ -69,6 +69,7 @@ function adminApp() {
         _mappingKwDebounceId: null,
         mappingFoodSearch: '',
         mappingFoodResults: [],
+        mappingFoodSearched: false,
         _mappingFoodDebounceId: null,
 
         // Polling
@@ -2226,6 +2227,7 @@ function adminApp() {
             this._mappingFoodDebounceId = setTimeout(async () => {
                 if (!this.mappingFoodSearch || this.mappingFoodSearch.length < CONST.MIN_KEYWORD_SEARCH_LEN) {
                     this.mappingFoodResults = [];
+                    this.mappingFoodSearched = false;
                     return;
                 }
                 try {
@@ -2237,6 +2239,7 @@ function adminApp() {
                 } catch (e) {
                     this.mappingFoodResults = [];
                 }
+                this.mappingFoodSearched = true;
             }, CONST.FOOD_DEBOUNCE_MS);
         },
 

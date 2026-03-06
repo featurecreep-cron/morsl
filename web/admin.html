@@ -200,6 +200,8 @@
                 <div class="schedule-preview"
                      x-text="'Runs ' + formatScheduleDays(scheduleForm.day_of_week) + ' at ' + String(scheduleForm.hour).padStart(2,'0') + ':' + String(scheduleForm.minute).padStart(2,'0') + ' (' + (settings.timezone || 'UTC') + ')'">
                 </div>
+                <!-- Advanced: schedule options -->
+                <div x-show="tierVisible('standard')">
                 <div class="branding-subheader">Options</div>
                 <div class="settings-row">
                     <div class="settings-label">Enabled</div>
@@ -215,6 +217,9 @@
                         <span class="toggle-track"></span>
                     </label>
                 </div>
+                </div>
+                <!-- Advanced: meal plan integration -->
+                <div x-show="tierVisible('standard')">
                 <div class="branding-subheader">Meal Plan</div>
                 <div class="settings-row">
                     <div class="settings-label">Save to Meal Plan</div>
@@ -242,6 +247,7 @@
                                x-model.number="scheduleForm.cleanup_uncooked_days"
                                min="0" max="30">
                     </div>
+                </div>
                 </div>
                 <div class="schedule-form-actions">
                     <button class="btn-generate" @click="saveSchedule()">Save</button>
@@ -894,6 +900,10 @@
                                     </li>
                                 </template>
                             </ul>
+                            <small class="field-hint" x-show="mappingKwSearch.length >= 2 && mappingKwResults.length === 0 && keywords.length === 0"
+                                   style="color:var(--text-muted);">Could not load keywords from Tandoor. Check your connection.</small>
+                            <small class="field-hint" x-show="mappingKwSearch.length >= 2 && mappingKwResults.length === 0 && keywords.length > 0"
+                                   style="color:var(--text-muted);">No matching keywords found.</small>
                         </div>
                     </template>
                     <template x-if="newKwName">
@@ -942,6 +952,8 @@
                                     </li>
                                 </template>
                             </ul>
+                            <small class="field-hint" x-show="mappingFoodSearched && mappingFoodSearch.length >= 2 && mappingFoodResults.length === 0"
+                                   style="color:var(--text-muted);">No matching foods found.</small>
                         </div>
                     </template>
                     <template x-if="newFoodName">
