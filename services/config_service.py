@@ -13,6 +13,9 @@ from utils import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
+# Category IDs renamed in categories.json migration — remap in profiles too
+_CATEGORY_REMAP = {"by-cuisine": "by-spirit", "by-meal": "by-style"}
+
 
 @dataclass
 class ProfileInfo:
@@ -41,6 +44,26 @@ class ConfigService:
 
     def __init__(self, profiles_dir: str = "data/profiles") -> None:
         self.profiles_dir = profiles_dir
+        self._migrate_profile_categories()
+
+    def _migrate_profile_categories(self) -> None:
+        """Rewrite profile files that use old category IDs."""
+        if not os.path.isdir(self.profiles_dir):
+            return
+        for filename in sorted(os.listdir(self.profiles_dir)):
+            if not filename.endswith(".json"):
+                continue
+            path = os.path.join(self.profiles_dir, filename)
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                old_cat = data.get("category", "")
+                if old_cat in _CATEGORY_REMAP:
+                    data["category"] = _CATEGORY_REMAP[old_cat]
+                    atomic_write_json(path, data)
+                    logger.info("Migrated profile %s category %s → %s", filename, old_cat, data["category"])
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Skipping profile migration for %s: %s", filename, e)
 
     # ---- Profile CRUD ----
 
@@ -138,7 +161,7 @@ class ConfigService:
                         constraint_count=constraint_count,
                         description=description,
                         icon=config.get("icon", ""),
-                        category=config.get("category", ""),
+                        category=_CATEGORY_REMAP.get(config.get("category", ""), config.get("category", "")),
                         default=is_default,
                         show_on_menu=config.get("show_on_menu", True),
                         item_noun=config.get("item_noun", ""),
