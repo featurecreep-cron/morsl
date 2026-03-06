@@ -143,6 +143,7 @@ class GenerationService:
                 )
 
         except Exception as e:
+            logger.warning("Menu generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
             self._status.error = str(e)

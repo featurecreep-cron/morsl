@@ -155,11 +155,11 @@ def format_date(string: str, future: bool = False) -> tuple[datetime, bool]:
         return date, after
 
     after, offset, _interval = split_offset(string)
-    # TODO support more time intervals that days
-    offset: timedelta = timedelta(days=offset)
+    # TODO support more time intervals than days
+    delta: timedelta = timedelta(days=offset)
     if future:
-        return now() + offset, after
-    return now() - offset, after
+        return now() + delta, after
+    return now() - delta, after
 
 
 def cached(func: FuncType) -> FuncType:

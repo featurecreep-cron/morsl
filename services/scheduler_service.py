@@ -190,8 +190,8 @@ class SchedulerService:
                         "cleanup_days": cleanup_days,
                     },
                 )
-            except Exception as e:
-                _logger.warning(f"Scheduled cleanup failed (non-fatal): {e}")
+            except Exception:
+                _logger.warning("Scheduled cleanup failed (non-fatal)", exc_info=True)
 
         # Step 3: Generate
         schedule["last_run"] = now().isoformat()
@@ -212,8 +212,8 @@ class SchedulerService:
             if schedule.get("create_meal_plan") and self._weekly_save_callback:
                 try:
                     await self._weekly_save_callback(template_name)
-                except Exception as e:
-                    _logger.warning(f"Scheduled weekly save failed (non-fatal): {e}")
+                except Exception:
+                    _logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
         else:
             await self._generation_callback(schedule["profile"])
 
@@ -226,8 +226,8 @@ class SchedulerService:
                             "meal_plan_type": mp_type,
                         },
                     )
-                except Exception as e:
-                    _logger.warning(f"Scheduled meal plan creation failed (non-fatal): {e}")
+                except Exception:
+                    _logger.warning("Scheduled meal plan creation failed (non-fatal)", exc_info=True)
 
     def _save(self) -> None:
         path = os.path.join(self.data_dir, "schedules.json")

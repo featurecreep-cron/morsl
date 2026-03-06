@@ -13,9 +13,9 @@ from utils import format_date
 def _apply_date_filters(recipes: List[Recipe], constraint: Dict[str, Any]) -> List[Recipe]:
     """Apply cooked_date and created_date filters from a parsed constraint."""
     if cooked_date := constraint.get("cooked_date"):
-        recipes = Recipe.recipesWithDate(recipes, "cookedon", cooked_date, after=constraint.get("cooked_after", False))
+        recipes = Recipe.recipes_with_date(recipes, "cookedon", cooked_date, after=constraint.get("cooked_after", False))
     if created_date := constraint.get("created_date"):
-        recipes = Recipe.recipesWithDate(recipes, "createdon", created_date, after=constraint.get("created_after", False))
+        recipes = Recipe.recipes_with_date(recipes, "createdon", created_date, after=constraint.get("created_after", False))
     return recipes
 
 
@@ -173,7 +173,7 @@ class MenuService:
             weight = 1 if soft else int(c.get("weight", 0))
 
             if ctype == "keyword":
-                found_recipes = Recipe.recipesWithKeyword(self.recipes, c.get("keywords", []))
+                found_recipes = Recipe.recipes_with_keyword(self.recipes, c.get("keywords", []))
                 found_recipes = _apply_date_filters(found_recipes, c)
                 self.recipe_picker.add_keyword_constraint(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
@@ -202,7 +202,7 @@ class MenuService:
                 else:
                     rating_condition = None
 
-                found_recipes = Recipe.recipesWithRating(found_recipes, rating_condition)
+                found_recipes = Recipe.recipes_with_rating(found_recipes, rating_condition)
                 self.recipe_picker.add_rating_constraints(found_recipes, c["count"], c["operator"], exclude=exclude, weight=weight, upper_bound=c.get("upper_bound"))
 
             elif ctype == "cookedon":
@@ -211,10 +211,10 @@ class MenuService:
 
                 if within_days is not None:
                     d, _ = format_date(f"{within_days}d")
-                    found_recipes = Recipe.recipesWithDate(self.recipes, "cookedon", d, after=True)
+                    found_recipes = Recipe.recipes_with_date(self.recipes, "cookedon", d, after=True)
                 elif older_than_days is not None:
                     d, _ = format_date(f"-{older_than_days}d")
-                    found_recipes = Recipe.recipesWithDate(self.recipes, "cookedon", d, after=False)
+                    found_recipes = Recipe.recipes_with_date(self.recipes, "cookedon", d, after=False)
                 else:
                     found_recipes = list(self.recipes)
 
@@ -228,10 +228,10 @@ class MenuService:
 
                 if within_days is not None:
                     d, _ = format_date(f"{within_days}d")
-                    found_recipes = Recipe.recipesWithDate(self.recipes, "createdon", d, after=True)
+                    found_recipes = Recipe.recipes_with_date(self.recipes, "createdon", d, after=True)
                 elif older_than_days is not None:
                     d, _ = format_date(f"-{older_than_days}d")
-                    found_recipes = Recipe.recipesWithDate(self.recipes, "createdon", d, after=False)
+                    found_recipes = Recipe.recipes_with_date(self.recipes, "createdon", d, after=False)
                 else:
                     found_recipes = list(self.recipes)
 

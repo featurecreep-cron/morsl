@@ -175,7 +175,7 @@ class TandoorAPI:
 
     def get_keyword_tree(self, kw_id: str | int, params: dict[str, Any] | None = None, **kwargs) -> list[dict[str, Any]]:
         """
-        Fetch a keyword and it's descendants from the API.
+        Fetch a keyword and its descendants from the API.
         Returns:
             list: A list of keyword objects in tandoor format.
         """
@@ -191,7 +191,7 @@ class TandoorAPI:
 
     def get_food_tree(self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs) -> List[Dict[str, Any]]:
         """
-        Fetch a food and it's descendants from the API.
+        Fetch a food and its descendants from the API.
         Returns:
             list: A list of food objects in tandoor format.
         """
@@ -305,8 +305,8 @@ class TandoorAPI:
         self.logger.debug(f"Succesfully deleted meal plan {obj_id}.")
 
     @cached
-    def get_food_substitutes(self, id: Union[str, int], substitute: str) -> List[Dict[str, Any]]:
-        url = f"{self.url}{substitute}/{id}/substitutes/"
+    def get_food_substitutes(self, food_id: Union[str, int], substitute: str) -> List[Dict[str, Any]]:
+        url = f"{self.url}{substitute}/{food_id}/substitutes/"
         self.logger.debug(f"Connecting to tandoor api at url: {url}")
         response = self.session.get(url, params={"onhand": 1}, timeout=DEFAULT_TIMEOUT)
 

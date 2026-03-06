@@ -63,12 +63,12 @@ class Recipe(TandoorEntity):
         self.ingredients = []
 
     @staticmethod
-    def recipesWithKeyword(recipes: List["Recipe"], keywords: List["Keyword"]) -> List["Recipe"]:
+    def recipes_with_keyword(recipes: List["Recipe"], keywords: List["Keyword"]) -> List["Recipe"]:
         """Return recipes containing any of the given keywords."""
         return [r for r in recipes if any(k in r.keywords for k in [x.id for x in keywords])]
 
     @staticmethod
-    def recipesWithDate(recipes: List["Recipe"], field: str, date: datetime, after: bool = True) -> List["Recipe"]:
+    def recipes_with_date(recipes: List["Recipe"], field: str, date: datetime, after: bool = True) -> List["Recipe"]:
         """Return recipes where *field* (createdon/cookedon) is before/after *date*."""
         if after:
             return [r for r in recipes if (d := getattr(r, field, None)) is not None and d > date]
@@ -77,7 +77,7 @@ class Recipe(TandoorEntity):
             return [r for r in recipes if (d := getattr(r, field, None)) is not None and d < date]
 
     @staticmethod
-    def recipesWithRating(recipes: List["Recipe"], rating: int) -> List["Recipe"]:
+    def recipes_with_rating(recipes: List["Recipe"], rating: int) -> List["Recipe"]:
         """Return recipes matching *rating*. Negative means <= abs(rating)."""
         lessthan = rating < 0
         if lessthan:
@@ -85,7 +85,7 @@ class Recipe(TandoorEntity):
         else:
             return [r for r in recipes if getattr(r, "rating", 0) >= rating]
 
-    def addDetails(self, api: "TandoorAPI") -> None:
+    def add_details(self, api: "TandoorAPI") -> None:
         """Populate self.ingredients, substituting on-hand foods where possible."""
         recipe = api.get_recipe_details(self.id)
         for f in [i["food"] for s in recipe["steps"] for i in s["ingredients"]]:

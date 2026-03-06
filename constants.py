@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
-# ── Cache (factory defaults — runtime reads from settings where applicable) ──
+# Cache (factory defaults — runtime reads from settings where applicable)
 API_CACHE_MAXSIZE = 512
 API_CACHE_TTL_MINUTES = 240
 ADMIN_TOKEN_CACHE_MAXSIZE = 128
 ADMIN_TOKEN_CACHE_TTL_SECONDS = 86400
 
-# ── HTTP client ──────────────────────────────────────────────────────────────
+# HTTP client
 HTTP_CONNECT_TIMEOUT = 5
 HTTP_READ_TIMEOUT = 30
 DEFAULT_TIMEOUT = (HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT)
@@ -19,31 +19,31 @@ HTTP_POOL_CONNECTIONS = 5
 HTTP_POOL_MAXSIZE = 10
 API_PAGE_SIZE = 100
 
-# ── SSE & shutdown ───────────────────────────────────────────────────────────
+# SSE & shutdown
 SSE_QUEUE_TIMEOUT = 30.0
 GENERATION_SHUTDOWN_TIMEOUT = 10.0
 
-# ── Upload limits ────────────────────────────────────────────────────────────
+# Upload limits
 CUSTOM_ICON_MAX_SIZE = 512 * 1024
 BRANDING_IMAGE_MAX_SIZE = 5 * 1024 * 1024
 GZIP_MIN_SIZE = 500
 
-# ── History ──────────────────────────────────────────────────────────────────
+# History
 MAX_HISTORY_ENTRIES = 100
 
-# ── Solver ───────────────────────────────────────────────────────────────────
+# Solver
 SOLVER_SLACK_EPSILON = 1e-6
 SOLVER_RANDOM_SCALE = 10
 
-# ── Paths ────────────────────────────────────────────────────────────────────
+# Paths
 UPLOADS_DIR = Path("data/branding")
 ICONS_DIR = Path("web/icons")
 DEFAULT_FAVICON_PATH = ICONS_DIR / "default-favicon.svg"
 
-# ── Menu generation ──────────────────────────────────────────────────────────
+# Menu generation
 DEFAULT_CHOICES = 5
 
-# ── Settings factory defaults (settings-backed values) ───────────────────────
+# Settings factory defaults (settings-backed values)
 DEFAULT_MENU_POLL_SECONDS = 60
 DEFAULT_TOAST_SECONDS = 2
 DEFAULT_MAX_DISCOVER_GENS = 10

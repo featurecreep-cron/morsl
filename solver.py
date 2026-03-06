@@ -175,9 +175,7 @@ class RecipePicker:
                 self.numrecipes -= 1
                 self.logger.info(f"Infeasible at {self.numrecipes + 1} recipes, trying {self.numrecipes}...")
             else:
-                self.logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                self.logger.info("No solution found, adjustment of criteria required.")
-                self.logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                self.logger.warning("No solution found at %d recipes — adjustment of criteria required.", self.numrecipes)
                 raise RuntimeError("No solution found.")
 
         if self.numrecipes < original_n:

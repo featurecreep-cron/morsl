@@ -160,6 +160,7 @@ class WeeklyGenerationService:
             self._status.warnings = result.get("warnings", [])
 
         except Exception as e:
+            logger.warning("Weekly generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
             self._status.error = str(e)

@@ -32,61 +32,61 @@ class TestRecipeEquality:
 class TestRecipesWithKeyword:
     def test_filters_matching_keywords(self, sample_recipes):
         kw_italian = Keyword({"id": 10, "name": "Italian"})
-        result = Recipe.recipesWithKeyword(sample_recipes, [kw_italian])
+        result = Recipe.recipes_with_keyword(sample_recipes, [kw_italian])
         assert all(10 in r.keywords for r in result)
         assert len(result) == 3  # Pasta Carbonara, Pizza, Lasagna
 
     def test_multiple_keywords(self, sample_recipes):
         kw_italian = Keyword({"id": 10, "name": "Italian"})
         kw_japanese = Keyword({"id": 40, "name": "Japanese"})
-        result = Recipe.recipesWithKeyword(sample_recipes, [kw_italian, kw_japanese])
+        result = Recipe.recipes_with_keyword(sample_recipes, [kw_italian, kw_japanese])
         assert len(result) == 5  # 3 Italian + 2 Japanese
 
     def test_no_matching_keywords(self, sample_recipes):
         kw_none = Keyword({"id": 999, "name": "Nonexistent"})
-        result = Recipe.recipesWithKeyword(sample_recipes, [kw_none])
+        result = Recipe.recipes_with_keyword(sample_recipes, [kw_none])
         assert len(result) == 0
 
     def test_empty_recipes(self):
         kw = Keyword({"id": 10, "name": "Italian"})
-        result = Recipe.recipesWithKeyword([], [kw])
+        result = Recipe.recipes_with_keyword([], [kw])
         assert len(result) == 0
 
 
 class TestRecipesWithDate:
     def test_filter_after_date(self, sample_recipes):
         cutoff = datetime(2024, 5, 1, tzinfo=timezone.utc)
-        result = Recipe.recipesWithDate(sample_recipes, "cookedon", cutoff, after=True)
+        result = Recipe.recipes_with_date(sample_recipes, "cookedon", cutoff, after=True)
         assert all(r.cookedon > cutoff for r in result)
 
     def test_filter_before_date(self, sample_recipes):
         cutoff = datetime(2024, 5, 1, tzinfo=timezone.utc)
-        result = Recipe.recipesWithDate(sample_recipes, "cookedon", cutoff, after=False)
+        result = Recipe.recipes_with_date(sample_recipes, "cookedon", cutoff, after=False)
         assert all(r.cookedon < cutoff for r in result)
 
     def test_none_dates_excluded(self, sample_recipes):
         cutoff = datetime(2020, 1, 1, tzinfo=timezone.utc)
-        result = Recipe.recipesWithDate(sample_recipes, "cookedon", cutoff, after=True)
+        result = Recipe.recipes_with_date(sample_recipes, "cookedon", cutoff, after=True)
         # Sushi and Fish & Chips have cookedon=None, should be excluded
         assert all(r.cookedon is not None for r in result)
 
     def test_createdon_filter(self, sample_recipes):
         cutoff = datetime(2023, 6, 1, tzinfo=timezone.utc)
-        result = Recipe.recipesWithDate(sample_recipes, "createdon", cutoff, after=True)
+        result = Recipe.recipes_with_date(sample_recipes, "createdon", cutoff, after=True)
         assert all(r.createdon > cutoff for r in result)
 
 
 class TestRecipesWithRating:
     def test_positive_rating_gte(self, sample_recipes):
-        result = Recipe.recipesWithRating(sample_recipes, 4)
+        result = Recipe.recipes_with_rating(sample_recipes, 4)
         assert all(r.rating >= 4 for r in result)
 
     def test_negative_rating_lte(self, sample_recipes):
-        result = Recipe.recipesWithRating(sample_recipes, -3)
+        result = Recipe.recipes_with_rating(sample_recipes, -3)
         assert all(0 < r.rating <= 3 for r in result)
 
     def test_zero_rating(self, sample_recipes):
-        result = Recipe.recipesWithRating(sample_recipes, 0)
+        result = Recipe.recipes_with_rating(sample_recipes, 0)
         assert len(result) == len(sample_recipes)
 
 

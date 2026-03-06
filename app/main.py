@@ -89,8 +89,8 @@ async def lifespan(app: FastAPI):
                 )
                 # Wait for generation to complete so downstream steps can use the result
                 await gen_svc.wait_for_completion()
-            except Exception as e:
-                logger.warning(f"Scheduled generation failed for profile '{profile}': {e}")
+            except Exception:
+                logger.warning("Scheduled generation failed for profile '%s'", profile, exc_info=True)
 
         async def meal_plan_callback(action: str, params: dict) -> None:
             """Handle meal plan pipeline actions dispatched by the scheduler."""
@@ -135,8 +135,8 @@ async def lifespan(app: FastAPI):
                     settings_service=settings_svc,
                 )
                 await weekly_svc.wait_for_completion()
-            except Exception as e:
-                logger.warning(f"Scheduled weekly generation failed for '{template_name}': {e}")
+            except Exception:
+                logger.warning("Scheduled weekly generation failed for '%s'", template_name, exc_info=True)
 
         async def weekly_save_callback(template_name: str) -> None:
             try:
@@ -152,8 +152,8 @@ async def lifespan(app: FastAPI):
                     weekly_plan=plan,
                     shared=[],
                 )
-            except Exception as e:
-                logger.warning(f"Scheduled weekly save failed (non-fatal): {e}")
+            except Exception:
+                logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
 
         scheduler_svc.set_generation_callback(generation_callback)
         scheduler_svc.set_clear_callback(get_generation_service(settings).clear_menu)
@@ -162,8 +162,8 @@ async def lifespan(app: FastAPI):
         scheduler_svc.set_weekly_save_callback(weekly_save_callback)
         scheduler_svc.start()
         logger.info("Scheduler started")
-    except Exception as e:
-        logger.warning(f"Scheduler startup failed (non-fatal): {e}")
+    except Exception:
+        logger.warning("Scheduler startup failed (non-fatal)", exc_info=True)
 
     yield
 
@@ -172,21 +172,21 @@ async def lifespan(app: FastAPI):
     try:
         gen_service = get_generation_service(settings)
         await gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception as e:
-        logger.warning(f"Error during shutdown cleanup: {e}")
+    except Exception:
+        logger.warning("Error during shutdown cleanup", exc_info=True)
 
     try:
         weekly_gen_service = get_weekly_generation_service(settings)
         await weekly_gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception as e:
-        logger.warning(f"Weekly generation shutdown error: {e}")
+    except Exception:
+        logger.warning("Weekly generation shutdown error", exc_info=True)
 
     # Stop scheduler
     try:
         scheduler_svc = get_scheduler_service(settings)
         scheduler_svc.stop()
-    except Exception as e:
-        logger.warning(f"Scheduler shutdown error: {e}")
+    except Exception:
+        logger.warning("Scheduler shutdown error", exc_info=True)
 
     logger.info("Shutdown complete")
 
