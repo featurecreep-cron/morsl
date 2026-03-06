@@ -125,13 +125,13 @@ def generate_icons(source: Path, output_dir: Path) -> None:
         favicon_svg.write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">\n'
-            '  <style>\n'
-            '    rect { fill: #f0f0f0; }\n'
-            '    @media (prefers-color-scheme: dark) { rect { fill: #1a1a1a; } }\n'
-            '  </style>\n'
+            "  <style>\n"
+            "    rect { fill: #f0f0f0; }\n"
+            "    @media (prefers-color-scheme: dark) { rect { fill: #1a1a1a; } }\n"
+            "  </style>\n"
             '  <rect width="32" height="32" rx="6"/>\n'
             f'  <image width="24" height="24" x="4" y="4" href="data:image/png;base64,{b64_24}"/>\n'
-            '</svg>\n'
+            "</svg>\n"
         )
     else:
         # Raster source: embed 32x32 PNG as base64 data-URI in a minimal SVG
