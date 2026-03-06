@@ -142,7 +142,7 @@
 
                 <div class="setup-actions">
                     <button class="setup-btn setup-btn-secondary" @click="_addProfileMode ? (window.location.href = '/admin') : (step = 1)">Back</button>
-                    <button class="setup-btn setup-btn-secondary" x-show="!_addProfileMode" @click="profileQueue = []; step = 4">Skip Profiles</button>
+                    <button class="setup-btn setup-btn-secondary" x-show="!_addProfileMode" @click="profileQueue = []; step = 4">Skip for Now</button>
                     <button class="setup-btn setup-btn-primary"
                             :disabled="!hasProfileSelections"
                             @click="buildProfileQueue()">Next</button>

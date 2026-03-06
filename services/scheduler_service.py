@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import tzinfo
 from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,10 +18,11 @@ from utils import atomic_write_json, now
 class SchedulerService:
     """Manages scheduled menu generation using APScheduler."""
 
-    def __init__(self, data_dir: str = "data") -> None:
+    def __init__(self, data_dir: str = "data", timezone: tzinfo | None = None) -> None:
         self.data_dir = data_dir
+        self._timezone: tzinfo = timezone or ZoneInfo("UTC")
         self._schedules: Dict[str, Dict[str, Any]] = {}
-        self._scheduler = AsyncIOScheduler()
+        self._scheduler = AsyncIOScheduler(timezone=self._timezone)
         self._generation_callback: Optional[Callable[..., Any]] = None
         self._clear_callback: Optional[Callable[[], None]] = None
         self._meal_plan_callback: Optional[Callable[..., Any]] = None
@@ -53,6 +56,14 @@ class SchedulerService:
             if schedule.get("enabled", True):
                 self._add_job(schedule_id, schedule)
         self._scheduler.start()
+
+    def update_timezone(self, tz: tzinfo) -> None:
+        """Update timezone and reschedule all jobs."""
+        self._timezone = tz
+        for schedule_id, schedule in self._schedules.items():
+            if schedule.get("enabled", True):
+                self._remove_job(schedule_id)
+                self._add_job(schedule_id, schedule)
 
     @property
     def is_running(self) -> bool:
@@ -143,6 +154,7 @@ class SchedulerService:
             day_of_week=schedule["day_of_week"],
             hour=schedule["hour"],
             minute=schedule["minute"],
+            timezone=self._timezone,
         )
         self._scheduler.add_job(
             self._run_scheduled_generation,

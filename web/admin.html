@@ -113,7 +113,8 @@
                 <select x-model="selectedProfile" :disabled="status.state === 'generating'">
                     <template x-for="p in profiles" :key="p.name">
                         <option :value="p.name"
-                                x-text="p.name + ' (' + itemNounText(p.choices, p.item_noun || settings.item_noun) + ', ' + p.constraint_count + ' rules)'">
+                                x-text="p.name + ' (' + itemNounText(p.choices, p.item_noun || settings.item_noun) + ', ' + p.constraint_count + ' rules)'"
+                                :title="p.constraint_count ? 'Rules filter which recipes are eligible — keyword requirements, rating minimums, ingredient preferences, etc.' : 'No rules — this profile picks from all your recipes'">
                         </option>
                     </template>
                 </select>
@@ -193,7 +194,7 @@
                     </div>
                 </div>
                 <div class="schedule-preview"
-                     x-text="'Runs ' + formatScheduleDays(scheduleForm.day_of_week) + ' at ' + String(scheduleForm.hour).padStart(2,'0') + ':' + String(scheduleForm.minute).padStart(2,'0')">
+                     x-text="'Runs ' + formatScheduleDays(scheduleForm.day_of_week) + ' at ' + String(scheduleForm.hour).padStart(2,'0') + ':' + String(scheduleForm.minute).padStart(2,'0') + ' (' + (settings.timezone || 'UTC') + ')'">
                 </div>
                 <div class="branding-subheader">Options</div>
                 <div class="settings-row">
@@ -250,7 +251,7 @@
                     <span style="flex:1; display:flex; flex-wrap:wrap; align-items:center; gap:0.35rem;">
                         <strong x-text="s.template || s.profile"></strong>
                         <span x-show="s.template" class="schedule-badge">Weekly</span>
-                        <span x-text="formatScheduleDays(s.day_of_week) + ' @ ' + String(s.hour).padStart(2,'0') + ':' + String(s.minute).padStart(2,'0')"></span>
+                        <span x-text="formatScheduleDays(s.day_of_week) + ' @ ' + String(s.hour).padStart(2,'0') + ':' + String(s.minute).padStart(2,'0') + ' ' + (settings.timezone || 'UTC')"></span>
                         <span x-show="s.create_meal_plan" class="schedule-badge">Meal Plan</span>
                         <span x-show="!s.enabled" class="schedule-badge schedule-badge--off">Disabled</span>
                     </span>
@@ -1129,7 +1130,7 @@
                 </div>
                 <div class="settings-row">
                     <div class="settings-label">
-                        Ratings
+                        Enable Rating
                         <small>Let users rate recipes from the menu page</small>
                     </div>
                     <label class="toggle-switch">
@@ -1182,6 +1183,33 @@
                                @change="toggleSetting('save_ratings_to_tandoor', $event.target.checked)">
                         <span class="toggle-track"></span>
                     </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Timezone
+                        <small>Controls when scheduled menus are generated. Set this to match your local time. Typically set via the <code>TZ</code> environment variable in Docker.</small>
+                    </div>
+                    <input type="text" class="drawer-input"
+                           :value="settings.timezone || 'UTC'"
+                           @change="toggleSetting('timezone', $event.target.value)"
+                           placeholder="America/New_York"
+                           list="tz-suggestions"
+                           style="width:220px;">
+                    <datalist id="tz-suggestions">
+                        <option value="America/New_York">
+                        <option value="America/Chicago">
+                        <option value="America/Denver">
+                        <option value="America/Los_Angeles">
+                        <option value="America/Anchorage">
+                        <option value="Pacific/Honolulu">
+                        <option value="Europe/London">
+                        <option value="Europe/Berlin">
+                        <option value="Europe/Paris">
+                        <option value="Asia/Tokyo">
+                        <option value="Asia/Shanghai">
+                        <option value="Australia/Sydney">
+                        <option value="UTC">
+                    </datalist>
                 </div>
             </div>
         </section>
@@ -1720,7 +1748,7 @@
 
         <div class="drawer-footer">
             <button class="btn-generate btn-secondary" @click="previewProfile()" :disabled="profilePreviewing" style="flex:0 0 auto; padding:0 1rem;">
-                <span x-text="profilePreviewing ? '...' : 'Test'"></span>
+                <span x-text="profilePreviewing ? '...' : 'Test Profile'"></span>
             </button>
             <span class="preview-result" x-show="previewResult !== null" x-text="typeof previewResult === 'number' ? previewResult + ' recipes match' : previewResult"></span>
             <button class="btn-generate" @click="saveProfile()" :disabled="profileSaving" style="margin-left:auto;">

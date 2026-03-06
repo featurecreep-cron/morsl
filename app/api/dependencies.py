@@ -132,7 +132,13 @@ def get_meal_plan_service(
 
 
 def get_scheduler_service(settings: Settings = Depends(get_settings)) -> SchedulerService:
-    return _get_or_create("scheduler", lambda: SchedulerService(data_dir=settings.data_dir))
+    def _create() -> SchedulerService:
+        settings_svc = get_settings_service(settings)
+        return SchedulerService(
+            data_dir=settings.data_dir,
+            timezone=settings_svc.get_timezone(),
+        )
+    return _get_or_create("scheduler", _create)
 
 
 def require_admin(

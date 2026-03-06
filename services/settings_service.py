@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from typing import Any, Dict
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from constants import (
     API_CACHE_TTL_MINUTES,
@@ -45,6 +46,7 @@ PUBLIC_KEYS = frozenset(
         "max_discover_generations",
         "max_previous_recipes",
         "item_noun",
+        "timezone",
     }
 )
 
@@ -79,6 +81,7 @@ DEFAULTS: Dict[str, Any] = {
     "max_discover_generations": DEFAULT_MAX_DISCOVER_GENS,
     "max_previous_recipes": DEFAULT_MAX_PREVIOUS_RECIPES,
     "item_noun": "",
+    "timezone": os.environ.get("TZ", "UTC"),
     "tandoor_url": "",
     "tandoor_token_b64": "",
 }
@@ -121,9 +124,23 @@ class SettingsService:
                         valid[key] = max(lo, min(hi, int(valid[key])))
                     except (TypeError, ValueError):
                         valid[key] = DEFAULTS[key]
+            # Validate timezone if provided
+            if "timezone" in valid:
+                try:
+                    ZoneInfo(valid["timezone"])
+                except (ZoneInfoNotFoundError, KeyError):
+                    valid.pop("timezone")
             self._settings.update(valid)
             self._save()
             return dict(self._settings)
+
+    def get_timezone(self) -> ZoneInfo:
+        """Return the configured timezone as a ZoneInfo object."""
+        tz_name = self._settings.get("timezone") or os.environ.get("TZ", "UTC")
+        try:
+            return ZoneInfo(tz_name)
+        except (ZoneInfoNotFoundError, KeyError):
+            return ZoneInfo("UTC")
 
     def _save(self) -> None:
         path = os.path.join(self.data_dir, "settings.json")
