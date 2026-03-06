@@ -671,7 +671,7 @@ function resolveIconLarge(key) {
  * Returns a large placeholder SVG for a recipe card.
  * Lookup priority: keyword mapping → food mapping → profile name match → random.
  */
-function getPlaceholderSvg(recipe, profileName, iconMappings) {
+function getPlaceholderSvg(recipe, profileName, iconMappings, logoUrl) {
     const kwIcons = (iconMappings && iconMappings.keyword_icons) || {};
     const foodIcons = (iconMappings && iconMappings.food_icons) || {};
 
@@ -714,7 +714,10 @@ function getPlaceholderSvg(recipe, profileName, iconMappings) {
         }
     }
 
-    // 4. Random from built-in icons
+    // 4. Fall back to logo
+    if (logoUrl) return getBrandIcon(logoUrl);
+
+    // 5. Last resort: random built-in icon
     const keys = Object.keys(ICONS);
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
     return ICONS[randomKey].large;

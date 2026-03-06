@@ -1186,7 +1186,7 @@ function menuApp() {
 
         placeholderSvg(recipe) {
             void this._iconGen;
-            return getPlaceholderSvg(recipe, this.activeProfile, this.iconMappings);
+            return getPlaceholderSvg(recipe, this.activeProfile, this.iconMappings, this.settings.logo_url || this.loadingIconUrl || '');
         },
 
         ratingStars,
