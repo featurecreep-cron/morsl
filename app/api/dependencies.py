@@ -138,6 +138,7 @@ def get_scheduler_service(settings: Settings = Depends(get_settings)) -> Schedul
             data_dir=settings.data_dir,
             timezone=settings_svc.get_timezone(),
         )
+
     return _get_or_create("scheduler", _create)
 
 
