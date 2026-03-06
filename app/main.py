@@ -35,11 +35,13 @@ async def lifespan(app: FastAPI):
     logger.info("Server starting up")
     settings = get_settings()
 
-    # Ensure data directories exist
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    Path(settings.profiles_dir).mkdir(parents=True, exist_ok=True)
-    Path(settings.data_dir, "templates").mkdir(parents=True, exist_ok=True)
-    Path(settings.data_dir, "weekly_plans").mkdir(parents=True, exist_ok=True)
+    # Ensure data directories exist (may fail if volume is root-owned;
+    # the entrypoint script handles this, but guard here too)
+    for d in [UPLOADS_DIR, Path(settings.profiles_dir), Path(settings.data_dir, "templates"), Path(settings.data_dir, "weekly_plans")]:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            logger.warning("Cannot create %s — check volume ownership (needs UID 1000)", d)
 
     # Generate icons on startup if favicon.svg is missing (fresh container)
     icons_dir = ICONS_DIR
