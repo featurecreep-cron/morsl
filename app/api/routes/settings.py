@@ -114,13 +114,6 @@ def update_settings(
         if body["kiosk_pin"] != current_pin:
             revoke_admin_tokens()
     result = svc.update(body)
-    # Reschedule jobs if timezone changed
-    if "timezone" in body:
-        try:
-            scheduler = get_scheduler_service(settings)
-            scheduler.update_timezone(svc.get_timezone())
-        except Exception:
-            logger.warning("Failed to update scheduler timezone", exc_info=True)
     return _mask_secrets(result)
 
 

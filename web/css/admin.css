@@ -136,8 +136,13 @@
     padding: 0 1rem;
     border-bottom: 1px solid var(--btn-border, rgba(212, 168, 71, 0.35));
     flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
-
+.admin-tabs::-webkit-scrollbar {
+    display: none;
+}
 .admin-tab {
     background: none;
     border: none;
@@ -146,6 +151,8 @@
     font-family: var(--body-font, sans-serif);
     font-size: 0.9rem;
     padding: 0.6rem 1rem;
+    white-space: nowrap;
+    flex-shrink: 0;
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
     position: relative;

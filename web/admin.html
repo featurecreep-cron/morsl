@@ -1287,29 +1287,9 @@
                 <div class="settings-row">
                     <div class="settings-label">
                         Timezone
-                        <small>Controls when scheduled menus are generated. Set this to match your local time. Typically set via the <code>TZ</code> environment variable in Docker.</small>
+                        <small>Controls when scheduled menus fire. Set via the <code>TZ</code> environment variable in your Docker Compose file.</small>
                     </div>
-                    <input type="text" class="drawer-input"
-                           :value="settings.timezone || 'UTC'"
-                           @change="toggleSetting('timezone', $event.target.value)"
-                           placeholder="America/New_York"
-                           list="tz-suggestions"
-                           style="width:220px;">
-                    <datalist id="tz-suggestions">
-                        <option value="America/New_York">
-                        <option value="America/Chicago">
-                        <option value="America/Denver">
-                        <option value="America/Los_Angeles">
-                        <option value="America/Anchorage">
-                        <option value="Pacific/Honolulu">
-                        <option value="Europe/London">
-                        <option value="Europe/Berlin">
-                        <option value="Europe/Paris">
-                        <option value="Asia/Tokyo">
-                        <option value="Asia/Shanghai">
-                        <option value="Australia/Sydney">
-                        <option value="UTC">
-                    </datalist>
+                    <span class="drawer-input" style="width:220px; opacity:0.7; cursor:default;" x-text="settings.timezone || 'UTC'"></span>
                 </div>
             </div>
         </section>

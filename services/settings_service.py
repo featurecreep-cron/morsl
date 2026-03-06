@@ -84,7 +84,7 @@ DEFAULTS: Dict[str, Any] = {
     "max_discover_generations": DEFAULT_MAX_DISCOVER_GENS,
     "max_previous_recipes": DEFAULT_MAX_PREVIOUS_RECIPES,
     "item_noun": "",
-    "timezone": os.environ.get("TZ", "UTC"),
+    "timezone": "",  # Read-only: always computed from TZ env var
     "qr_menu_url": "",
     "qr_wifi_ssid": "",
     "qr_wifi_password": "",
@@ -108,12 +108,17 @@ class SettingsService:
     def get_all(self) -> Dict[str, Any]:
         """Return all settings (admin view)."""
         with self._lock:
-            return dict(self._settings)
+            result = dict(self._settings)
+            result["timezone"] = os.environ.get("TZ", "UTC")
+            return result
 
     def get_public(self) -> Dict[str, Any]:
         """Return only customer-visible settings."""
         with self._lock:
-            return {k: v for k, v in self._settings.items() if k in PUBLIC_KEYS}
+            result = {k: v for k, v in self._settings.items() if k in PUBLIC_KEYS}
+            if "timezone" in PUBLIC_KEYS:
+                result["timezone"] = os.environ.get("TZ", "UTC")
+            return result
 
     # Numeric settings with (min, max) bounds — validated in update()
     _BOUNDS: Dict[str, tuple] = {
@@ -133,19 +138,15 @@ class SettingsService:
                         valid[key] = max(lo, min(hi, int(valid[key])))
                     except (TypeError, ValueError):
                         valid[key] = DEFAULTS[key]
-            # Validate timezone if provided
-            if "timezone" in valid:
-                try:
-                    ZoneInfo(valid["timezone"])
-                except (ZoneInfoNotFoundError, KeyError):
-                    valid.pop("timezone")
+            # Timezone is read-only (set via TZ env var)
+            valid.pop("timezone", None)
             self._settings.update(valid)
             self._save()
             return dict(self._settings)
 
     def get_timezone(self) -> ZoneInfo:
-        """Return the configured timezone as a ZoneInfo object."""
-        tz_name = self._settings.get("timezone") or os.environ.get("TZ", "UTC")
+        """Return the timezone from the TZ environment variable."""
+        tz_name = os.environ.get("TZ", "UTC")
         try:
             return ZoneInfo(tz_name)
         except (ZoneInfoNotFoundError, KeyError):
