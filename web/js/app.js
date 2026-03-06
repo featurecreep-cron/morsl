@@ -266,6 +266,7 @@ function menuApp() {
                     }
                     document.title = this.settings.app_name || 'Morsl';
                     this._updateFaviconLinks();
+                    this._renderFooterQr();
                 }
             } catch (e) {
                 console.warn('Failed to load settings:', e);
@@ -279,6 +280,25 @@ function menuApp() {
             if (!url) return;
             document.querySelectorAll('link[rel="icon"]').forEach(link => {
                 link.href = url;
+            });
+        },
+
+        _renderFooterQr() {
+            if (!this.settings.qr_show_on_menu || typeof qrcode === 'undefined') return;
+            this.$nextTick(() => {
+                const render = (ref, data) => {
+                    if (!ref || !data) return;
+                    const container = ref.querySelector('.footer-qr-code');
+                    if (!container) return;
+                    try {
+                        const qr = qrcode(0, 'M');
+                        qr.addData(data);
+                        qr.make();
+                        container.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 1 });
+                    } catch (e) { /* skip */ }
+                };
+                render(this.$refs.footerQrWifi, this.settings.qr_wifi_string);
+                render(this.$refs.footerQrMenu, this.settings.qr_menu_url);
             });
         },
 

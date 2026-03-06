@@ -47,6 +47,9 @@ PUBLIC_KEYS = frozenset(
         "max_previous_recipes",
         "item_noun",
         "timezone",
+        "qr_menu_url",
+        "qr_wifi_string",
+        "qr_show_on_menu",
     }
 )
 
@@ -82,6 +85,12 @@ DEFAULTS: Dict[str, Any] = {
     "max_previous_recipes": DEFAULT_MAX_PREVIOUS_RECIPES,
     "item_noun": "",
     "timezone": os.environ.get("TZ", "UTC"),
+    "qr_menu_url": "",
+    "qr_wifi_ssid": "",
+    "qr_wifi_password": "",
+    "qr_wifi_encryption": "WPA",
+    "qr_wifi_string": "",
+    "qr_show_on_menu": False,
     "tandoor_url": "",
     "tandoor_token_b64": "",
 }

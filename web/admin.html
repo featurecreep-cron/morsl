@@ -865,6 +865,75 @@
             </div>
         </section>
 
+        <!-- QR Codes -->
+        <section class="admin-section" x-show="tierVisible('standard')" x-transition>
+            <h2 class="section-title">QR Codes</h2>
+            <small class="section-help">Generate QR codes for the menu page footer. Guests can scan to open the menu on their phone or join your WiFi.</small>
+            <div x-show="settingsLoaded" class="settings-grid" style="margin-top:0.75rem;">
+
+                <!-- Menu URL -->
+                <div class="settings-row" style="flex-direction:column; align-items:stretch;">
+                    <label class="branding-label">Menu URL</label>
+                    <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+                        <div style="flex:1;">
+                            <input type="url" class="drawer-input"
+                                   :value="settings.qr_menu_url || ''"
+                                   @change="saveQrSetting('qr_menu_url', $event.target.value)"
+                                   placeholder="https://menu.example.com">
+                            <small class="branding-help">The URL guests will reach when they scan this QR code</small>
+                        </div>
+                        <div x-show="settings.qr_menu_url" class="qr-preview" x-ref="qrMenuPreview"></div>
+                    </div>
+                </div>
+
+                <!-- WiFi QR -->
+                <div class="settings-row" style="flex-direction:column; align-items:stretch;">
+                    <label class="branding-label">Guest WiFi</label>
+                    <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+                        <div style="flex:1;">
+                            <div style="display:flex; gap:0.5rem; margin-bottom:0.35rem;">
+                                <input type="text" class="drawer-input" style="flex:2;"
+                                       :value="settings.qr_wifi_ssid || ''"
+                                       @change="saveWifiQr()"
+                                       x-ref="wifiSsid"
+                                       placeholder="Network name (SSID)">
+                                <select class="drawer-select" style="flex:0 0 auto; width:auto;"
+                                        :value="settings.qr_wifi_encryption || 'WPA'"
+                                        @change="saveWifiQr()"
+                                        x-ref="wifiEncryption">
+                                    <option value="WPA">WPA/WPA2</option>
+                                    <option value="WEP">WEP</option>
+                                    <option value="nopass">Open (no password)</option>
+                                </select>
+                            </div>
+                            <input type="text" class="drawer-input"
+                                   x-show="($refs.wifiEncryption?.value || settings.qr_wifi_encryption || 'WPA') !== 'nopass'"
+                                   :value="settings.qr_wifi_password || ''"
+                                   @change="saveWifiQr()"
+                                   x-ref="wifiPassword"
+                                   placeholder="WiFi password">
+                            <small class="branding-help">Generates a QR code that auto-connects phones to your WiFi</small>
+                        </div>
+                        <div x-show="settings.qr_wifi_string" class="qr-preview" x-ref="qrWifiPreview"></div>
+                    </div>
+                </div>
+
+                <!-- Show on menu toggle -->
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show on Menu Page
+                        <small>Display QR codes in the menu page footer</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.qr_show_on_menu"
+                               @change="toggleSetting('qr_show_on_menu', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
         <!-- Placeholder Mappings -->
         <section class="admin-section">
             <h2 class="section-title">Placeholder Mappings</h2>
@@ -2118,6 +2187,7 @@
     <script src="/js/constants.js"></script>
     <script src="/js/icons.js"></script>
     <script src="/js/icon-picker.js"></script>
+    <script src="/js/qrcode.min.js"></script>
     <script src="/js/admin.js"></script>
 </body>
 </html>

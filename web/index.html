@@ -270,6 +270,16 @@
 
         <!-- Footer (inside content-area so it scrolls with content) -->
         <footer class="menu-footer text-center" x-show="state === 'ready'">
+            <div class="footer-qr-row" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
+                <div class="footer-qr" x-show="settings.qr_wifi_string" x-ref="footerQrWifi">
+                    <div class="footer-qr-code"></div>
+                    <span class="footer-qr-label">Join WiFi</span>
+                </div>
+                <div class="footer-qr" x-show="settings.qr_menu_url" x-ref="footerQrMenu">
+                    <div class="footer-qr-code"></div>
+                    <span class="footer-qr-label">Open Menu</span>
+                </div>
+            </div>
             <p class="menu-slogan" x-show="sloganFooter" x-text="sloganFooter"></p>
         </footer>
     </div><!-- .content-area -->
@@ -684,6 +694,7 @@
     <script src="/js/shared.js"></script>
     <script src="/js/constants.js"></script>
     <script src="/js/icons.js"></script>
+    <script src="/js/qrcode.min.js"></script>
     <script src="/js/app.js"></script>
 </body>
 </html>

@@ -2022,6 +2022,7 @@ function adminApp() {
                     }
                     document.title = (this.settings.app_name || 'Morsl') + ' - Admin';
                     this._updateFaviconLinks();
+                    this.renderQrPreviews();
                 }
             } catch (e) {
                 console.warn('Failed to load settings:', e);
@@ -2155,6 +2156,61 @@ function adminApp() {
                     }
                 },
             };
+        },
+
+        // ---- QR Codes ----
+
+        _renderQr(ref, data) {
+            if (!ref || !data) { if (ref) ref.innerHTML = ''; return; }
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(data);
+                qr.make();
+                ref.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2 });
+            } catch (e) {
+                console.warn('QR generation failed:', e);
+                ref.innerHTML = '';
+            }
+        },
+
+        renderQrPreviews() {
+            this.$nextTick(() => {
+                this._renderQr(this.$refs.qrMenuPreview, this.settings.qr_menu_url);
+                this._renderQr(this.$refs.qrWifiPreview, this.settings.qr_wifi_string);
+            });
+        },
+
+        async saveQrSetting(key, value) {
+            this.settings[key] = value;
+            await this.saveSettings({ [key]: value });
+            this.renderQrPreviews();
+        },
+
+        async saveWifiQr() {
+            const ssid = this.$refs.wifiSsid?.value || '';
+            const password = this.$refs.wifiPassword?.value || '';
+            const encryption = this.$refs.wifiEncryption?.value || 'WPA';
+            // Build WiFi QR string (standard format)
+            let wifiString = '';
+            if (ssid) {
+                const esc = s => s.replace(/([\\;,":])/, '\\$1');
+                wifiString = `WIFI:T:${encryption};S:${esc(ssid)};`;
+                if (encryption !== 'nopass' && password) {
+                    wifiString += `P:${esc(password)};`;
+                }
+                wifiString += ';';
+            }
+            this.settings.qr_wifi_ssid = ssid;
+            this.settings.qr_wifi_password = password;
+            this.settings.qr_wifi_encryption = encryption;
+            this.settings.qr_wifi_string = wifiString;
+            await this.saveSettings({
+                qr_wifi_ssid: ssid,
+                qr_wifi_password: password,
+                qr_wifi_encryption: encryption,
+                qr_wifi_string: wifiString,
+            });
+            this.renderQrPreviews();
         },
 
         // ---- Icon Mappings ----
