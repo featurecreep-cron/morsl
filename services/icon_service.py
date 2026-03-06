@@ -117,14 +117,19 @@ def generate_icons(source: Path, output_dir: Path) -> None:
     if is_svg:
         import cairosvg
 
-        # Render icon at 24px and embed with dark background for tab visibility
+        # Render icon at 24px and embed in an adaptive SVG that switches
+        # background based on browser color scheme. This ensures visibility
+        # regardless of whether browser chrome is light or dark.
         png_24 = cairosvg.svg2png(url=str(source), output_width=24, output_height=24)
         b64_24 = base64.b64encode(png_24).decode()
-        bg_hex = "#{:02x}{:02x}{:02x}".format(*BG_COLOR[:3])
         favicon_svg.write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">\n'
-            f'  <rect width="32" height="32" rx="6" fill="{bg_hex}"/>\n'
+            '  <style>\n'
+            '    rect { fill: #f0f0f0; }\n'
+            '    @media (prefers-color-scheme: dark) { rect { fill: #1a1a1a; } }\n'
+            '  </style>\n'
+            '  <rect width="32" height="32" rx="6"/>\n'
             f'  <image width="24" height="24" x="4" y="4" href="data:image/png;base64,{b64_24}"/>\n'
             '</svg>\n'
         )
