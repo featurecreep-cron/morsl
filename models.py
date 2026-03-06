@@ -81,9 +81,9 @@ class Recipe(TandoorEntity):
         """Return recipes matching *rating*. Negative means <= abs(rating)."""
         lessthan = rating < 0
         if lessthan:
-            return [r for r in recipes if 0 < (getattr(r, "rating", None) or 0) <= abs(rating)]
+            return [r for r in recipes if 0 < (r.rating or 0) <= abs(rating)]
         else:
-            return [r for r in recipes if getattr(r, "rating", 0) >= rating]
+            return [r for r in recipes if (r.rating or 0) >= rating]
 
     def add_details(self, api: "TandoorAPI") -> None:
         """Populate self.ingredients, substituting on-hand foods where possible."""
