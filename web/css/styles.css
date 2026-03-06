@@ -1404,6 +1404,8 @@ body {
 
 .shaker-icon {
     font-size: 3rem;
+    width: 4rem;
+    height: 4rem;
     display: inline-block;
     animation: shake 0.6s ease-in-out infinite;
     color: var(--accent-color);

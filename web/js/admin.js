@@ -2183,7 +2183,9 @@ function adminApp() {
             const nameKey = type === 'keyword' ? 'newKwName' : 'newFoodName';
             const iconKey = type === 'keyword' ? 'newKwIcon' : 'newFoodIcon';
             const mapKey = type === 'keyword' ? 'keyword_icons' : 'food_icons';
-            const name = this[nameKey].trim();
+            const searchKey = type === 'keyword' ? 'mappingKwSearch' : 'mappingFoodSearch';
+            // Fall back to search text if no dropdown selection was made
+            const name = (this[nameKey] || this[searchKey] || '').trim();
             const icon = this[iconKey];
             if (!name || !icon) return;
             this.iconMappings[mapKey][name.toLowerCase()] = icon;

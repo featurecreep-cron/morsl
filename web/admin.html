@@ -904,7 +904,7 @@
                     <span x-show="newKwIcon" style="width:18px; height:18px; display:inline-flex;" x-html="resolveIcon(newKwIcon)"></span>
                     <span x-text="newKwIcon ? 'Change' : 'Icon'"></span>
                 </button>
-                <button type="button" class="btn-branding" @click="addMapping('keyword')" :disabled="!newKwName.trim() || !newKwIcon">Add</button>
+                <button type="button" class="btn-branding" @click="addMapping('keyword')" :disabled="!(newKwName.trim() || mappingKwSearch.trim()) || !newKwIcon">Add</button>
             </div>
 
             <!-- Food Mappings -->
@@ -952,7 +952,7 @@
                     <span x-show="newFoodIcon" style="width:18px; height:18px; display:inline-flex;" x-html="resolveIcon(newFoodIcon)"></span>
                     <span x-text="newFoodIcon ? 'Change' : 'Icon'"></span>
                 </button>
-                <button type="button" class="btn-branding" @click="addMapping('food')" :disabled="!newFoodName.trim() || !newFoodIcon">Add</button>
+                <button type="button" class="btn-branding" @click="addMapping('food')" :disabled="!(newFoodName.trim() || mappingFoodSearch.trim()) || !newFoodIcon">Add</button>
             </div>
         </section>
 
