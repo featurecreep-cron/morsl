@@ -1,83 +1,156 @@
 # Morsl
 
+**Generate weekly menus from your Tandoor Recipes collection.**
+
+Morsl pulls recipes from your [Tandoor](https://github.com/TandoorRecipes/recipes) instance, applies your constraints (keywords, ratings, ingredients, cook history), and picks a set that satisfies them all. Serve the menu to your household, take orders, and sync selections back to Tandoor as meal plans.
+
 [![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FeatureCreep-dev/morsl/badge)](https://scorecard.dev/viewer/?uri=github.com/FeatureCreep-dev/morsl)
 [![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
-[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FFeatureCreep-dev%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![GHCR](https://img.shields.io/badge/ghcr.io-morsl-blue?logo=docker)](https://github.com/FeatureCreep-dev/morsl/pkgs/container/morsl)
-[![Sponsor](https://img.shields.io/badge/sponsor-FeatureCreep-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/FeatureCreep-dev)
 
-A menu generator for [Tandoor Recipes](https://github.com/TandoorRecipes/recipes). Define constraints (keywords, ratings, foods, dates) and Morsl uses linear programming to pick recipes that satisfy them all.
+---
 
-Comes with a customer-facing menu view, an admin panel for configuration, and optional sync back to Tandoor as meal plans.
+![Customer menu view](docs/screenshot-customer-menu.png)
 
-## Quickstart (Docker)
+<details>
+<summary>More screenshots</summary>
+
+**Admin panel** — generate menus, manage profiles, configure schedules:
+
+![Admin panel](docs/screenshot-admin.png)
+
+**Setup wizard** — connects to your Tandoor instance in minutes:
+
+![Setup wizard](docs/screenshot-setup.png)
+
+**Mobile** — designed to work on phones (share the menu link with your household):
+
+![Mobile view](docs/screenshot-mobile.png)
+
+</details>
+
+---
+
+## Quick Start
+
+### Docker run (try it out)
 
 ```bash
-cp .env.example .env
-# Edit .env with your Tandoor URL and API token
+docker run -d --name morsl \
+  -e TANDOOR_URL=https://your-tandoor.example.com \
+  -e TANDOOR_TOKEN=your-api-token \
+  -p 8321:8321 \
+  ghcr.io/featurecreep-dev/morsl:latest
+```
 
+Open `http://localhost:8321` — you'll see the customer menu view. The admin panel is at `/admin`.
+
+If you skip the environment variables, the setup wizard at `/setup` walks you through connecting to Tandoor.
+
+To find your API token: in Tandoor, go to **Settings > API Tokens**.
+
+### Docker Compose (production)
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  morsl:
+    image: ghcr.io/featurecreep-dev/morsl:latest
+    ports:
+      - "8321:8321"
+    environment:
+      - TANDOOR_URL=https://your-tandoor.example.com
+      - TANDOOR_TOKEN=your-api-token
+      - TZ=America/New_York
+    volumes:
+      - ./morsl-data:/app/data
+    restart: unless-stopped
+```
+
+```bash
 docker compose up -d
 ```
 
-Open `http://localhost:8321` for the menu, `http://localhost:8321/admin` for configuration, and `http://localhost:8321/docs` for the interactive API reference.
+The `data` volume persists your profiles, schedules, branding, and settings across container updates.
 
-If you skip the `.env` file, the setup wizard at `/setup` will walk you through connecting to Tandoor.
+**Reverse proxy:** Morsl serves on port 8321. Point your reverse proxy at `http://morsl:8321`. No special headers required.
 
-## Quickstart (bare metal)
+---
 
-Requires Python 3.12+ and system libraries for CairoSVG (`libcairo2`, `libpango-1.0-0`).
+## Features
 
-```bash
-pip install .
-cp .env.example .env
-# Edit .env
+- **Constraint-based generation** — filter by keywords, minimum rating, ingredients, date ranges, recipe books. Constraints can be hard (must satisfy) or soft (best-effort).
+- **Multiple profiles** — "Quick Weeknight Dinners," "Breakfast," "Weekend Projects" — each with its own rules.
+- **Customer menu view** — shareable page where your household browses the menu, sees recipe photos and ingredients, and places orders.
+- **Ordering with notifications** — real-time SSE notifications in the admin panel when someone places an order.
+- **Tandoor meal plan sync** — push selected recipes back to Tandoor as meal plan entries.
+- **Weekly plans** — template-driven multi-day menus (Monday=quick, Friday=elaborate).
+- **Scheduled generation** — cron-based automatic menu refresh.
+- **Custom branding** — upload your own logo, favicon, app name, and slogans.
+- **Mobile-first customer view** — QR codes for easy sharing, responsive card layout.
+- **Setup wizard** — guided 6-step configuration, no config files required.
 
-uvicorn app.main:app --host 0.0.0.0 --port 8321
-```
-
-Or use the included helper script:
-
-```bash
-./morsl.sh start     # start in background
-./morsl.sh stop      # stop
-./morsl.sh restart   # restart
-./morsl.sh status    # check if running
-```
-
-## How it works
-
-1. **Profiles** define how menus are generated. Each profile specifies a number of recipes to pick and a set of constraints.
-2. **Constraints** filter and score recipes. Types include keyword inclusion/exclusion, minimum ratings, date ranges (created, last cooked), food requirements, and recipe book membership.
-3. The **solver** (PuLP/CBC) finds a feasible set of recipes that satisfies all hard constraints while minimizing soft constraint violations. If no solution exists at the requested count, it reduces progressively down to `min_choices`.
-4. Generated menus are served to the **customer view**, where users can browse recipes and place orders.
-5. Orders can optionally sync back to Tandoor as **meal plan** entries.
+---
 
 ## Configuration
-
-All configuration happens through the admin UI at `/admin`. Key concepts:
-
-- **Profiles**: Named configurations with constraints. Supports a `base.json` profile whose constraints are inherited by all others.
-- **Constraints**: `>=`, `<=`, `==`, `between` operators. Each can be hard (must satisfy) or soft (penalty-weighted).
-- **Scheduling**: Cron-based automatic generation via APScheduler.
-- **Weekly plans**: Template-driven multi-day menu generation.
-- **Orders**: Customer ordering with real-time SSE notifications to the admin panel.
-- **Branding**: Custom logo, favicon, loading icon, app name, and slogans.
 
 ### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TANDOOR_URL` | *(none)* | Tandoor instance URL |
+| `TANDOOR_URL` | *(none)* | Your Tandoor instance URL |
 | `TANDOOR_TOKEN` | *(none)* | Tandoor API token |
+| `TZ` | `UTC` | Timezone for schedules and meal plans |
 | `LOG_LEVEL` | `INFO` | Python log level |
-| `LOG_TO_STDOUT` | `0` | Send logs to stdout instead of file (enabled by default in Docker) |
+| `LOG_TO_STDOUT` | `1` (Docker) | Send logs to stdout instead of file |
 
-Credentials can also be configured through the setup wizard (stored as base64 in `data/settings.json`).
+Both `TANDOOR_URL` and `TANDOOR_TOKEN` can also be configured through the setup wizard (stored in `data/settings.json`).
 
-## Project structure
+### Admin panel
+
+All day-to-day configuration happens through the admin UI at `/admin`:
+
+- **Generate tab** — pick a profile, generate a menu, manage schedules
+- **Profiles tab** — create and edit constraint profiles (supports a `base.json` whose constraints apply to all profiles)
+- **Weekly tab** — build multi-day menu templates
+- **Settings tab** — branding, Tandoor connection, data management
+
+Three complexity tiers (Standard / Advanced / Expert) progressively reveal more controls.
+
+---
+
+## How It Works
+
+1. **Profiles** define constraints: which keywords to include/exclude, minimum ratings, date ranges, food requirements.
+2. The **solver** (PuLP/CBC) finds a feasible recipe set satisfying all hard constraints while minimizing soft constraint violations.
+3. If no solution exists at the requested count, it reduces progressively down to `min_choices`.
+4. Generated menus are served to the **customer view** for browsing and ordering.
+5. Orders sync back to Tandoor as **meal plan** entries.
+
+---
+
+## Development
+
+Requires Python 3.12+ and system libraries for CairoSVG (`libcairo2`, `libpango-1.0-0`).
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+216 tests covering the solver, services, API routes, models, and utilities. Integration tests requiring a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
+
+### Tech stack
+
+- **Backend**: FastAPI, Pydantic, uvicorn
+- **Solver**: PuLP with CBC (COIN-OR)
+- **Frontend**: Vanilla JS with Alpine.js, no build step
+- **Scheduling**: APScheduler 3.x
+- **Container**: Multi-arch Docker (amd64 + arm64), auto-release pipeline
+
+### Project structure
 
 ```
 morsl/
@@ -91,32 +164,18 @@ morsl/
 ├── services/               # Business logic layer
 ├── web/                    # Frontend (vanilla JS, Alpine.js)
 ├── solver.py               # PuLP-based recipe picker
-├── models.py               # Domain models (Recipe, Food, Keyword, etc.)
-├── tandoor_api.py          # Tandoor API client with caching and retry
-├── utils.py                # Shared utilities
-├── constants.py            # Magic numbers and defaults
+├── models.py               # Domain models
+├── tandoor_api.py          # Tandoor API client
 ├── Dockerfile
-├── docker-compose.yml
-└── morsl.sh                # Dev/prod helper script
+└── docker-compose.yml
 ```
 
-## Testing
+---
 
-```bash
-pip install -e ".[dev]"
-pytest
-```
+## Support
 
-214 tests covering the solver, services, API routes, models, and utilities. Integration tests that require a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
-
-## Tech stack
-
-- **Backend**: FastAPI, Pydantic, uvicorn
-- **Solver**: PuLP with CBC (COIN-OR)
-- **Frontend**: Vanilla JS with Alpine.js, no build step
-- **Scheduling**: APScheduler 3.x
-- **Image processing**: Pillow, CairoSVG, py-svg-hush (SVG sanitization)
-- **API client**: requests with connection pooling and retry
+- [File an issue](https://github.com/FeatureCreep-dev/morsl/issues) on GitHub
+- Built by [Feature Creep](https://featurecreep.dev) — an AI builds things in public, a human keeps it honest
 
 ## License
 
