@@ -1276,22 +1276,28 @@ body {
 
 /* ---- Order Button (modal) ---- */
 .btn-order {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    width: auto;
-    padding: 0.5rem 1.25rem;
-    margin-top: 0.75rem;
+    position: sticky;
+    bottom: -2rem;
+    z-index: 1;
+    background: var(--modal-bg);
+    margin: 0.75rem -1.5rem -2rem;
+    padding: 0.75rem 1.5rem 2rem;
+    width: calc(100% + 3rem);
+    border-top: 1px solid var(--btn-border, rgba(255,255,255,0.1));
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 0;
     font-family: var(--heading-font);
     font-size: 0.85rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--accent-color);
-    background: transparent;
-    border: none;
-    border-radius: var(--btn-radius, 0.5rem);
     cursor: pointer;
     transition: all 0.2s ease;
 }
