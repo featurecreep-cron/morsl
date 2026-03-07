@@ -5,10 +5,8 @@
 Morsl connects to your [Tandoor Recipes](https://github.com/TandoorRecipes/recipes) instance, picks recipes based on your preferences (keywords, ratings, ingredients, cook history), and serves a menu your household can browse and order from. Selections sync back to Tandoor as meal plans.
 
 [![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
-[![Release](https://img.shields.io/github/v/release/FeatureCreep-dev/morsl)](https://github.com/FeatureCreep-dev/morsl/releases)
 [![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
-[![GHCR](https://img.shields.io/badge/ghcr.io-morsl-blue?logo=docker)](https://github.com/FeatureCreep-dev/morsl/pkgs/container/morsl)
+[![Release](https://img.shields.io/github/v/release/FeatureCreep-dev/morsl)](https://github.com/FeatureCreep-dev/morsl/releases)
 
 ---
 
@@ -52,7 +50,7 @@ docker compose up -d
 
 Open `http://your-server:8321`. The setup wizard walks you through connecting to Tandoor if you skip the environment variables.
 
-![Setup wizard — connects to your Tandoor instance in minutes](docs/screenshot-setup.png)
+![Setup wizard — guided configuration with profile presets](docs/screenshot-setup.png)
 
 The `data` volume keeps your profiles, schedules, branding, and settings safe across updates.
 
@@ -154,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-216 tests covering the solver, services, API routes, models, and utilities. Integration tests requiring a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
+200+ tests covering the solver, services, API routes, models, and utilities. Integration tests requiring a live Tandoor instance are marked `@pytest.mark.integration` and skipped by default.
 
 ### Tech stack
 
@@ -187,15 +185,10 @@ morsl/                         # Python package
 │       └── routes/            # API endpoints
 └── services/                  # Business logic layer
 web/                           # Frontend (vanilla JS, Alpine.js)
-tests/                         # 216 tests
+tests/                         # 200+ tests
 Dockerfile
 docker-compose.yml
 ```
-
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FeatureCreep-dev/morsl/badge)](https://scorecard.dev/viewer/?uri=github.com/FeatureCreep-dev/morsl)
-[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FFeatureCreep-dev%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Sponsor](https://img.shields.io/badge/sponsor-FeatureCreep-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/FeatureCreep-dev)
 
 </details>
 

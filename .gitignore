@@ -47,6 +47,9 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 
-# Backups from dev-reset.sh
+# Dev-only files (not for public repo)
+.dev-notes.md
+dev-reset.sh
+TODO.md
 .claude/backups/
 data/categories.json
