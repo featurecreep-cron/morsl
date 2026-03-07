@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.order_service import OrderService
+from morsl.services.order_service import OrderService
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ class TestOrderService:
         assert order_service._cached_meal_type is None
 
     def test_get_api_lazy_init(self, order_service):
-        with patch("services.order_service.TandoorAPI") as MockAPI:
+        with patch("morsl.services.order_service.TandoorAPI") as MockAPI:
             MockAPI.return_value = MagicMock()
             api = order_service._get_api()
             assert api is not None
@@ -301,7 +301,7 @@ class TestThreadSafety:
         """10 threads calling _get_api concurrently — only one TandoorAPI created."""
         errors = []
 
-        with patch("services.order_service.TandoorAPI") as MockAPI:
+        with patch("morsl.services.order_service.TandoorAPI") as MockAPI:
             MockAPI.return_value = MagicMock()
 
             def worker():

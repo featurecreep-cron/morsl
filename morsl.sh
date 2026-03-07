@@ -19,7 +19,7 @@ start() {
     fi
 
     echo "Starting server on port $PORT..."
-    nohup uvicorn app.main:app --port $PORT --host 127.0.0.1 > "$LOGFILE" 2>&1 &
+    nohup uvicorn morsl.app.main:app --port $PORT --host 127.0.0.1 > "$LOGFILE" 2>&1 &
     echo $! > "$PIDFILE"
     sleep 2
 

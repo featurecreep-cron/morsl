@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["*"]  # This includes all Python packages
+include = ["morsl", "morsl.*"]
 
 [tool.ruff]
 fix = true

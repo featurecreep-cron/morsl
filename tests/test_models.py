@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from models import Book, Keyword, Recipe
+from morsl.models import Book, Keyword, Recipe
 
 from .conftest import make_recipe
 

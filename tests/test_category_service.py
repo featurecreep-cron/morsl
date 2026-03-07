@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from services.category_service import CategoryService
+from morsl.services.category_service import CategoryService
 
 
 class TestCategoryServiceCRUD:

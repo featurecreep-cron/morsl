@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from constants import API_CACHE_TTL_MINUTES
-from services.config_service import ConfigService
-from services.generation_service import GenerationService, GenerationState
-from services.menu_service import MenuService
+from morsl.constants import API_CACHE_TTL_MINUTES
+from morsl.services.config_service import ConfigService
+from morsl.services.generation_service import GenerationService, GenerationState
+from morsl.services.menu_service import MenuService
 
 
 class TestMenuService:
@@ -19,7 +19,7 @@ class TestMenuService:
             "cache": API_CACHE_TTL_MINUTES,
             "constraints": [],
         }
-        with patch("services.menu_service.TandoorAPI"):
+        with patch("morsl.services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
         assert service.choices == 5
         assert service.min_choices is None
@@ -30,7 +30,7 @@ class TestMenuService:
             "min_choices": 3,
             "cache": 0,
         }
-        with patch("services.menu_service.TandoorAPI"):
+        with patch("morsl.services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
         assert service.min_choices == 3
 
@@ -44,7 +44,7 @@ class TestMenuService:
                 {"type": "food", "items": [{"id": 10, "name": "Whiskey"}], "count": 2, "operator": ">="},
             ],
         }
-        with patch("services.menu_service.TandoorAPI"):
+        with patch("morsl.services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
 
         assert len(service.constraints) == 2
@@ -63,14 +63,14 @@ class TestMenuService:
                 {"type": "food", "items": [{"id": 1, "name": "Syrup"}], "except": [{"id": 2, "name": "Sugar Syrup"}], "count": 2, "operator": ">="},
             ],
         }
-        with patch("services.menu_service.TandoorAPI"):
+        with patch("morsl.services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
 
         assert service.constraints[0]["except_ids"] == [2]
 
     def test_parse_constraints_empty(self, mock_logger):
         config = {"choices": 5, "cache": 0, "constraints": []}
-        with patch("services.menu_service.TandoorAPI"):
+        with patch("morsl.services.menu_service.TandoorAPI"):
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
         assert service.constraints == []
 
@@ -79,7 +79,7 @@ class TestMenuService:
         mock_recipe_data = [
             {"id": 1, "name": "R1", "description": "", "new": False, "servings": 4, "keywords": [], "rating": 3.0, "last_cooked": None, "created_at": "2024-01-01T12:00:00+00:00"},
         ]
-        with patch("services.menu_service.TandoorAPI") as MockAPI:
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
             api = MockAPI.return_value
             api.get_recipes.return_value = mock_recipe_data
             service = MenuService(url="http://localhost", token="test", config=config, logger=mock_logger)
@@ -256,7 +256,7 @@ class TestOnHandSubstitution:
     """Tests for on-hand food substitution in GenerationService._sync_generate()."""
 
     def _make_solver_result(self):
-        from models import Recipe, SolverResult
+        from morsl.models import Recipe, SolverResult
 
         r = Recipe(
             {
@@ -297,7 +297,7 @@ class TestOnHandSubstitution:
 
     def test_substitution_when_not_onhand(self, mock_logger):
         """When food is not on hand, substitute with an on-hand alternative."""
-        with patch("services.generation_service.MenuService") as MockMS:
+        with patch("morsl.services.generation_service.MenuService") as MockMS:
             ms = MockMS.return_value
             ms.prepare_data.return_value = None
             ms.recipes = [MagicMock()]
@@ -316,7 +316,7 @@ class TestOnHandSubstitution:
 
     def test_no_substitution_when_onhand(self, mock_logger):
         """When food is already on hand, no substitution occurs."""
-        with patch("services.generation_service.MenuService") as MockMS:
+        with patch("morsl.services.generation_service.MenuService") as MockMS:
             ms = MockMS.return_value
             ms.prepare_data.return_value = None
             ms.recipes = [MagicMock()]
@@ -332,7 +332,7 @@ class TestOnHandSubstitution:
 
     def test_steps_and_timing_extracted(self, mock_logger):
         """Steps and timing are extracted from recipe details."""
-        with patch("services.generation_service.MenuService") as MockMS:
+        with patch("morsl.services.generation_service.MenuService") as MockMS:
             ms = MockMS.return_value
             ms.prepare_data.return_value = None
             ms.recipes = [MagicMock()]
@@ -354,7 +354,7 @@ class TestOnHandSubstitution:
 
     def test_substitution_no_subs_available(self, mock_logger):
         """When no substitutes are available, keep original food."""
-        with patch("services.generation_service.MenuService") as MockMS:
+        with patch("morsl.services.generation_service.MenuService") as MockMS:
             ms = MockMS.return_value
             ms.prepare_data.return_value = None
             ms.recipes = [MagicMock()]

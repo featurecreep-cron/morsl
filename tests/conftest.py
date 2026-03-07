@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from models import Recipe
+from morsl.models import Recipe
 
 
 @pytest.fixture

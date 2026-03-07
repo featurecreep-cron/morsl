@@ -16,17 +16,16 @@ WORKDIR /app
 
 # Install Python deps first (cached unless pyproject.toml changes)
 COPY pyproject.toml ./
-RUN mkdir -p app services && \
-    touch app/__init__.py services/__init__.py models.py tandoor_api.py utils.py solver.py constants.py && \
+RUN mkdir -p morsl/app morsl/services && \
+    touch morsl/__init__.py morsl/app/__init__.py morsl/services/__init__.py \
+          morsl/models.py morsl/tandoor_api.py morsl/utils.py morsl/solver.py morsl/constants.py && \
     pip install --no-cache-dir . && \
-    rm -rf app services models.py tandoor_api.py utils.py solver.py constants.py
+    rm -rf morsl
 
 # Copy actual source
-COPY app/ app/
-COPY services/ services/
+COPY morsl/ morsl/
 COPY scripts/ scripts/
 COPY web/ web/
-COPY models.py tandoor_api.py utils.py solver.py constants.py ./
 COPY docker-entrypoint.sh /usr/local/bin/
 
 # Create writable dirs for runtime data
@@ -49,4 +48,4 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8321/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8321"]
+CMD ["uvicorn", "morsl.app.main:app", "--host", "0.0.0.0", "--port", "8321"]

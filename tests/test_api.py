@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.dependencies import (
+from morsl.app.api.dependencies import (
     _admin_tokens,
     create_admin_token,
     get_config_service,
@@ -18,14 +18,14 @@ from app.api.dependencies import (
     get_settings_service,
     revoke_admin_tokens,
 )
-from app.config import Settings
-from app.main import app
-from constants import API_CACHE_TTL_MINUTES
-from services.config_service import ConfigService, ProfileInfo
-from services.generation_service import GenerationService, GenerationState, GenerationStatus
-from services.meal_plan_service import MealPlanService
-from services.order_service import OrderService
-from services.settings_service import SettingsService
+from morsl.app.config import Settings
+from morsl.app.main import app
+from morsl.constants import API_CACHE_TTL_MINUTES
+from morsl.services.config_service import ConfigService, ProfileInfo
+from morsl.services.generation_service import GenerationService, GenerationState, GenerationStatus
+from morsl.services.meal_plan_service import MealPlanService
+from morsl.services.order_service import OrderService
+from morsl.services.settings_service import SettingsService
 
 
 @pytest.fixture
@@ -292,8 +292,8 @@ class TestSettingsEnforcement:
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
         with (
-            patch("app.api.routes.proxy.requests.patch", return_value=mock_response) as mock_patch,
-            patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
+            patch("morsl.app.api.routes.proxy.requests.patch", return_value=mock_response) as mock_patch,
+            patch("morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
         ):
             response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
             assert response.status_code == 200
@@ -312,7 +312,10 @@ class TestSettingsEnforcement:
         mock_response.json.return_value = {"rating": 3.0}
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
-        with patch("app.api.routes.proxy.requests.patch", return_value=mock_response), patch("app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post:
+        with (
+            patch("morsl.app.api.routes.proxy.requests.patch", return_value=mock_response),
+            patch("morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
+        ):
             response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"})
             assert response.status_code == 200
             # Verify cook log includes the customer name in comment

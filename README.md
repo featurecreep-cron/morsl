@@ -5,6 +5,8 @@
 Morsl connects to your [Tandoor Recipes](https://github.com/TandoorRecipes/recipes) instance, picks recipes based on your preferences (keywords, ratings, ingredients, cook history), and serves a menu your household can browse and order from. Selections sync back to Tandoor as meal plans.
 
 [![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
+[![Release](https://img.shields.io/github/v/release/FeatureCreep-dev/morsl)](https://github.com/FeatureCreep-dev/morsl/releases)
 [![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
 [![GHCR](https://img.shields.io/badge/ghcr.io-morsl-blue?logo=docker)](https://github.com/FeatureCreep-dev/morsl/pkgs/container/morsl)
 
@@ -12,29 +14,12 @@ Morsl connects to your [Tandoor Recipes](https://github.com/TandoorRecipes/recip
 
 ![Customer menu view — recipe cards with photos, ratings, ingredients, and ordering](docs/screenshot-customer-menu.png)
 
-<details>
-<summary>More screenshots</summary>
-
-**Admin panel** — generate menus, manage profiles, configure schedules:
-
-![Admin panel](docs/screenshot-admin.png)
-
-**Setup wizard** — connects to your Tandoor instance in minutes:
-
-![Setup wizard](docs/screenshot-setup.png)
-
-**Mobile** — designed to work on phones (share the menu link with your household):
-
-![Mobile view](docs/screenshot-mobile.png)
-
-</details>
-
 ---
 
 ## What You Need
 
 - A running [Tandoor Recipes](https://docs.tandoor.dev) instance
-- A Tandoor API token (in Tandoor: **Settings > API Tokens > Create**)
+- A Tandoor API token (in Tandoor: **Settings > API Tokens > Create** — just click Create and copy the token string)
 - Docker installed on your server
 
 ## Quick Start
@@ -50,7 +35,7 @@ services:
     ports:
       - "8321:8321"
     environment:
-      - TANDOOR_URL=https://your-tandoor.example.com
+      - TANDOOR_URL=http://your-tandoor-address:port  # e.g. http://192.168.1.50:8080
       - TANDOOR_TOKEN=your-api-token
       - TZ=America/New_York
     volumes:
@@ -67,19 +52,29 @@ docker compose up -d
 
 Open `http://your-server:8321`. The setup wizard walks you through connecting to Tandoor if you skip the environment variables.
 
+![Setup wizard — connects to your Tandoor instance in minutes](docs/screenshot-setup.png)
+
 The `data` volume keeps your profiles, schedules, branding, and settings safe across updates.
 
 ### Docker run (quick test)
 
 ```bash
 docker run -d --name morsl \
-  -e TANDOOR_URL=https://your-tandoor.example.com \
+  -e TANDOOR_URL=http://your-tandoor-address:port \
   -e TANDOOR_TOKEN=your-api-token \
   -p 8321:8321 \
   ghcr.io/featurecreep-dev/morsl:latest
 ```
 
 **Note:** Without a volume mount (`-v`), your settings are lost when the container restarts. Use Docker Compose for anything permanent.
+
+### Updating
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Your data (profiles, schedules, branding, settings) is stored in the volume and survives updates.
 
 ---
 
@@ -88,7 +83,7 @@ docker run -d --name morsl \
 1. **Create profiles** in the admin panel (`/admin`). Each profile defines what kind of recipes to pick — "Weeknight Dinner" might require the keyword "entree" and prefer 4+ star recipes. "Breakfast" might pick 3 recipes tagged "breakfast."
 2. **Generate a menu.** Morsl picks recipes that match your rules. If your rules are too strict, it picks fewer recipes rather than giving you nothing.
 3. **Share the menu.** Your household opens `http://your-server:8321` on their phone or computer — no accounts needed. They browse recipe cards, see photos and ingredients, and tap to order.
-4. **Orders appear** instantly in the admin panel. Selections can sync back to Tandoor as meal plan entries.
+4. **Orders appear** instantly in the admin panel. You can sync selections back to Tandoor as meal plan entries with one click.
 
 ---
 
@@ -99,12 +94,14 @@ docker run -d --name morsl \
 - **Household menu** — shareable page where your family browses and orders, no accounts needed
 - **Live order notifications** — the admin panel updates instantly when someone places an order
 - **Tandoor meal plan sync** — push selections back to Tandoor
-- **Weekly plans** — assign different profiles to different days and meal types (breakfast from one profile, dinner from another)
+- **Weekly plans** — plan your whole week: assign different profiles to different days and meals. Monday breakfast from "Quick Breakfast," Monday dinner from "Weeknight Dinner," Saturday dinner from "Weekend Projects" — all generated at once
 - **Scheduled generation** — automatic menu refresh on a schedule
 - **Custom branding** — your own logo, favicon, app name, and slogans
 - **Mobile-friendly** — responsive layout, QR codes for easy sharing from desktop
 - **Setup wizard** — guided 6-step configuration, no config files required
 - **Works with any recipe collection** — even if your recipes aren't tagged or rated, Morsl still picks from them. Tags and ratings just give you more control.
+
+![Mobile view — designed for phones, share the menu link with your household](docs/screenshot-mobile.png)
 
 ---
 
@@ -122,9 +119,13 @@ docker run -d --name morsl \
 
 Both `TANDOOR_URL` and `TANDOOR_TOKEN` can also be configured through the setup wizard.
 
+The API token needs read access to recipes, keywords, and books. If you want to sync orders back to Tandoor as meal plans, it also needs write access to meal plans. Tandoor tokens have full access by default, so a freshly created token works.
+
 ### Admin panel
 
 Everything is configured through the admin UI at `/admin`:
+
+![Admin panel — generate menus, manage profiles, configure schedules](docs/screenshot-admin.png)
 
 - **Generate** — pick a profile, generate a menu, set up automatic schedules
 - **Profiles** — create and edit profiles with filtering rules
@@ -132,6 +133,8 @@ Everything is configured through the admin UI at `/admin`:
 - **Settings** — branding, Tandoor connection, data management
 
 Three complexity tiers (Standard / Advanced / Expert) progressively show more options. Start with Standard — it covers most use cases.
+
+API documentation is available at `/docs` (interactive) and `/redoc` (reference).
 
 ### Security
 
@@ -168,24 +171,27 @@ The image runs as UID 1000 by default. To change this, rebuild with `--build-arg
 ### Project structure
 
 ```
-morsl/
-├── app/                    # FastAPI application
-│   ├── main.py             # Lifespan, middleware, page routes
-│   ├── config.py           # Pydantic Settings
+morsl/                         # Python package
+├── __init__.py
+├── solver.py                  # PuLP-based recipe picker
+├── models.py                  # Domain models
+├── tandoor_api.py             # Tandoor API client
+├── constants.py               # Configuration constants
+├── utils.py                   # Shared utilities
+├── app/                       # FastAPI application
+│   ├── main.py                # Lifespan, middleware, page routes
+│   ├── config.py              # Pydantic Settings
 │   └── api/
-│       ├── dependencies.py # DI singletons, auth
-│       ├── models.py       # Request/response schemas
-│       └── routes/         # API endpoints
-├── services/               # Business logic layer
-├── web/                    # Frontend (vanilla JS, Alpine.js)
-├── solver.py               # PuLP-based recipe picker
-├── models.py               # Domain models
-├── tandoor_api.py          # Tandoor API client
-├── Dockerfile
-└── docker-compose.yml
+│       ├── dependencies.py    # DI singletons, auth
+│       ├── models.py          # Request/response schemas
+│       └── routes/            # API endpoints
+└── services/                  # Business logic layer
+web/                           # Frontend (vanilla JS, Alpine.js)
+tests/                         # 216 tests
+Dockerfile
+docker-compose.yml
 ```
 
-[![codecov](https://codecov.io/gh/FeatureCreep-dev/morsl/graph/badge.svg)](https://codecov.io/gh/FeatureCreep-dev/morsl)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/FeatureCreep-dev/morsl/badge)](https://scorecard.dev/viewer/?uri=github.com/FeatureCreep-dev/morsl)
 [![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FFeatureCreep-dev%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)

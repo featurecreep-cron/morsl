@@ -8,13 +8,9 @@ Usage:
     python scripts/generate_icons.py
 """
 
-import sys
 from pathlib import Path
 
-# Allow import from project root
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from services.icon_service import generate_icons
+from morsl.services.icon_service import generate_icons
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ICONS_DIR = PROJECT_ROOT / "web" / "icons"

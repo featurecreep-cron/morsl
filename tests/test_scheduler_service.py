@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.scheduler_service import SchedulerService
+from morsl.services.scheduler_service import SchedulerService
 
 
 @pytest.fixture

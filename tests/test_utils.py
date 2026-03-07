@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from utils import format_date, setup_logging, split_offset, string_to_date
+from morsl.utils import format_date, setup_logging, split_offset, string_to_date
 
 
 class TestStringToDate:

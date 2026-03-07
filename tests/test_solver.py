@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from models import Recipe, RelaxedConstraint, SolverResult
-from solver import RecipePicker
+from morsl.models import Recipe, RelaxedConstraint, SolverResult
+from morsl.solver import RecipePicker
 
 
 class TestRecipePickerBasic:

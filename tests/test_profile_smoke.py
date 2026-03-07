@@ -4,12 +4,8 @@ Validates that all profiles can successfully select recipes."""
 from __future__ import annotations
 
 import os
-import sys
 
 import pytest
-
-# Ensure project root is in path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def get_env_credentials():
@@ -40,14 +36,14 @@ def credentials():
 @pytest.fixture(scope="module")
 def config_service():
     """Fixture providing ConfigService instance."""
-    from services.config_service import ConfigService
+    from morsl.services.config_service import ConfigService
 
     return ConfigService()
 
 
 def get_profile_names():
     """Get list of all profile names for parametrization."""
-    from services.config_service import ConfigService
+    from morsl.services.config_service import ConfigService
 
     cs = ConfigService()
     return [p.name for p in cs.list_profiles()]
