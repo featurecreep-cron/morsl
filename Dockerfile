@@ -1,9 +1,9 @@
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.source="https://github.com/FeatureCreep-dev/morsl" \
+LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
       org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/FeatureCreep-dev/morsl"
+      org.opencontainers.image.url="https://github.com/featurecreep-cron/morsl"
 
 # System deps for cairosvg / Pillow
 RUN apt-get update && \

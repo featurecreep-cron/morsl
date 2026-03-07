@@ -7,7 +7,7 @@ body:
     attributes:
       label: Morsl version
       description: Docker image tag or commit hash
-      placeholder: "v0.1.0 or ghcr.io/featurecreep-dev/morsl:latest"
+      placeholder: "v0.1.0 or ghcr.io/featurecreep-cron/morsl:latest"
     validations:
       required: true
 

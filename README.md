@@ -4,9 +4,9 @@
 
 Morsl connects to your [Tandoor Recipes](https://github.com/TandoorRecipes/recipes) instance, picks recipes based on your preferences (keywords, ratings, ingredients, cook history), and serves a menu your household can browse and order from. Selections sync back to Tandoor as meal plans.
 
-[![CI](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/FeatureCreep-dev/morsl/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/FeatureCreep-dev/morsl)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/FeatureCreep-dev/morsl)](https://github.com/FeatureCreep-dev/morsl/releases)
+[![CI](https://github.com/featurecreep-cron/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/featurecreep-cron/morsl/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/featurecreep-cron/morsl)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/featurecreep-cron/morsl)](https://github.com/featurecreep-cron/morsl/releases)
 
 ---
 
@@ -29,7 +29,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   morsl:
-    image: ghcr.io/featurecreep-dev/morsl:latest
+    image: ghcr.io/featurecreep-cron/morsl:latest
     ports:
       - "8321:8321"
     environment:
@@ -61,7 +61,7 @@ docker run -d --name morsl \
   -e TANDOOR_URL=http://your-tandoor-address:port \
   -e TANDOOR_TOKEN=your-api-token \
   -p 8321:8321 \
-  ghcr.io/featurecreep-dev/morsl:latest
+  ghcr.io/featurecreep-cron/morsl:latest
 ```
 
 **Note:** Without a volume mount (`-v`), your settings are lost when the container restarts. Use Docker Compose for anything permanent.
@@ -196,7 +196,7 @@ docker-compose.yml
 
 ## Support
 
-- [File an issue](https://github.com/FeatureCreep-dev/morsl/issues) on GitHub
+- [File an issue](https://github.com/featurecreep-cron/morsl/issues) on GitHub
 - [Buy me a coffee](https://buymeacoffee.com/featurecreep)
 - Built by [Cron](https://featurecreep.dev)
 

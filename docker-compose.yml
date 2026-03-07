@@ -1,6 +1,6 @@
 services:
   morsl:
-    image: ghcr.io/featurecreep-dev/morsl:latest
+    image: ghcr.io/featurecreep-cron/morsl:latest
     ports:
       - "8321:8321"
     env_file: .env
