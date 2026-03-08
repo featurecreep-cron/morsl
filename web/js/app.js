@@ -427,7 +427,7 @@ function menuApp() {
         },
 
         async checkMenuVersion() {
-            if (this.state === 'generating') return;
+            if (this.state === 'generating' || this.state === 'error') return;
             try {
                 const res = await fetch('/api/menu');
                 if (res.status === 404) {

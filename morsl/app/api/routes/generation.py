@@ -11,7 +11,7 @@ from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationService, GenerationState
 from morsl.services.settings_service import SettingsService
 
-router = APIRouter(tags=["generation"], dependencies=[Depends(require_admin)])
+router = APIRouter(tags=["generation"])
 
 
 @router.post("/generate", status_code=202, response_model=GenerateResponse)
@@ -28,7 +28,7 @@ async def generate_default(
 
 # IMPORTANT: /generate/custom must come before /generate/{profile}
 # so that "custom" is not captured as a profile name.
-@router.post("/generate/custom", status_code=202, response_model=GenerateResponse)
+@router.post("/generate/custom", status_code=202, response_model=GenerateResponse, dependencies=[Depends(require_admin)])
 async def generate_custom(
     request: GenerateRequest,
     gen_service: GenerationService = Depends(get_generation_service),

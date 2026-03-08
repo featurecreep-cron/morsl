@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -29,10 +30,22 @@ from morsl.constants import GENERATION_SHUTDOWN_TIMEOUT, GZIP_MIN_SIZE, ICONS_DI
 logger = logging.getLogger(__name__)
 
 
+class _HealthCheckFilter(logging.Filter):
+    """Suppress access-log entries for /health to avoid log spam from Docker healthchecks."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return '"GET /health' not in msg
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Server starting up")
+
+    # Suppress healthcheck access-log spam (Docker checks every 30s)
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.addFilter(_HealthCheckFilter())
     settings = get_settings()
 
     # Ensure data directories exist (may fail if volume is root-owned;
@@ -42,6 +55,18 @@ async def lifespan(app: FastAPI):
             d.mkdir(parents=True, exist_ok=True)
         except PermissionError:
             logger.warning("Cannot create %s — check volume ownership (needs UID 1000)", d)
+
+    # PIN reset via env var — allows recovery if PIN is forgotten
+    if os.environ.get("MORSL_RESET_PIN", "").lower() in ("1", "true", "yes"):
+        try:
+            settings_svc = get_settings_service(settings)
+            settings_svc.update({"kiosk_pin": "", "admin_pin_enabled": False, "kiosk_pin_enabled": False})
+            from morsl.app.api.dependencies import revoke_admin_tokens
+
+            revoke_admin_tokens()
+            logger.info("PIN cleared via MORSL_RESET_PIN env var — remove the env var and restart")
+        except Exception:
+            logger.warning("PIN reset failed", exc_info=True)
 
     # Generate icons on startup if favicon.svg is missing (fresh container)
     icons_dir = ICONS_DIR

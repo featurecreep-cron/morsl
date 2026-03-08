@@ -3,7 +3,10 @@
   "short_name": "Morsl",
   "description": "Menu generator for Tandoor Recipes",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
+  "orientation": "any",
   "background_color": "#0d0d0d",
   "theme_color": "#d4a847",
   "icons": [
