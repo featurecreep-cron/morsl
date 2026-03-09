@@ -176,12 +176,22 @@ body {
 }
 @media (max-width: 480px) {
     .explore-btn {
-        width: 95px;
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
         height: 80px;
+        overflow: hidden;
     }
     .explore-btn-icon {
         width: 40px;
         height: 40px;
+    }
+    .explore-btn-label {
+        font-size: clamp(0.55rem, 2.5vw, 0.75rem);
+        letter-spacing: 0.03em;
+    }
+    .explore-btn-subtitle {
+        font-size: clamp(0.5rem, 2vw, 0.65rem);
     }
 }
 
@@ -206,9 +216,12 @@ body {
     text-align: center;
     line-height: 1.2;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
+    max-width: 100%;
 }
 
 .explore-btn-subtitle {

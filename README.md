@@ -5,8 +5,13 @@
 Morsl connects to your [Tandoor Recipes](https://github.com/TandoorRecipes/recipes) instance, picks recipes based on your preferences (keywords, ratings, ingredients, cook history), and serves a menu your household can browse and order from. Selections sync back to Tandoor as meal plans.
 
 [![CI](https://github.com/featurecreep-cron/morsl/actions/workflows/ci.yml/badge.svg)](https://github.com/featurecreep-cron/morsl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/featurecreep-cron/morsl/graph/badge.svg)](https://codecov.io/gh/featurecreep-cron/morsl)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/featurecreep-cron/morsl/badge)](https://scorecard.dev/viewer/?uri=github.com/featurecreep-cron/morsl)
 [![License: MIT](https://img.shields.io/github/license/featurecreep-cron/morsl)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/featurecreep-cron/morsl)](https://github.com/featurecreep-cron/morsl/releases)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Ffeaturecreep-cron%2Fmorsl%2Fmain%2Fpyproject.toml)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![GHCR](https://img.shields.io/badge/ghcr.io-morsl-blue?logo=docker)](https://github.com/featurecreep-cron/morsl/pkgs/container/morsl)
 
 ---
 
@@ -137,6 +142,24 @@ API documentation is available at `/docs` (interactive) and `/redoc` (reference)
 ### Security
 
 Morsl has no built-in authentication by default. If you're only using it at home on your local network, this is fine. If you're exposing it to the internet, put it behind a reverse proxy with authentication (Authelia, Authentik, etc.) or enable the admin PIN in Settings.
+
+**Forgot your PIN?** Two options:
+
+1. **Script** — run inside the container:
+   ```bash
+   docker exec morsl python scripts/reset-pin.py
+   ```
+
+2. **Manual** — edit `settings.json` in your data volume directly:
+   ```json
+   {
+     "kiosk_pin": "",
+     "admin_pin_enabled": false,
+     "kiosk_pin_enabled": false
+   }
+   ```
+
+Either way, restart the container afterward, then set a new PIN from admin settings.
 
 ---
 
