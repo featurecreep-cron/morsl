@@ -1408,18 +1408,17 @@
                 <div class="settings-row" x-show="settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled)">
                     <div class="settings-label">
                         PIN Code
-                        <small>Set the PIN used for admin and kiosk access</small>
+                        <small x-show="settings.has_pin" style="color: var(--success-text, #6b9e5a);">PIN is set</small>
+                        <small x-show="!settings.has_pin" style="color: var(--warning-text, #ffc107);">No PIN set — admin access is unrestricted</small>
                     </div>
-                    <input type="password" class="drawer-input" style="max-width:160px; letter-spacing:0.2em; text-align:center;"
-                           :value="settings.kiosk_pin || ''"
-                           @change="toggleSetting('kiosk_pin', $event.target.value)"
-                           placeholder="Enter PIN"
-                           autocomplete="off">
-                </div>
-                <div class="settings-row" x-show="(settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled)) && !settings.kiosk_pin"
-                     style="border:none; padding-top:0;">
-                    <div class="settings-label">
-                        <small style="color: var(--warning-text, #ffc107);">Warning: PIN is enabled but empty. Anyone can access admin without entering a PIN.</small>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="password" class="drawer-input" style="max-width:160px; letter-spacing:0.2em; text-align:center;"
+                               :placeholder="settings.has_pin ? '••••' : 'Enter PIN'"
+                               @change="toggleSetting('pin', $event.target.value); $event.target.value = ''"
+                               autocomplete="off">
+                        <button type="button" class="btn-branding" x-show="settings.has_pin"
+                                @click="toggleSetting('pin', '')"
+                                style="white-space:nowrap;">Clear</button>
                     </div>
                 </div>
             </div>

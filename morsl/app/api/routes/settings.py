@@ -71,7 +71,7 @@ def _has_credentials(settings: Settings, svc: SettingsService) -> bool:
 def _mask_secrets(settings: Dict[str, Any]) -> Dict[str, Any]:
     """Replace secret values with boolean flags."""
     result = dict(settings)
-    result["has_pin"] = bool(result.pop("kiosk_pin", ""))
+    result["has_pin"] = bool(result.pop("pin", ""))
     result["has_tandoor_token"] = bool(result.pop("tandoor_token_b64", ""))
     return result
 
@@ -109,9 +109,9 @@ def update_settings(
     if cred_in_body:
         raise HTTPException(400, f"Use POST /settings/credentials for: {', '.join(sorted(cred_in_body))}")
     # Revoke tokens if PIN value is actually changing
-    if "kiosk_pin" in body:
-        current_pin = svc.get_all().get("kiosk_pin", "")
-        if body["kiosk_pin"] != current_pin:
+    if "pin" in body:
+        current_pin = svc.get_all().get("pin", "")
+        if body["pin"] != current_pin:
             revoke_admin_tokens()
     result = svc.update(body)
     return _mask_secrets(result)
@@ -132,7 +132,7 @@ def verify_pin(
     settings = svc.get_all()
     if not (settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))):
         return {"valid": True}
-    stored_pin = settings.get("kiosk_pin", "")
+    stored_pin = settings.get("pin", "")
     if not stored_pin:
         return {"valid": True}
     valid = hmac.compare_digest(body.pin, stored_pin)

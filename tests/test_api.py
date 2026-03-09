@@ -379,7 +379,7 @@ class TestVerifyPin:
         mock_settings_service.get_all.return_value = {
             "kiosk_enabled": True,
             "kiosk_pin_enabled": True,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "1234"})
         assert response.status_code == 200
@@ -391,7 +391,7 @@ class TestVerifyPin:
         mock_settings_service.get_all.return_value = {
             "kiosk_enabled": True,
             "kiosk_pin_enabled": True,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "9999"})
         assert response.status_code == 200
@@ -401,7 +401,7 @@ class TestVerifyPin:
         mock_settings_service.get_all.return_value = {
             "kiosk_enabled": False,
             "kiosk_pin_enabled": True,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         assert response.status_code == 200
@@ -411,7 +411,7 @@ class TestVerifyPin:
         mock_settings_service.get_all.return_value = {
             "kiosk_enabled": True,
             "kiosk_pin_enabled": False,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         assert response.status_code == 200
@@ -421,7 +421,7 @@ class TestVerifyPin:
         mock_settings_service.get_all.return_value = {
             "kiosk_enabled": True,
             "kiosk_pin_enabled": True,
-            "kiosk_pin": "",
+            "pin": "",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "anything"})
         assert response.status_code == 200
@@ -432,7 +432,7 @@ class TestVerifyPin:
             "admin_pin_enabled": True,
             "kiosk_enabled": False,
             "kiosk_pin_enabled": False,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "1234"})
         assert response.status_code == 200
@@ -445,7 +445,7 @@ class TestVerifyPin:
             "admin_pin_enabled": True,
             "kiosk_enabled": False,
             "kiosk_pin_enabled": False,
-            "kiosk_pin": "",
+            "pin": "",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "anything"})
         assert response.status_code == 200
@@ -456,7 +456,7 @@ class TestVerifyPin:
             "admin_pin_enabled": True,
             "kiosk_enabled": True,
             "kiosk_pin_enabled": True,
-            "kiosk_pin": "5678",
+            "pin": "5678",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "5678"})
         assert response.status_code == 200
@@ -478,6 +478,7 @@ class TestAdminAuth:
     async def test_admin_route_no_token_returns_401(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
+            "pin": "1234",
             "kiosk_enabled": False,
             "kiosk_pin_enabled": False,
         }
@@ -487,6 +488,7 @@ class TestAdminAuth:
     async def test_admin_route_invalid_token_returns_401(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
+            "pin": "1234",
             "kiosk_enabled": False,
             "kiosk_pin_enabled": False,
         }
@@ -500,7 +502,7 @@ class TestAdminAuth:
         token = create_admin_token()
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
-            "kiosk_pin": "1234",
+            "pin": "1234",
             "theme": "cast-iron",
         }
         response = await settings_client.get(
@@ -509,12 +511,24 @@ class TestAdminAuth:
         )
         assert response.status_code == 200
 
+    async def test_pin_enabled_but_empty_allows_without_token(self, settings_client, mock_settings_service):
+        """PIN feature toggled on but no PIN set — should not block access."""
+        mock_settings_service.get_all.return_value = {
+            "admin_pin_enabled": True,
+            "kiosk_enabled": False,
+            "kiosk_pin_enabled": False,
+            "pin": "",
+            "theme": "cast-iron",
+        }
+        response = await settings_client.get("/api/settings")
+        assert response.status_code == 200
+
     async def test_pin_disabled_allows_without_token(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": False,
             "kiosk_enabled": False,
             "kiosk_pin_enabled": False,
-            "kiosk_pin": "",
+            "pin": "",
             "theme": "cast-iron",
         }
         response = await settings_client.get("/api/settings")
@@ -522,17 +536,17 @@ class TestAdminAuth:
 
     async def test_get_settings_masks_pin(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
-            "kiosk_pin": "secret123",
+            "pin": "secret123",
             "theme": "cast-iron",
         }
         response = await settings_client.get("/api/settings")
         data = response.json()
-        assert "kiosk_pin" not in data
+        assert "pin" not in data
         assert data["has_pin"] is True
 
     async def test_get_settings_has_pin_false_when_empty(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
-            "kiosk_pin": "",
+            "pin": "",
             "theme": "cast-iron",
         }
         response = await settings_client.get("/api/settings")
@@ -540,9 +554,9 @@ class TestAdminAuth:
         assert data["has_pin"] is False
 
     async def test_update_settings_masks_pin(self, settings_client, mock_settings_service):
-        mock_settings_service.get_all.return_value = {"kiosk_pin": "old"}
+        mock_settings_service.get_all.return_value = {"pin": "old"}
         mock_settings_service.update.return_value = {
-            "kiosk_pin": "new-pin",
+            "pin": "new-pin",
             "theme": "cast-iron",
         }
         response = await settings_client.put(
@@ -550,34 +564,34 @@ class TestAdminAuth:
             json={"theme": "cast-iron"},
         )
         data = response.json()
-        assert "kiosk_pin" not in data
+        assert "pin" not in data
         assert data["has_pin"] is True
 
     async def test_pin_change_revokes_tokens(self, settings_client, mock_settings_service):
         token = create_admin_token()
         assert token in _admin_tokens
-        mock_settings_service.get_all.return_value = {"kiosk_pin": "old-pin"}
-        mock_settings_service.update.return_value = {"kiosk_pin": "new-pin"}
+        mock_settings_service.get_all.return_value = {"pin": "old-pin"}
+        mock_settings_service.update.return_value = {"pin": "new-pin"}
         await settings_client.put(
             "/api/settings",
-            json={"kiosk_pin": "new-pin"},
+            json={"pin": "new-pin"},
         )
         assert token not in _admin_tokens
 
     async def test_same_pin_keeps_tokens(self, settings_client, mock_settings_service):
         token = create_admin_token()
-        mock_settings_service.get_all.return_value = {"kiosk_pin": "1234"}
-        mock_settings_service.update.return_value = {"kiosk_pin": "1234"}
+        mock_settings_service.get_all.return_value = {"pin": "1234"}
+        mock_settings_service.update.return_value = {"pin": "1234"}
         await settings_client.put(
             "/api/settings",
-            json={"kiosk_pin": "1234"},
+            json={"pin": "1234"},
         )
         assert token in _admin_tokens
 
     async def test_verify_pin_token_works_for_admin_routes(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
-            "kiosk_pin": "9999",
+            "pin": "9999",
             "theme": "cast-iron",
         }
         # Get token via verify-pin
@@ -593,7 +607,7 @@ class TestAdminAuth:
     async def test_verify_pin_no_token_on_failure(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
-            "kiosk_pin": "1234",
+            "pin": "1234",
         }
         response = await settings_client.post("/api/settings/verify-pin", json={"pin": "wrong"})
         data = response.json()

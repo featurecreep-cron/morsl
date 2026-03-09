@@ -65,7 +65,7 @@ DEFAULTS: Dict[str, Any] = {
     "theme": "cast-iron",
     "kiosk_enabled": False,
     "kiosk_gesture": "menu",
-    "kiosk_pin": "",
+    "pin": "",
     "kiosk_pin_enabled": False,
     "admin_pin_enabled": False,
     "api_cache_minutes": API_CACHE_TTL_MINUTES,
@@ -169,5 +169,8 @@ class SettingsService:
         if os.path.isfile(path):
             with open(path) as f:
                 stored = json.load(f)
+            # Migrate renamed keys
+            if "kiosk_pin" in stored and "pin" not in stored:
+                stored["pin"] = stored.pop("kiosk_pin")
             # Merge stored over defaults so new keys get their defaults
             self._settings.update(stored)

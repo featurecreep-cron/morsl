@@ -1,4 +1,4 @@
-"""Reset the kiosk PIN. Run inside the container:
+"""Reset the admin PIN. Run inside the container:
 docker exec morsl python scripts/reset-pin.py
 """
 
@@ -11,7 +11,7 @@ if settings_path.exists():
 else:
     settings = {}
 
-settings["kiosk_pin"] = ""
+settings["pin"] = ""
 settings["admin_pin_enabled"] = False
 settings["kiosk_pin_enabled"] = False
 settings_path.write_text(json.dumps(settings, indent=2))
