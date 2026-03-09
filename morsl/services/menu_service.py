@@ -125,10 +125,13 @@ class MenuService:
         item_ids = constraint.get("item_ids", [])
         except_ids = constraint.get("except_ids", [])
 
-        # Fetch Food objects for logging
+        # Fetch Food objects for logging — skip items that fail
         food_list: List[Food] = []
         for fd_id in item_ids:
-            food_list.append(Food(self.tandoor.get_food(fd_id)))
+            try:
+                food_list.append(Food(self.tandoor.get_food(fd_id)))
+            except Exception:
+                self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
         constraint["foods"] = food_list
 
         # Find recipes with these foods
