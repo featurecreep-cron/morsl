@@ -1155,9 +1155,9 @@ function menuApp() {
         },
 
         kioskAdminAccess() {
-            const needsPin = this.settings.admin_pin_enabled ||
+            const pinFeatureOn = this.settings.admin_pin_enabled ||
                 (this.settings.kiosk_enabled && this.settings.kiosk_pin_enabled);
-            if (needsPin) {
+            if (pinFeatureOn && this.settings.has_pin) {
                 this.showKioskPin = true;
                 this.showKioskPinText = false;
                 this.kioskPinValue = '';

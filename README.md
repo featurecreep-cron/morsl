@@ -153,7 +153,7 @@ Morsl has no built-in authentication by default. If you're only using it at home
 2. **Manual** — edit `settings.json` in your data volume directly:
    ```json
    {
-     "kiosk_pin": "",
+     "pin": "",
      "admin_pin_enabled": false,
      "kiosk_pin_enabled": false
    }

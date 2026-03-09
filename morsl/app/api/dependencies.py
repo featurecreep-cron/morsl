@@ -153,8 +153,8 @@ def require_admin(
     """
     settings = svc.get_all()
     pin_active = settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))
-    if not pin_active:
-        return  # No PIN configured — allow all
+    if not pin_active or not settings.get("pin"):
+        return  # No PIN configured or PIN empty — allow all
 
     token = request.headers.get("X-Admin-Token", "")
     with _admin_tokens_lock:

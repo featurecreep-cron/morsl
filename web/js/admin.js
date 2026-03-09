@@ -241,7 +241,8 @@ function adminApp() {
         // ---- Auth ----
 
         _isPinRequired(settings) {
-            return settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled);
+            const featureOn = settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled);
+            return featureOn && settings.has_pin;
         },
 
         async adminFetch(url, opts = {}) {
