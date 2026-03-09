@@ -39,6 +39,8 @@ RUN groupadd -g $GID appgroup && \
     chown -R appuser:appgroup data web/icons
 USER appuser
 
+ARG APP_VERSION=dev
+ENV MORSL_VERSION=$APP_VERSION
 ENV LOG_TO_STDOUT=1
 
 EXPOSE 8321

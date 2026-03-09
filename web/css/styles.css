@@ -1938,6 +1938,14 @@ body {
     background: var(--btn-active-bg);
     color: var(--accent-color);
 }
+.nav-menu-version {
+    display: block;
+    padding: 0.4rem 1rem;
+    font-size: 0.7rem;
+    color: var(--text-muted, #999);
+    border-top: 1px solid var(--card-border, #eee);
+    margin-top: 0.25rem;
+}
 
 /* ---- Responsive ---- */
 @media (max-width: 575.98px) {

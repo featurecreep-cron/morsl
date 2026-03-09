@@ -2,6 +2,7 @@ function adminApp() {
     return {
         // Navigation
         navOpen: false,
+        appVersion: '',
 
         // Bumped when custom icons finish loading, to trigger Alpine re-renders
         _iconGen: 0,
@@ -276,6 +277,12 @@ function adminApp() {
             this._iconHandler = () => this._iconGen++;
             window.addEventListener('custom-icons-loaded', this._iconHandler);
             this._svgAbort = new AbortController();
+
+            // Fetch version (no auth required)
+            try {
+                const h = await fetch('/health');
+                if (h.ok) this.appVersion = (await h.json()).version || '';
+            } catch (_) { /* ignore */ }
 
             // Check if PIN is required before loading admin data
             if (await this._checkPinGate()) return;

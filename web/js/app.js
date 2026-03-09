@@ -28,6 +28,7 @@ function menuApp() {
 
         // Navigation
         navOpen: false,
+        appVersion: '',
 
         // Recipe modal
         selectedRecipe: null,
@@ -184,6 +185,11 @@ function menuApp() {
         async init() {
             this.applyTheme(this.currentTheme);
             this.registerServiceWorker();
+            // Fetch version (no auth required)
+            try {
+                const h = await fetch('/health');
+                if (h.ok) this.appVersion = (await h.json()).version || '';
+            } catch (_) { /* ignore */ }
             // Restore history from localStorage
             try {
                 const saved = localStorage.getItem(CONST.LS_MENU_HISTORY);
