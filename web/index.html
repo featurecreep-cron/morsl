@@ -544,6 +544,7 @@
         <a href="#" class="nav-menu-item" role="menuitem"
            x-show="settings.meal_plan_enabled !== false && mainCarouselRecipes.length > 0"
            @click.prevent="openMealPlanSave(); navOpen = false">Save to Meal Plan</a>
+        <span class="nav-menu-version" x-show="appVersion" x-text="appVersion"></span>
     </div>
 
     <!-- Recipe detail modal -->

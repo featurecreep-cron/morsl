@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -203,10 +204,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete")
 
 
+APP_VERSION = os.environ.get("MORSL_VERSION", "dev")
+
 app = FastAPI(
     title="Morsl",
     description="API for generating menus from Tandoor recipes\n\n[Back to Admin](/admin) | [Menu](/)",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -246,6 +249,7 @@ def health_check(
 
     return {
         "status": "ok",
+        "version": APP_VERSION,
         "credentials_configured": has_env_creds or has_ui_creds,
         "scheduler_running": scheduler_running,
     }
