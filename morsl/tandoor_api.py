@@ -42,7 +42,13 @@ class TandoorAPIError(TandoorError):
 
     def __init__(self, status_code: int, detail: str) -> None:
         self.status_code = status_code
-        super().__init__(f"Tandoor API error {status_code}: {detail}")
+        # Strip HTML and truncate — Tandoor sends full Django error pages on 500s
+        clean = detail.strip()
+        if "<html" in clean.lower():
+            clean = f"(HTML error page, {len(detail)} bytes)"
+        elif len(clean) > 200:
+            clean = clean[:200] + "..."
+        super().__init__(f"Tandoor API error {status_code}: {clean}")
 
 
 class TandoorAPI:
