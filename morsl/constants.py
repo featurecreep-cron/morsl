@@ -6,7 +6,10 @@ from pathlib import Path
 API_CACHE_MAXSIZE = 512
 API_CACHE_TTL_MINUTES = 240
 ADMIN_TOKEN_CACHE_MAXSIZE = 128
-ADMIN_TOKEN_CACHE_TTL_SECONDS = 86400
+PIN_TIMEOUT_OPTIONS = [0, 30, 60, 300]
+# Grace period for "immediate" timeout — allows admin page to complete its
+# parallel API calls during a single page load before the token expires.
+PIN_IMMEDIATE_GRACE_SECONDS = 120
 
 # HTTP client
 HTTP_CONNECT_TIMEOUT = 5

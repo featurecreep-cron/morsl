@@ -62,6 +62,7 @@ class MenuResponse(BaseModel):
     requested_count: int
     constraint_count: int
     status: str
+    profile: str = ""
     warnings: List[str] = []
     relaxed_constraints: List[RelaxedConstraintResponse] = []
 

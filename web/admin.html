@@ -1422,6 +1422,20 @@
                                 style="white-space:nowrap;">Clear</button>
                     </div>
                 </div>
+                <div class="settings-row" x-show="settings.admin_pin_enabled || (settings.kiosk_enabled && settings.kiosk_pin_enabled)">
+                    <div class="settings-label">
+                        PIN Session Timeout
+                        <small>How long the PIN stays valid after entry</small>
+                    </div>
+                    <select class="drawer-select"
+                            :value="settings.pin_timeout ?? 0"
+                            @change="toggleSetting('pin_timeout', parseInt($event.target.value))">
+                        <option value="0">Every visit (immediate)</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                    </select>
+                </div>
             </div>
         </section>
 

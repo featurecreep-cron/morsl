@@ -305,7 +305,27 @@ function adminApp() {
                 const pubRes = await fetch('/api/settings/public');
                 if (pubRes.ok) {
                     const pub = await pubRes.json();
-                    if (this._isPinRequired(pub) && !sessionStorage.getItem(CONST.SS_ADMIN_TOKEN)) {
+                    if (!this._isPinRequired(pub)) return false;
+                    const token = sessionStorage.getItem(CONST.SS_ADMIN_TOKEN);
+                    const tokenTs = parseInt(sessionStorage.getItem(CONST.SS_ADMIN_TOKEN_TS) || '0', 10);
+                    const pinTimeout = pub.pin_timeout ?? 0;
+
+                    let needsPin = !token;
+                    if (token && pinTimeout === 0) {
+                        // Immediate mode — always require re-entry on page load
+                        sessionStorage.removeItem(CONST.SS_ADMIN_TOKEN);
+                        sessionStorage.removeItem(CONST.SS_ADMIN_TOKEN_TS);
+                        needsPin = true;
+                    } else if (token && pinTimeout > 0 && tokenTs) {
+                        // Timed mode — check if token has expired client-side
+                        if (Date.now() - tokenTs > pinTimeout * 1000) {
+                            sessionStorage.removeItem(CONST.SS_ADMIN_TOKEN);
+                            sessionStorage.removeItem(CONST.SS_ADMIN_TOKEN_TS);
+                            needsPin = true;
+                        }
+                    }
+
+                    if (needsPin) {
                         this.showPinGate = true;
                         this.$nextTick(() => {
                             if (this.$refs.pinGateInput) this.$refs.pinGateInput.focus();
@@ -2388,7 +2408,10 @@ function adminApp() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.valid) {
-                        if (data.token) sessionStorage.setItem(CONST.SS_ADMIN_TOKEN, data.token);
+                        if (data.token) {
+                            sessionStorage.setItem(CONST.SS_ADMIN_TOKEN, data.token);
+                            sessionStorage.setItem(CONST.SS_ADMIN_TOKEN_TS, String(Date.now()));
+                        }
                         this.showPinGate = false;
                         this.pinInput = '';
                         await this._loadAdminData();
