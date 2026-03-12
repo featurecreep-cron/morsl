@@ -246,6 +246,7 @@ function menuApp() {
         destroy() {
             if (this._svgAbort) { this._svgAbort.abort(); this._svgAbort = null; }
             if (this._menuPollId) { clearInterval(this._menuPollId); this._menuPollId = null; }
+            if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             if (this._statusPollId) { clearInterval(this._statusPollId); this._statusPollId = null; }
             if (this._resizeHandler) { window.removeEventListener('resize', this._resizeHandler); this._resizeHandler = null; }
             if (this._kioskGestureCleanup) { this._kioskGestureCleanup(); this._kioskGestureCleanup = null; }
@@ -387,17 +388,22 @@ function menuApp() {
             const newRecipes = data.recipes || [];
             this.warnings = data.warnings || [];
             this.relaxedConstraints = data.relaxed_constraints || [];
-            this.menuVersion = data.version;
             this.generatedAt = data.generated_at || '';
 
             if (newRecipes.length > 0) {
                 this.currentRecipes = newRecipes;
 
-                // Seed a shelf on initial load if none exist
                 if (this.shelves.length === 0) {
+                    // First load — seed shelf
                     const name = data.profile || this.activeProfile || 'Menu';
                     this.addShelf(name, newRecipes);
                     this.activeDeckName = name;
+                } else if (data.version !== this.menuVersion) {
+                    // Server has a newer menu than what shelves hold — update active shelf
+                    const target = data.profile || this.activeDeckName || this.activeProfile || 'Menu';
+                    this.addShelf(target, newRecipes);
+                    this.activeDeckName = target;
+                    this.saveShelves();
                 }
 
                 // Keep previousRecipes for backward compatibility
@@ -418,6 +424,9 @@ function menuApp() {
                 } catch (e) { /* storage full */ }
             }
 
+            // Set menuVersion AFTER shelf comparison so staleness is detected
+            this.menuVersion = data.version;
+
             // Combined list for carousel
             this.recipes = [...this.currentRecipes, ...this.previousRecipes];
 
@@ -430,10 +439,15 @@ function menuApp() {
         startMenuPolling() {
             const pollMs = (this.settings.menu_poll_seconds ?? CONST.DEFAULT_MENU_POLL_SECONDS) * 1000;
             this._menuPollId = setInterval(() => this.checkMenuVersion(), pollMs);
+            // Poll immediately when tab becomes visible (catches updates while backgrounded)
+            this._visibilityHandler = () => {
+                if (document.visibilityState === 'visible') this.checkMenuVersion();
+            };
+            document.addEventListener('visibilitychange', this._visibilityHandler);
         },
 
         async checkMenuVersion() {
-            if (this.state === 'generating' || this.state === 'error') return;
+            if (this.state === 'generating') return;
             try {
                 const res = await fetch('/api/menu');
                 if (res.status === 404) {
@@ -1187,7 +1201,10 @@ function menuApp() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.valid) {
-                        if (data.token) sessionStorage.setItem(CONST.SS_ADMIN_TOKEN, data.token);
+                        if (data.token) {
+                            sessionStorage.setItem(CONST.SS_ADMIN_TOKEN, data.token);
+                            sessionStorage.setItem(CONST.SS_ADMIN_TOKEN_TS, String(Date.now()));
+                        }
                         this.showKioskPin = false;
                         window.location.href = '/admin';
                     } else {

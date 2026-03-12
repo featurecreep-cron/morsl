@@ -49,6 +49,7 @@ PUBLIC_KEYS = frozenset(
         "timezone",
         "qr_menu_url",
         "qr_wifi_string",
+        "pin_timeout",
         "qr_show_on_menu",
     }
 )
@@ -68,6 +69,7 @@ DEFAULTS: Dict[str, Any] = {
     "pin": "",
     "kiosk_pin_enabled": False,
     "admin_pin_enabled": False,
+    "pin_timeout": 0,
     "api_cache_minutes": API_CACHE_TTL_MINUTES,
     "meal_plan_enabled": False,
     "app_name": "Morsl",
@@ -126,6 +128,7 @@ class SettingsService:
         "toast_seconds": (1, 10),
         "max_discover_generations": (1, 50),
         "max_previous_recipes": (10, 200),
+        "pin_timeout": (0, 300),
     }
 
     def update(self, updates: Dict[str, Any]) -> Dict[str, Any]:

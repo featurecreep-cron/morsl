@@ -3,14 +3,14 @@ from __future__ import annotations
 import base64
 import secrets
 import threading
+import time
 from functools import lru_cache
 from logging import Logger
 
-import cachetools
 from fastapi import Depends, HTTPException, Request
 
 from morsl.app.config import Settings
-from morsl.constants import ADMIN_TOKEN_CACHE_MAXSIZE, ADMIN_TOKEN_CACHE_TTL_SECONDS
+from morsl.constants import ADMIN_TOKEN_CACHE_MAXSIZE, PIN_IMMEDIATE_GRACE_SECONDS
 from morsl.services.category_service import CategoryService
 from morsl.services.config_service import ConfigService
 from morsl.services.custom_icon_service import CustomIconService
@@ -25,8 +25,8 @@ from morsl.services.template_service import TemplateService
 from morsl.services.weekly_generation_service import WeeklyGenerationService
 from morsl.utils import setup_logging
 
-# Admin token store — bounded size + auto-expiry (24h TTL)
-_admin_tokens: cachetools.TTLCache = cachetools.TTLCache(maxsize=ADMIN_TOKEN_CACHE_MAXSIZE, ttl=ADMIN_TOKEN_CACHE_TTL_SECONDS)
+# Admin token store — token → creation timestamp
+_admin_tokens: dict[str, float] = {}
 _admin_tokens_lock = threading.Lock()
 
 # Service singleton registry — replaces 12 separate global variables
@@ -41,10 +41,11 @@ def _get_or_create(key: str, factory):
 
 
 def create_admin_token() -> str:
-    """Generate a new admin session token and store it."""
+    """Generate a new admin session token and store it with a creation timestamp."""
     token = secrets.token_hex(16)
     with _admin_tokens_lock:
-        _admin_tokens[token] = True
+        _admin_tokens[token] = time.time()
+        _cleanup_expired_tokens()
     return token
 
 
@@ -52,6 +53,17 @@ def revoke_admin_tokens() -> None:
     """Invalidate all admin tokens (e.g. after PIN change)."""
     with _admin_tokens_lock:
         _admin_tokens.clear()
+
+
+def _cleanup_expired_tokens() -> None:
+    """Prune tokens beyond the max size. Call while holding _admin_tokens_lock."""
+    if len(_admin_tokens) <= ADMIN_TOKEN_CACHE_MAXSIZE:
+        return
+    # Remove oldest tokens to get back under the limit
+    sorted_tokens = sorted(_admin_tokens.items(), key=lambda x: x[1])
+    excess = len(_admin_tokens) - ADMIN_TOKEN_CACHE_MAXSIZE
+    for tok, _ in sorted_tokens[:excess]:
+        del _admin_tokens[tok]
 
 
 @lru_cache
@@ -150,6 +162,11 @@ def require_admin(
 
     When PIN is disabled (neither admin_pin_enabled nor kiosk+kiosk_pin_enabled),
     all requests are allowed through without a token.
+
+    Token validity is checked against the pin_timeout setting:
+    - pin_timeout=0 (immediate): tokens valid for a grace period (enough for
+      the admin page to complete its parallel API calls on a single page load)
+    - pin_timeout>0: tokens valid for that many seconds
     """
     settings = svc.get_all()
     pin_active = settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))
@@ -157,9 +174,15 @@ def require_admin(
         return  # No PIN configured or PIN empty — allow all
 
     token = request.headers.get("X-Admin-Token", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Admin authentication required")
+
+    pin_timeout = settings.get("pin_timeout", 0)
+    effective_ttl = PIN_IMMEDIATE_GRACE_SECONDS if pin_timeout == 0 else pin_timeout
+
     with _admin_tokens_lock:
-        valid = token and token in _admin_tokens
-    if not valid:
+        created_at = _admin_tokens.get(token)
+    if created_at is None or (time.time() - created_at) > effective_ttl:
         raise HTTPException(status_code=401, detail="Admin authentication required")
 
 

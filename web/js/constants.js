@@ -41,6 +41,7 @@ const CONST = {
 
     // sessionStorage keys
     SS_ADMIN_TOKEN: 'admin-token',
+    SS_ADMIN_TOKEN_TS: 'admin-token-ts',
 
     // Defaults for settings-backed values (before settings load)
     DEFAULT_MENU_POLL_SECONDS: 60,

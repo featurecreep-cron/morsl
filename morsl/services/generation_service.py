@@ -111,6 +111,8 @@ class GenerationService:
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(None, self._sync_generate, config, url, token, logger)
 
+            result["profile"] = profile_name
+
             # Save to disk atomically
             self._save_menu(result)
 
