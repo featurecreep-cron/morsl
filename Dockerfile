@@ -1,20 +1,12 @@
-FROM python:3.14-slim
-
-LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
-      org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.url="https://github.com/featurecreep-cron/morsl"
-
-# System deps for cairosvg / Pillow
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
-        libgdk-pixbuf-2.0-0 shared-mime-info curl && \
-    rm -rf /var/lib/apt/lists/*
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
-# Install Python deps first (cached unless pyproject.toml changes)
+# Install Python deps into a virtualenv for clean copy to runtime stage.
+# cairosvg/Pillow are pure-Python or ship prebuilt wheels — no build tools needed.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY pyproject.toml ./
 RUN mkdir -p morsl/app morsl/services && \
     touch morsl/__init__.py morsl/app/__init__.py morsl/services/__init__.py \
@@ -22,7 +14,29 @@ RUN mkdir -p morsl/app morsl/services && \
     pip install --no-cache-dir . && \
     rm -rf morsl
 
-# Copy actual source
+# ---
+
+FROM python:3.14-slim
+
+LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
+      org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/featurecreep-cron/morsl"
+
+# Runtime-only native libs (no dev headers, no build tools, no curl)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+        libgdk-pixbuf-2.0-0 shared-mime-info && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy virtualenv from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Copy application source
 COPY morsl/ morsl/
 COPY scripts/ scripts/
 COPY web/ web/
@@ -48,6 +62,6 @@ EXPOSE 8321
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8321/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8321/health')" || exit 1
 
 CMD ["uvicorn", "morsl.app.main:app", "--host", "0.0.0.0", "--port", "8321"]
