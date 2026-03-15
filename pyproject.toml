@@ -3,6 +3,9 @@ name = "morsl"
 version = "0.1.0"
 description = "Autocreate menus from Tandoor API"
 requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Cron", email = "cron@featurecreep.dev" }]
+keywords = ["meal-planning", "tandoor", "menu-generator", "docker", "self-hosted"]
 dependencies = [
     "requests==2.32.5",
     "pulp==2.9.0",
