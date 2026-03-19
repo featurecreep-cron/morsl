@@ -66,7 +66,6 @@ ignore = [
     "S311",  # random — used for LP variety, not security
 ]
 fixable = ["ALL"]
-extend-select = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "S"]
@@ -96,8 +95,5 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 
-[lint]
-select = ["I002", "TCH004"]
-
-[lint.isort]
+[tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
