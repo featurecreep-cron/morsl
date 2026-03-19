@@ -167,6 +167,34 @@ class TestRequestsConstraint:
         )
 
 
+class TestHttpxConstraint:
+    """import httpx only in settings route and proxy."""
+
+    _ALLOWED = {"settings.py", "proxy.py"}
+
+    def test_httpx_only_in_allowed_files(self):
+        violations = []
+        for path in _all_source_files():
+            if path.name in self._ALLOWED:
+                continue
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name == "httpx":
+                            violations.append(f"{path.name}:{node.lineno}")
+                elif (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and (node.module == "httpx" or node.module.startswith("httpx."))
+                ):
+                    violations.append(f"{path.name}:{node.lineno}")
+        assert not violations, (
+            "httpx imported outside allowed files "
+            f"({', '.join(self._ALLOWED)}):\n" + "\n".join(violations)
+        )
+
+
 class TestTandoorAPIInstantiation:
     """TandoorAPI() only in service modules."""
 
