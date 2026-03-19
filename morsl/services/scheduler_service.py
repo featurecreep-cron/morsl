@@ -199,13 +199,13 @@ class SchedulerService:
 
         await self._run_pre_generate(schedule, is_weekly)
 
-        schedule["last_run"] = now().isoformat()
-        self._save()
-
         if is_weekly:
             await self._run_weekly_pipeline(schedule, template_name)
         else:
             await self._run_profile_pipeline(schedule)
+
+        schedule["last_run"] = now().isoformat()
+        self._save()
 
     async def _run_pre_generate(self, schedule: Dict[str, Any], is_weekly: bool) -> None:
         """Clear menu and cleanup old meal plans before generation."""

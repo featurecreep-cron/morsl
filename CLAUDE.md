@@ -25,7 +25,7 @@ These are non-negotiable. Violations are caught by `tests/test_architecture.py`.
 3. **TandoorAPI is sole HTTP client for Tandoor.** Proxy routes are the documented exception.
 4. **`import requests` only in `tandoor_api.py` and `routes/proxy.py`.**
 5. **TandoorAPI instantiation only in service modules**, never in routes.
-6. **Frozen domain models.** `GenerationStatus` is the documented exception.
+6. **Frozen domain models.** `GenerationStatus` and `WeeklyGenerationStatus` are the documented exceptions.
 7. **Tokens never in logs.** No f-string with "token" in logger calls.
 8. **Service singletons via `dependencies.py` only.** No service instantiates another service directly (workflow composition via method parameters is fine).
 
