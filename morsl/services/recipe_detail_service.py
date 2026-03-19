@@ -12,7 +12,7 @@ from morsl.tandoor_api import TandoorAPI
 
 def fetch_recipe_details(
     api: TandoorAPI,
-    recipes: list,
+    recipes: tuple | list,
     logger: Logger,
 ) -> List[Dict[str, Any]]:
     """Fetch full details (image, ingredients, steps) for a list of Recipe objects.

@@ -1,5 +1,7 @@
 """Centralised magic numbers and factory defaults for the backend."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 # Cache (factory defaults — runtime reads from settings where applicable)

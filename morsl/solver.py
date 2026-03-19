@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 
 from pulp import LpMaximize, LpProblem, LpVariable, lpSum, value

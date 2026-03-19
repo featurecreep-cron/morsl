@@ -81,7 +81,7 @@ def _resolve_favicon_source(favicon_url, icons_dir: Path) -> Path:
         return UPLOADS_DIR / favicon_url.split("/")[-1]
     source = (Path("web") / favicon_url.lstrip("/")).resolve()
     web_root = Path("web").resolve()
-    if not str(source).startswith(str(web_root)):
+    if not source.is_relative_to(web_root):
         logger.warning("favicon_url points outside web/: %s", favicon_url)
         return icons_dir / "default-favicon.svg"
     return source

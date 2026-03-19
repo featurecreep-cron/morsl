@@ -15,6 +15,8 @@ from apscheduler.triggers.cron import CronTrigger
 
 from morsl.utils import atomic_write_json, now
 
+logger = logging.getLogger(__name__)
+
 
 class SchedulerService:
     """Manages scheduled menu generation using APScheduler."""
@@ -207,7 +209,6 @@ class SchedulerService:
 
     async def _run_pre_generate(self, schedule: Dict[str, Any], is_weekly: bool) -> None:
         """Clear menu and cleanup old meal plans before generation."""
-        _logger = logging.getLogger(__name__)
 
         if not is_weekly and schedule.get("clear_before_generate") and self._clear_callback:
             self._clear_callback()
@@ -224,14 +225,14 @@ class SchedulerService:
                     },
                 )
             except Exception:
-                _logger.warning(
+                logger.warning(
                     "Scheduled cleanup failed (non-fatal)",
                     exc_info=True,
                 )
 
     async def _run_weekly_pipeline(self, schedule: Dict[str, Any], template_name: str) -> None:
         """Generate weekly plan and optionally save to Tandoor."""
-        _logger = logging.getLogger(__name__)
+
         from datetime import date, timedelta
 
         today = date.today()
@@ -245,14 +246,14 @@ class SchedulerService:
             try:
                 await self._weekly_save_callback(template_name)
             except Exception:
-                _logger.warning(
+                logger.warning(
                     "Scheduled weekly save failed (non-fatal)",
                     exc_info=True,
                 )
 
     async def _run_profile_pipeline(self, schedule: Dict[str, Any]) -> None:
         """Generate from profile and optionally create meal plans."""
-        _logger = logging.getLogger(__name__)
+
         await self._generation_callback(schedule["profile"])
 
         mp_type = schedule.get("meal_plan_type")
@@ -260,7 +261,7 @@ class SchedulerService:
             try:
                 await self._meal_plan_callback("create", {"meal_plan_type": mp_type})
             except Exception:
-                _logger.warning(
+                logger.warning(
                     "Scheduled meal plan creation failed (non-fatal)",
                     exc_info=True,
                 )

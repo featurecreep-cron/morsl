@@ -8,6 +8,8 @@ Usage:
     python scripts/generate_icons.py
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from morsl.services.icon_service import generate_icons
