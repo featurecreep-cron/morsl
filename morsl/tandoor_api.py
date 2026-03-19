@@ -62,13 +62,20 @@ class TandoorAPI:
             self.url = f"{url}api/"
         else:
             self.url = f"{url}/api/"
-        self.headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.token}"}
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}",
+        }
 
         # Connection-pooled session with retries and default timeout
         self.session = requests.Session()
         self.session.headers.update(self.headers)
         adapter = HTTPAdapter(
-            max_retries=Retry(total=HTTP_MAX_RETRIES, backoff_factor=HTTP_BACKOFF_FACTOR, status_forcelist=HTTP_RETRY_STATUS_CODES),
+            max_retries=Retry(
+                total=HTTP_MAX_RETRIES,
+                backoff_factor=HTTP_BACKOFF_FACTOR,
+                status_forcelist=HTTP_RETRY_STATUS_CODES,
+            ),
             pool_connections=HTTP_POOL_CONNECTIONS,
             pool_maxsize=HTTP_POOL_MAXSIZE,
         )
@@ -76,7 +83,9 @@ class TandoorAPI:
         self.session.mount("https://", adapter)
 
     @cached
-    def get_paged_results(self, url: str, params: Optional[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+    def get_paged_results(
+        self, url: str, params: Optional[Dict[str, Any]], **kwargs
+    ) -> List[Dict[str, Any]]:
         results = []
         while url:
             self.logger.debug(f"Connecting to tandoor api at url: {url}")
@@ -85,7 +94,10 @@ class TandoorAPI:
                 params = None
             response = self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
             if response.status_code != 200:
-                self.logger.info(f"Failed to fetch recipes. Status code: {response.status_code}: {response.text}")
+                self.logger.info(
+                    f"Failed to fetch recipes. Status code: "
+                    f"{response.status_code}: {response.text}"
+                )
                 raise TandoorAPIError(response.status_code, response.text)
             content = json.loads(response.content)
             new_results = content.get("results", [])
@@ -101,7 +113,9 @@ class TandoorAPI:
         response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
 
         if response.status_code != 200:
-            self.logger.info(f"Failed to fetch recipes. Status code: {response.status_code}: {response.text}")
+            self.logger.info(
+                f"Failed to fetch recipes. Status code: {response.status_code}: {response.text}"
+            )
             raise TandoorAPIError(response.status_code, response.text)
         return json.loads(response.content)
 
@@ -123,7 +137,12 @@ class TandoorAPI:
             self.logger.info(f"Error deleting object: {response.text}")
             raise RuntimeError(f"Error deleting object: {response.text}")
 
-    def get_recipes(self, params: Optional[Dict[str, Any]] = None, filters: Union[List[int], int, None] = None, **kwargs) -> List[Dict[str, Any]]:
+    def get_recipes(
+        self,
+        params: Optional[Dict[str, Any]] = None,
+        filters: Union[List[int], int, None] = None,
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
         """Fetch a list of recipes from the API.
 
         Two independent query paths run in sequence and results are concatenated:
@@ -179,7 +198,9 @@ class TandoorAPI:
         else:
             raise TandoorAPIError(response.status_code, response.text)
 
-    def get_keyword_tree(self, kw_id: str | int, params: dict[str, Any] | None = None, **kwargs) -> list[dict[str, Any]]:
+    def get_keyword_tree(
+        self, kw_id: str | int, params: dict[str, Any] | None = None, **kwargs
+    ) -> list[dict[str, Any]]:
         """
         Fetch a keyword and its descendants from the API.
         Returns:
@@ -195,7 +216,9 @@ class TandoorAPI:
         self.logger.debug(f"Returning {len(keywords)} total keywords.")
         return keywords
 
-    def get_food_tree(self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs) -> List[Dict[str, Any]]:
+    def get_food_tree(
+        self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> List[Dict[str, Any]]:
         """
         Fetch a food and its descendants from the API.
         Returns:
@@ -211,7 +234,9 @@ class TandoorAPI:
         self.logger.debug(f"Returning {len(foods)} total food.")
         return foods
 
-    def get_food(self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def get_food(
+        self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         """Fetch a single food by ID."""
 
         url = f"{self.url}food/"
@@ -220,7 +245,9 @@ class TandoorAPI:
         self.logger.debug(f"Returning food {food['id']}: {food['name']}.")
         return food
 
-    def get_book(self, book_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
+    def get_book(
+        self, book_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> Dict[str, Any]:
         """Fetch a single recipe book by ID."""
 
         url = f"{self.url}recipe-book/"
@@ -230,7 +257,9 @@ class TandoorAPI:
         return book
 
     @cached
-    def get_book_recipes(self, book: "Book", params: Optional[Dict[str, Any]] = None, **kwargs) -> List[Dict[str, Any]]:
+    def get_book_recipes(
+        self, book: "Book", params: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> List[Dict[str, Any]]:
         """
         Fetch all recipes in a book from the API.
         Returns:
@@ -247,7 +276,11 @@ class TandoorAPI:
         return recipes
 
     def get_mealplan_recipes(
-        self, mealtype_id: Optional[Union[List[int], int]] = None, date: Optional[datetime] = None, params: Optional[Dict[str, Any]] = None, **kwargs
+        self,
+        mealtype_id: Optional[Union[List[int], int]] = None,
+        date: Optional[datetime] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> List[Dict[str, Any]]:
         """
         Fetch all recipes of mealtype.
@@ -262,11 +295,19 @@ class TandoorAPI:
         if not isinstance(mealtype_id, list):
             mealtype_id = [mealtype_id]
 
-        url = f"{self.url}meal-plan/?from_date={date.strftime('%Y-%m-%d')}&to_date={date.strftime('%Y-%m-%d')}"
+        url = (
+            f"{self.url}meal-plan/"
+            f"?from_date={date.strftime('%Y-%m-%d')}"
+            f"&to_date={date.strftime('%Y-%m-%d')}"
+        )
         for mt in mealtype_id:
             url = url + f"&meal_type={mt}"
 
-        self.logger.debug(f"Returning recipes from meal plan on {date.strftime('%Y-%m-%d')} with meal play type IDs: {mealtype_id}.")
+        self.logger.debug(
+            f"Returning recipes from meal plan on "
+            f"{date.strftime('%Y-%m-%d')} with meal type IDs: "
+            f"{mealtype_id}."
+        )
         return [r["recipe"] for r in self.get_unpaged_results(url, "", **kwargs)]
 
     def create_meal_plan(
@@ -311,13 +352,18 @@ class TandoorAPI:
         self.logger.debug(f"Succesfully deleted meal plan {obj_id}.")
 
     @cached
-    def get_food_substitutes(self, food_id: Union[str, int], substitute: str) -> List[Dict[str, Any]]:
+    def get_food_substitutes(
+        self, food_id: Union[str, int], substitute: str
+    ) -> List[Dict[str, Any]]:
         url = f"{self.url}{substitute}/{food_id}/substitutes/"
         self.logger.debug(f"Connecting to tandoor api at url: {url}")
         response = self.session.get(url, params={"onhand": 1}, timeout=DEFAULT_TIMEOUT)
 
         if response.status_code != 200:
-            self.logger.info(f"Failed to fetch food substitutes. Status code: {response.status_code}: {response.text}")
+            self.logger.info(
+                f"Failed to fetch food substitutes. Status code: "
+                f"{response.status_code}: {response.text}"
+            )
             raise TandoorAPIError(response.status_code, response.text)
         return json.loads(response.content)
 
@@ -335,18 +381,24 @@ class TandoorAPI:
         response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
 
         if response.status_code != 200:
-            self.logger.info(f"Failed to fetch meal types. Status code: {response.status_code}: {response.text}")
+            self.logger.info(
+                f"Failed to fetch meal types. Status code: {response.status_code}: {response.text}"
+            )
             raise TandoorAPIError(response.status_code, response.text)
         return json.loads(response.content)
 
-    def create_meal_type(self, name: str, color: str = "#FF5722", order: int = 0, **kwargs) -> Dict[str, Any]:
+    def create_meal_type(
+        self, name: str, color: str = "#FF5722", order: int = 0, **kwargs
+    ) -> Dict[str, Any]:
         """Create a new meal type."""
         url = f"{self.url}meal-type/"
         data = {"name": name, "color": color, "order": order}
         self.logger.debug(f"Creating meal type: {name} with color {color}")
         return self.create_object(url, data)
 
-    def get_or_create_meal_type(self, name: str, color: str = "#FF5722", **kwargs) -> Dict[str, Any]:
+    def get_or_create_meal_type(
+        self, name: str, color: str = "#FF5722", **kwargs
+    ) -> Dict[str, Any]:
         """Get existing meal type by name or create it with auto-incremented order."""
         meal_types = self.get_meal_types()
         for mt in meal_types:
@@ -357,7 +409,13 @@ class TandoorAPI:
         max_order = max((mt.get("order", 0) for mt in meal_types), default=-1)
         return self.create_meal_type(name, color, order=max_order + 1)
 
-    def get_meal_plans_by_type(self, meal_type_id: int, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, **kwargs) -> List[Dict[str, Any]]:
+    def get_meal_plans_by_type(
+        self,
+        meal_type_id: int,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
         """Fetch meal plans filtered by meal type."""
         if from_date is None:
             from_date = now()
@@ -374,12 +432,17 @@ class TandoorAPI:
         response = self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
 
         if response.status_code != 200:
-            self.logger.info(f"Failed to fetch meal plans. Status code: {response.status_code}: {response.text}")
+            self.logger.info(
+                f"Failed to fetch meal plans. Status code: {response.status_code}: {response.text}"
+            )
             raise TandoorAPIError(response.status_code, response.text)
         return json.loads(response.content)
 
     def cleanup_uncooked_meal_plans(self, meal_plan_type: int, days: int) -> int:
-        """Delete meal plans older than `days` that have no matching cook log. Returns count deleted."""
+        """Delete meal plans older than `days` without a cook log.
+
+        Returns count deleted.
+        """
         from datetime import timedelta
 
         to_date = (now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -421,7 +484,9 @@ class TandoorAPI:
                 )
                 if del_resp.status_code in (200, 204):
                     deleted += 1
-        self.logger.info(f"Cleanup: deleted {deleted} uncooked meal plans from {from_date} to {to_date}")
+        self.logger.info(
+            f"Cleanup: deleted {deleted} uncooked meal plans from {from_date} to {to_date}"
+        )
         return deleted
 
     def create_meal_plans_from_menu(
@@ -440,7 +505,11 @@ class TandoorAPI:
             meal_type = self.get_meal_type(meal_plan_type_id)
         except (TandoorAPIError, TandoorNotFoundError) as e:
             self.logger.warning(f"Failed to fetch meal type {meal_plan_type_id}: {e}")
-            return {"created": 0, "errors": [f"Invalid meal type {meal_plan_type_id}: {e}"], "total": len(recipes)}
+            return {
+                "created": 0,
+                "errors": [f"Invalid meal type {meal_plan_type_id}: {e}"],
+                "total": len(recipes),
+            }
 
         plan_date = date or now().strftime("%Y-%m-%d")
         shared_objs = [{"id": uid} for uid in (shared or [])]
@@ -458,7 +527,9 @@ class TandoorAPI:
                 "meal_type": meal_type,
             }
             try:
-                resp = self.session.post(f"{self.url}meal-plan/", json=data, timeout=DEFAULT_TIMEOUT)
+                resp = self.session.post(
+                    f"{self.url}meal-plan/", json=data, timeout=DEFAULT_TIMEOUT
+                )
                 if resp.status_code in (200, 201):
                     created += 1
                 else:

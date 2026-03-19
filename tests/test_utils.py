@@ -97,7 +97,11 @@ class TestSetupLogging:
         assert logger.loglevel == logging.INFO
         handler_count = len(logger.handlers)
         # Find stdout handler level
-        stdout_h = [h for h in logger.handlers if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout]
+        stdout_h = [
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout
+        ]
         assert len(stdout_h) == 1
         assert stdout_h[0].level == logging.INFO
 
@@ -107,7 +111,11 @@ class TestSetupLogging:
         assert logger2.loglevel == logging.DEBUG
         # Handler count unchanged
         assert len(logger2.handlers) == handler_count
-        stdout_h2 = [h for h in logger2.handlers if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout]
+        stdout_h2 = [
+            h
+            for h in logger2.handlers
+            if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout
+        ]
         assert stdout_h2[0].level == logging.DEBUG
 
     def test_log_to_stdout_skips_file_handler(self):
@@ -122,7 +130,11 @@ class TestSetupLogging:
         import sys
 
         logger = setup_logging("INFO")
-        stderr_h = [h for h in logger.handlers if isinstance(h, logging.StreamHandler) and h.stream is sys.stderr]
+        stderr_h = [
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler) and h.stream is sys.stderr
+        ]
         assert len(stderr_h) == 1
         original_level = stderr_h[0].level
 

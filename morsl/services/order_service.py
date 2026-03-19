@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
 from datetime import datetime
@@ -54,7 +55,10 @@ class OrderService:
             try:
                 mt = api.get_meal_type(meal_type_id)
             except Exception:
-                self.logger.warning(f"Configured meal type {meal_type_id} not found, falling back to first available")
+                self.logger.warning(
+                    f"Configured meal type {meal_type_id} not found, "
+                    "falling back to first available"
+                )
             else:
                 with self._lock:
                     self._cached_meal_type = mt
@@ -64,7 +68,9 @@ class OrderService:
 
         # Use first available meal type
         with self._lock:
-            if self._cached_meal_type is not None and (meal_type_id is not None or self._cached_meal_type_id is None):
+            if self._cached_meal_type is not None and (
+                meal_type_id is not None or self._cached_meal_type_id is None
+            ):
                 return self._cached_meal_type
         # Network I/O outside lock
         api = self._get_api()
@@ -78,7 +84,14 @@ class OrderService:
         self.logger.info(f"Using first available meal type: {mt['id']} - {mt['name']}")
         return self._cached_meal_type
 
-    def place_order(self, recipe_id: int, recipe_name: str, servings: int = 1, customer_name: Optional[str] = None, meal_type_id: Optional[int] = None) -> Dict[str, Any]:
+    def place_order(
+        self,
+        recipe_id: int,
+        recipe_name: str,
+        servings: int = 1,
+        customer_name: Optional[str] = None,
+        meal_type_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Record an order as a Tandoor meal plan entry and notify SSE subscribers."""
         api = self._get_api()
         meal_type = self._get_meal_type(meal_type_id)
@@ -120,7 +133,9 @@ class OrderService:
         with self._lock:
             self._server_orders.append(order)
 
-    def get_server_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    def get_server_orders(
+        self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
         """Return server-stored orders filtered by date range, newest first."""
         if from_date is None:
             from_date = now()
@@ -151,7 +166,9 @@ class OrderService:
                     return
         raise RuntimeError(f"Server order not found: {order_id}")
 
-    def clear_server_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> int:
+    def clear_server_orders(
+        self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
+    ) -> int:
         """Remove server-stored orders matching date range. Returns count deleted."""
         if from_date is None:
             from_date = now()
@@ -163,10 +180,19 @@ class OrderService:
 
         with self._lock:
             before_count = len(self._server_orders)
-            self._server_orders = [o for o in self._server_orders if not (from_str <= o.get("timestamp", "")[:10] <= to_str)]
+            self._server_orders = [
+                o
+                for o in self._server_orders
+                if not (from_str <= o.get("timestamp", "")[:10] <= to_str)
+            ]
             return before_count - len(self._server_orders)
 
-    def get_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_orders(
+        self,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        meal_type_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
         """Return all orders for date range, newest first.
 
         Merges Tandoor meal plan orders with server-stored orders.
@@ -188,7 +214,9 @@ class OrderService:
         all_orders.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         return all_orders
 
-    def _get_tandoor_orders(self, from_date: datetime, to_date: datetime, meal_type_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    def _get_tandoor_orders(
+        self, from_date: datetime, to_date: datetime, meal_type_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """Fetch orders from Tandoor meal plans."""
         api = self._get_api()
         meal_type = self._get_meal_type(meal_type_id)
@@ -220,7 +248,12 @@ class OrderService:
 
         return orders
 
-    def get_order_counts(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None, meal_type_id: Optional[int] = None) -> Dict[int, Dict[str, Any]]:
+    def get_order_counts(
+        self,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        meal_type_id: Optional[int] = None,
+    ) -> Dict[int, Dict[str, Any]]:
         """Per-recipe order counts for date range."""
         orders = self.get_orders(from_date, to_date, meal_type_id=meal_type_id)
         counts: Dict[int, Dict[str, Any]] = {}
@@ -243,7 +276,9 @@ class OrderService:
             api = self._get_api()
             api.delete_meal_plan(int(order_id))
 
-    def clear_orders(self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> int:
+    def clear_orders(
+        self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
+    ) -> int:
         """Clear all orders for date range. Returns count of deleted orders."""
         # Clear server-stored orders
         server_count = self.clear_server_orders(from_date, to_date)
@@ -268,11 +303,8 @@ class OrderService:
 
     def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
         """Remove subscriber queue."""
-        with self._lock:
-            try:
-                self._subscribers.remove(q)
-            except ValueError:
-                pass
+        with self._lock, contextlib.suppress(ValueError):
+            self._subscribers.remove(q)
 
     @staticmethod
     def _build_timestamp(from_date: str, note: str) -> str:
@@ -321,7 +353,5 @@ class OrderService:
         if dead:
             with self._lock:
                 for q in dead:
-                    try:
+                    with contextlib.suppress(ValueError):
                         self._subscribers.remove(q)
-                    except ValueError:
-                        pass

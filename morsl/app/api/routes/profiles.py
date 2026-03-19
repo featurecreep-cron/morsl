@@ -5,7 +5,12 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from morsl.app.api.dependencies import get_config_service, get_credentials, get_settings_service, require_admin
+from morsl.app.api.dependencies import (
+    get_config_service,
+    get_credentials,
+    get_settings_service,
+    require_admin,
+)
 from morsl.app.api.models import ProfileCreateRequest, ProfileDetailResponse, ProfileResponse
 from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
 from morsl.services.config_service import ConfigService
@@ -52,7 +57,12 @@ def get_profile(
     return ProfileDetailResponse(name=name, config=config)
 
 
-@router.post("/profiles", response_model=ProfileDetailResponse, status_code=201, dependencies=[Depends(require_admin)])
+@router.post(
+    "/profiles",
+    response_model=ProfileDetailResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
 def create_profile(
     request: ProfileCreateRequest,
     config_service: ConfigService = Depends(get_config_service),
@@ -69,7 +79,9 @@ def create_profile(
     return ProfileDetailResponse(name=request.name, config=config)
 
 
-@router.put("/profiles/{name}", response_model=ProfileDetailResponse, dependencies=[Depends(require_admin)])
+@router.put(
+    "/profiles/{name}", response_model=ProfileDetailResponse, dependencies=[Depends(require_admin)]
+)
 def update_profile(
     name: str,
     request: ProfileCreateRequest,

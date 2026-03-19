@@ -81,7 +81,13 @@ def get_order_counts(
     fd = datetime.strptime(from_date, "%Y-%m-%d") if from_date else None
     td = datetime.strptime(to_date, "%Y-%m-%d") if to_date else None
     meal_type_id = settings_svc.get_all().get("order_meal_type_id")
-    return {"counts": list(order_service.get_order_counts(from_date=fd, to_date=td, meal_type_id=meal_type_id).values())}
+    return {
+        "counts": list(
+            order_service.get_order_counts(
+                from_date=fd, to_date=td, meal_type_id=meal_type_id
+            ).values()
+        )
+    }
 
 
 @router.delete("/orders/{order_id}", status_code=204, dependencies=[Depends(require_admin)])

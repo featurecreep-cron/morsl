@@ -15,7 +15,15 @@ class TestCategoryServiceCRUD:
         assert os.path.isfile(tmp_path / "categories.json")
 
     def test_load_existing_file(self, tmp_path):
-        cats = {"spirits": {"id": "spirits", "display_name": "Spirits", "subtitle": "", "icon": "", "sort_order": 0}}
+        cats = {
+            "spirits": {
+                "id": "spirits",
+                "display_name": "Spirits",
+                "subtitle": "",
+                "icon": "",
+                "sort_order": 0,
+            }
+        }
         (tmp_path / "categories.json").write_text(json.dumps(cats))
         svc = CategoryService(data_dir=str(tmp_path))
         assert len(svc.list_categories()) == 1
@@ -23,7 +31,9 @@ class TestCategoryServiceCRUD:
 
     def test_create_category(self, tmp_path):
         svc = CategoryService(data_dir=str(tmp_path))
-        cat = svc.create_category({"display_name": "By Spirit", "subtitle": "Whiskey, Gin...", "icon": "bowl"})
+        cat = svc.create_category(
+            {"display_name": "By Spirit", "subtitle": "Whiskey, Gin...", "icon": "bowl"}
+        )
         assert cat["id"] == "by-spirit"
         assert cat["display_name"] == "By Spirit"
         assert cat["subtitle"] == "Whiskey, Gin..."
@@ -51,7 +61,9 @@ class TestCategoryServiceCRUD:
     def test_update_category(self, tmp_path):
         svc = CategoryService(data_dir=str(tmp_path))
         svc.create_category({"display_name": "Old Name"})
-        updated = svc.update_category("old-name", {"display_name": "New Name", "subtitle": "Updated"})
+        updated = svc.update_category(
+            "old-name", {"display_name": "New Name", "subtitle": "Updated"}
+        )
         assert updated["display_name"] == "New Name"
         assert updated["subtitle"] == "Updated"
 
@@ -112,7 +124,13 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "Italian, Thai...", "icon": "food", "sort_order": 0},
+                "by-cuisine": {
+                    "id": "by-cuisine",
+                    "display_name": "By Cuisine",
+                    "subtitle": "Italian, Thai...",
+                    "icon": "food",
+                    "sort_order": 0,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))
@@ -126,7 +144,13 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "Dinner, Lunch...", "icon": "plate", "sort_order": 1},
+                "by-meal": {
+                    "id": "by-meal",
+                    "display_name": "By Meal",
+                    "subtitle": "Dinner, Lunch...",
+                    "icon": "plate",
+                    "sort_order": 1,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))
@@ -139,7 +163,13 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "by-spirit": {"id": "by-spirit", "display_name": "By Cuisine", "subtitle": "Old subtitle", "icon": "old", "sort_order": 0},
+                "by-spirit": {
+                    "id": "by-spirit",
+                    "display_name": "By Cuisine",
+                    "subtitle": "Old subtitle",
+                    "icon": "old",
+                    "sort_order": 0,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))
@@ -151,8 +181,20 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
-                "by-spirit": {"id": "by-spirit", "display_name": "By Spirit", "subtitle": "Already here", "icon": "bowl", "sort_order": 1},
+                "by-cuisine": {
+                    "id": "by-cuisine",
+                    "display_name": "By Cuisine",
+                    "subtitle": "",
+                    "icon": "",
+                    "sort_order": 0,
+                },
+                "by-spirit": {
+                    "id": "by-spirit",
+                    "display_name": "By Spirit",
+                    "subtitle": "Already here",
+                    "icon": "bowl",
+                    "sort_order": 1,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))
@@ -164,7 +206,13 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "house-menu": {"id": "house-menu", "display_name": "House Menu", "subtitle": "", "icon": "", "sort_order": 0},
+                "house-menu": {
+                    "id": "house-menu",
+                    "display_name": "House Menu",
+                    "subtitle": "",
+                    "icon": "",
+                    "sort_order": 0,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))
@@ -173,9 +221,27 @@ class TestCategoryServiceMigration:
 
     def test_already_migrated_data_unchanged(self, tmp_path):
         already_migrated = {
-            "by-spirit": {"id": "by-spirit", "display_name": "By Spirit", "subtitle": "Whiskey, Gin, Rum...", "icon": "bowl", "sort_order": 0},
-            "by-style": {"id": "by-style", "display_name": "By Style", "subtitle": "Martini, Negroni, Sour...", "icon": "dinner", "sort_order": 1},
-            "house-menu": {"id": "house-menu", "display_name": "House Menu", "subtitle": "Random cocktails", "icon": "", "sort_order": 2},
+            "by-spirit": {
+                "id": "by-spirit",
+                "display_name": "By Spirit",
+                "subtitle": "Whiskey, Gin, Rum...",
+                "icon": "bowl",
+                "sort_order": 0,
+            },
+            "by-style": {
+                "id": "by-style",
+                "display_name": "By Style",
+                "subtitle": "Martini, Negroni, Sour...",
+                "icon": "dinner",
+                "sort_order": 1,
+            },
+            "house-menu": {
+                "id": "house-menu",
+                "display_name": "House Menu",
+                "subtitle": "Random cocktails",
+                "icon": "",
+                "sort_order": 2,
+            },
         }
         self._write_categories(tmp_path, already_migrated)
         CategoryService(data_dir=str(tmp_path))
@@ -188,8 +254,20 @@ class TestCategoryServiceMigration:
         self._write_categories(
             tmp_path,
             {
-                "by-cuisine": {"id": "by-cuisine", "display_name": "By Cuisine", "subtitle": "", "icon": "", "sort_order": 0},
-                "by-meal": {"id": "by-meal", "display_name": "By Meal", "subtitle": "", "icon": "", "sort_order": 1},
+                "by-cuisine": {
+                    "id": "by-cuisine",
+                    "display_name": "By Cuisine",
+                    "subtitle": "",
+                    "icon": "",
+                    "sort_order": 0,
+                },
+                "by-meal": {
+                    "id": "by-meal",
+                    "display_name": "By Meal",
+                    "subtitle": "",
+                    "icon": "",
+                    "sort_order": 1,
+                },
             },
         )
         svc = CategoryService(data_dir=str(tmp_path))

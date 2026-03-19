@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, List
 
@@ -30,19 +30,19 @@ class TandoorEntity:
 
 class Food(TandoorEntity):
     def __init__(self, data: dict) -> None:
-        self.id = data.get("id", None)
-        self.name = data.get("name", None)
-        self.recipe = data.get("recipe", None)
-        self.shopping = data.get("shopping", None)
-        self.onhand = data.get("food_onhand", None)
-        self.ignore_shopping = data.get("ignore_shopping", None)
-        self.substitute_onhand = data.get("substitute_onhand", None)
+        self.id = data.get("id")
+        self.name = data.get("name")
+        self.recipe = data.get("recipe")
+        self.shopping = data.get("shopping")
+        self.onhand = data.get("food_onhand")
+        self.ignore_shopping = data.get("ignore_shopping")
+        self.substitute_onhand = data.get("substitute_onhand")
 
 
 class Unit(TandoorEntity):
     def __init__(self, data: dict) -> None:
-        self.id = data.get("id", None)
-        self.name = data.get("name", None)
+        self.id = data.get("id")
+        self.name = data.get("name")
 
 
 class Recipe(TandoorEntity):
@@ -68,7 +68,9 @@ class Recipe(TandoorEntity):
         return [r for r in recipes if any(k in r.keywords for k in [x.id for x in keywords])]
 
     @staticmethod
-    def recipes_with_date(recipes: List["Recipe"], field: str, date: datetime, after: bool = True) -> List["Recipe"]:
+    def recipes_with_date(
+        recipes: List["Recipe"], field: str, date: datetime, after: bool = True
+    ) -> List["Recipe"]:
         """Return recipes where *field* (createdon/cookedon) is before/after *date*."""
         if after:
             return [r for r in recipes if (d := getattr(r, field, None)) is not None and d > date]
@@ -108,24 +110,24 @@ class Book(TandoorEntity):
     def __init__(self, data: dict) -> None:
         self.id = data["id"]
         self.name = data["name"]
-        if f := data.get("filter", None):
+        if f := data.get("filter"):
             self.filter = f.get("id", None)
         else:
             self.filter = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class RelaxedConstraint:
     label: str
     slack_value: float
     weight: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class SolverResult:
-    recipes: List[Recipe]
-    requested_count: int
-    constraint_count: int
-    relaxed_constraints: List[RelaxedConstraint] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    recipes: tuple[Recipe, ...] = ()
+    requested_count: int = 0
+    constraint_count: int = 0
+    relaxed_constraints: tuple[RelaxedConstraint, ...] = ()
+    warnings: tuple[str, ...] = ()
     status: str = "optimal"

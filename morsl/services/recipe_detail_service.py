@@ -29,7 +29,10 @@ def fetch_recipe_details(
             "rating": r.rating,
             "image": None,
             "ingredients": [],
-            "keywords": [{"id": kid, "name": getattr(r, "keyword_names", {}).get(kid, "")} for kid in r.keywords],
+            "keywords": [
+                {"id": kid, "name": getattr(r, "keyword_names", {}).get(kid, "")}
+                for kid in r.keywords
+            ],
             "steps": [],
             "working_time": None,
             "cooking_time": None,
@@ -42,7 +45,9 @@ def fetch_recipe_details(
             # Enrich keywords with names from detailed response
             detail_kws = details.get("keywords", [])
             if detail_kws:
-                recipe_data["keywords"] = [{"id": kw["id"], "name": kw.get("name", "")} for kw in detail_kws]
+                recipe_data["keywords"] = [
+                    {"id": kw["id"], "name": kw.get("name", "")} for kw in detail_kws
+                ]
             for step in details.get("steps", []):
                 for ing in step.get("ingredients", []):
                     food_obj = ing.get("food")
@@ -56,9 +61,14 @@ def fetch_recipe_details(
                             if subs:
                                 food_obj = api.get_food(random.choice(subs)["id"])
                         except (KeyError, IndexError, TypeError) as e:
-                            logger.debug(f"Substitute lookup failed for food {food_obj.get('id')}: {e}")
+                            logger.debug(
+                                f"Substitute lookup failed for food {food_obj.get('id')}: {e}"
+                            )
                         except Exception as e:
-                            logger.warning(f"Unexpected error in substitute lookup for food {food_obj.get('id')}: {e}")
+                            logger.warning(
+                                f"Unexpected error in substitute lookup "
+                                f"for food {food_obj.get('id')}: {e}"
+                            )
                     recipe_data["ingredients"].append(
                         {
                             "amount": ing.get("amount"),

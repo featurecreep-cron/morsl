@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _CATEGORY_REMAP = {"by-cuisine": "by-spirit", "by-meal": "by-style"}
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProfileInfo:
     name: str
     choices: int
@@ -61,7 +61,9 @@ class ConfigService:
                 if old_cat in _CATEGORY_REMAP:
                     data["category"] = _CATEGORY_REMAP[old_cat]
                     atomic_write_json(path, data)
-                    logger.info("Migrated profile %s category %s → %s", filename, old_cat, data["category"])
+                    logger.info(
+                        "Migrated profile %s category %s → %s", filename, old_cat, data["category"]
+                    )
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Skipping profile migration for %s: %s", filename, e)
 
@@ -161,7 +163,9 @@ class ConfigService:
                         constraint_count=constraint_count,
                         description=description,
                         icon=config.get("icon", ""),
-                        category=_CATEGORY_REMAP.get(config.get("category", ""), config.get("category", "")),
+                        category=_CATEGORY_REMAP.get(
+                            config.get("category", ""), config.get("category", "")
+                        ),
                         default=is_default,
                         show_on_menu=config.get("show_on_menu", True),
                         item_noun=config.get("item_noun", ""),

@@ -113,7 +113,12 @@ def create_meal_type(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
-    response = requests.post(api_url, headers=headers, json={"name": body.name, "color": body.color or "#FF5722"}, timeout=DEFAULT_TIMEOUT)
+    response = requests.post(
+        api_url,
+        headers=headers,
+        json={"name": body.name, "color": body.color or "#FF5722"},
+        timeout=DEFAULT_TIMEOUT,
+    )
     if response.status_code not in (200, 201):
         raise HTTPException(
             status_code=response.status_code,
@@ -154,7 +159,9 @@ def set_rating(
 
     # Update the recipe's rating
     api_url = f"{url.rstrip('/')}/api/recipe/{recipe_id}/"
-    response = requests.patch(api_url, headers=headers, json={"rating": body.rating}, timeout=DEFAULT_TIMEOUT)
+    response = requests.patch(
+        api_url, headers=headers, json={"rating": body.rating}, timeout=DEFAULT_TIMEOUT
+    )
     if response.status_code not in (200, 204):
         raise HTTPException(
             status_code=response.status_code,

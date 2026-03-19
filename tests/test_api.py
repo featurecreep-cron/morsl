@@ -104,7 +104,14 @@ def client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger
 
 
 @pytest.fixture
-def settings_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger, mock_settings_service, mock_order_service):
+def settings_client(
+    mock_settings,
+    mock_gen_service,
+    mock_config_service,
+    mock_app_logger,
+    mock_settings_service,
+    mock_order_service,
+):
     app.dependency_overrides[get_settings] = lambda: mock_settings
     app.dependency_overrides[get_generation_service] = lambda: mock_gen_service
     app.dependency_overrides[get_config_service] = lambda: mock_config_service
@@ -144,12 +151,16 @@ class TestGenerationEndpoints:
         assert response.json()["request_id"] == "test-uuid-5678"
 
     async def test_generate_missing_profile(self, client, mock_config_service):
-        mock_config_service.load_profile.side_effect = FileNotFoundError("Profile not found: profiles/missing.ini")
+        mock_config_service.load_profile.side_effect = FileNotFoundError(
+            "Profile not found: profiles/missing.ini"
+        )
         response = await client.post("/api/generate/missing")
         assert response.status_code == 404
 
     async def test_generate_while_running(self, client, mock_gen_service):
-        mock_gen_service.get_status.return_value = GenerationStatus(state=GenerationState.GENERATING)
+        mock_gen_service.get_status.return_value = GenerationStatus(
+            state=GenerationState.GENERATING
+        )
         response = await client.post("/api/generate")
         assert response.status_code == 409
 
@@ -217,16 +228,22 @@ class TestSettingsEnforcement:
 
     async def test_order_disabled_returns_403(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {"orders_enabled": False}
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
+        response = await settings_client.post(
+            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
+        )
         assert response.status_code == 403
         assert "disabled" in response.json()["detail"]
 
-    async def test_order_no_tandoor_save(self, settings_client, mock_settings_service, mock_order_service):
+    async def test_order_no_tandoor_save(
+        self, settings_client, mock_settings_service, mock_order_service
+    ):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
+        response = await settings_client.post(
+            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["meal_plan_id"] is None
@@ -234,30 +251,46 @@ class TestSettingsEnforcement:
         mock_order_service.place_order.assert_not_called()
         mock_order_service.store_and_notify.assert_called_once()
 
-    async def test_order_with_customer_name(self, settings_client, mock_settings_service, mock_order_service):
+    async def test_order_with_customer_name(
+        self, settings_client, mock_settings_service, mock_order_service
+    ):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": True,
         }
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Bob"})
+        response = await settings_client.post(
+            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Bob"}
+        )
         assert response.status_code == 200
-        mock_order_service.place_order.assert_called_once_with(recipe_id=1, recipe_name="Martini", servings=1, customer_name="Bob", meal_type_id=None)
+        mock_order_service.place_order.assert_called_once_with(
+            recipe_id=1, recipe_name="Martini", servings=1, customer_name="Bob", meal_type_id=None
+        )
 
-    async def test_order_without_customer_name(self, settings_client, mock_settings_service, mock_order_service):
+    async def test_order_without_customer_name(
+        self, settings_client, mock_settings_service, mock_order_service
+    ):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": True,
         }
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"})
+        response = await settings_client.post(
+            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini"}
+        )
         assert response.status_code == 200
-        mock_order_service.place_order.assert_called_once_with(recipe_id=1, recipe_name="Martini", servings=1, customer_name=None, meal_type_id=None)
+        mock_order_service.place_order.assert_called_once_with(
+            recipe_id=1, recipe_name="Martini", servings=1, customer_name=None, meal_type_id=None
+        )
 
-    async def test_order_local_includes_customer_name(self, settings_client, mock_settings_service, mock_order_service):
+    async def test_order_local_includes_customer_name(
+        self, settings_client, mock_settings_service, mock_order_service
+    ):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Eve"})
+        response = await settings_client.post(
+            "/api/orders", json={"recipe_id": 1, "recipe_name": "Martini", "customer_name": "Eve"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["customer_name"] == "Eve"
@@ -280,7 +313,9 @@ class TestSettingsEnforcement:
         assert data["status"] == "ok"
         assert data["rating"] == 4.5
 
-    async def test_rating_enabled_forwards_to_tandoor(self, settings_client, mock_settings_service):
+    async def test_rating_enabled_forwards_to_tandoor(
+        self, settings_client, mock_settings_service
+    ):
         mock_settings_service.get_all.return_value = {
             "ratings_enabled": True,
             "save_ratings_to_tandoor": True,
@@ -292,8 +327,12 @@ class TestSettingsEnforcement:
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
         with (
-            patch("morsl.app.api.routes.proxy.requests.patch", return_value=mock_response) as mock_patch,
-            patch("morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
+            patch(
+                "morsl.app.api.routes.proxy.requests.patch", return_value=mock_response
+            ) as mock_patch,
+            patch(
+                "morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response
+            ) as mock_post,
         ):
             response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
             assert response.status_code == 200
@@ -301,7 +340,9 @@ class TestSettingsEnforcement:
             # Cook log entry created
             mock_post.assert_called_once()
 
-    async def test_rating_cook_log_includes_customer_name(self, settings_client, mock_settings_service):
+    async def test_rating_cook_log_includes_customer_name(
+        self, settings_client, mock_settings_service
+    ):
         mock_settings_service.get_all.return_value = {
             "ratings_enabled": True,
             "save_ratings_to_tandoor": True,
@@ -314,9 +355,13 @@ class TestSettingsEnforcement:
         mock_post_response.status_code = 201
         with (
             patch("morsl.app.api.routes.proxy.requests.patch", return_value=mock_response),
-            patch("morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response) as mock_post,
+            patch(
+                "morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response
+            ) as mock_post,
         ):
-            response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"})
+            response = await settings_client.patch(
+                "/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"}
+            )
             assert response.status_code == 200
             # Verify cook log includes the customer name in comment
             call_kwargs = mock_post.call_args
@@ -356,12 +401,17 @@ class TestOrderServerStorage:
         response = await settings_client.delete("/api/orders/local-999")
         assert response.status_code == 404
 
-    async def test_local_order_stored_on_post(self, settings_client, mock_settings_service, mock_order_service):
+    async def test_local_order_stored_on_post(
+        self, settings_client, mock_settings_service, mock_order_service
+    ):
         mock_settings_service.get_all.return_value = {
             "orders_enabled": True,
             "save_orders_to_tandoor": False,
         }
-        response = await settings_client.post("/api/orders", json={"recipe_id": 1, "recipe_name": "Negroni", "customer_name": "Alice"})
+        response = await settings_client.post(
+            "/api/orders",
+            json={"recipe_id": 1, "recipe_name": "Negroni", "customer_name": "Alice"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["id"].startswith("local-")
@@ -385,7 +435,8 @@ class TestVerifyPin:
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
-        assert isinstance(data["token"], str) and len(data["token"]) == 32
+        assert isinstance(data["token"], str)
+        assert len(data["token"]) == 32
 
     async def test_wrong_pin(self, settings_client, mock_settings_service):
         mock_settings_service.get_all.return_value = {
@@ -485,7 +536,9 @@ class TestAdminAuth:
         response = await settings_client.get("/api/settings")
         assert response.status_code == 401
 
-    async def test_admin_route_invalid_token_returns_401(self, settings_client, mock_settings_service):
+    async def test_admin_route_invalid_token_returns_401(
+        self, settings_client, mock_settings_service
+    ):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
             "pin": "1234",
@@ -511,7 +564,9 @@ class TestAdminAuth:
         )
         assert response.status_code == 200
 
-    async def test_pin_enabled_but_empty_allows_without_token(self, settings_client, mock_settings_service):
+    async def test_pin_enabled_but_empty_allows_without_token(
+        self, settings_client, mock_settings_service
+    ):
         """PIN feature toggled on but no PIN set — should not block access."""
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
@@ -544,7 +599,9 @@ class TestAdminAuth:
         assert "pin" not in data
         assert data["has_pin"] is True
 
-    async def test_get_settings_has_pin_false_when_empty(self, settings_client, mock_settings_service):
+    async def test_get_settings_has_pin_false_when_empty(
+        self, settings_client, mock_settings_service
+    ):
         mock_settings_service.get_all.return_value = {
             "pin": "",
             "theme": "cast-iron",
@@ -588,7 +645,9 @@ class TestAdminAuth:
         )
         assert token in _admin_tokens
 
-    async def test_verify_pin_token_works_for_admin_routes(self, settings_client, mock_settings_service):
+    async def test_verify_pin_token_works_for_admin_routes(
+        self, settings_client, mock_settings_service
+    ):
         mock_settings_service.get_all.return_value = {
             "admin_pin_enabled": True,
             "pin": "9999",
@@ -690,7 +749,14 @@ def mock_meal_plan_service():
 
 
 @pytest.fixture
-def meal_plan_client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger, mock_settings_service, mock_meal_plan_service):
+def meal_plan_client(
+    mock_settings,
+    mock_gen_service,
+    mock_config_service,
+    mock_app_logger,
+    mock_settings_service,
+    mock_meal_plan_service,
+):
     mock_settings_service.get_all.return_value = {"meal_plan_enabled": True}
     app.dependency_overrides[get_settings] = lambda: mock_settings
     app.dependency_overrides[get_generation_service] = lambda: mock_gen_service
@@ -713,8 +779,13 @@ class TestMealPlanSave:
         response = await meal_plan_client.post("/api/meal-plan", json=MEAL_PLAN_BODY)
         assert response.status_code == 403
 
-    async def test_explicit_recipes_sent_directly(self, meal_plan_client, mock_meal_plan_service, mock_gen_service):
-        body = {**MEAL_PLAN_BODY, "recipes": [{"id": 1, "name": "Pasta"}, {"id": 2, "name": "Salad"}]}
+    async def test_explicit_recipes_sent_directly(
+        self, meal_plan_client, mock_meal_plan_service, mock_gen_service
+    ):
+        body = {
+            **MEAL_PLAN_BODY,
+            "recipes": [{"id": 1, "name": "Pasta"}, {"id": 2, "name": "Salad"}],
+        }
         response = await meal_plan_client.post("/api/meal-plan", json=body)
         assert response.status_code == 200
         mock_meal_plan_service.save_menu.assert_called_once_with(
@@ -731,7 +802,9 @@ class TestMealPlanSave:
         assert response.status_code == 404
         assert "No recipes" in response.json()["detail"]
 
-    async def test_fallback_to_current_menu(self, meal_plan_client, mock_gen_service, mock_meal_plan_service):
+    async def test_fallback_to_current_menu(
+        self, meal_plan_client, mock_gen_service, mock_meal_plan_service
+    ):
         mock_gen_service.get_current_menu.return_value = {
             "recipes": [{"id": 10, "name": "Soup"}],
         }
@@ -750,15 +823,27 @@ class TestMealPlanSave:
         assert response.status_code == 404
         assert "No current menu" in response.json()["detail"]
 
-    async def test_partial_failure_returns_207(self, meal_plan_client, mock_gen_service, mock_meal_plan_service):
+    async def test_partial_failure_returns_207(
+        self, meal_plan_client, mock_gen_service, mock_meal_plan_service
+    ):
         mock_gen_service.get_current_menu.return_value = {"recipes": [{"id": 1, "name": "A"}]}
-        mock_meal_plan_service.save_menu.return_value = {"created": 1, "errors": ["one failed"], "total": 2}
+        mock_meal_plan_service.save_menu.return_value = {
+            "created": 1,
+            "errors": ["one failed"],
+            "total": 2,
+        }
         response = await meal_plan_client.post("/api/meal-plan", json=MEAL_PLAN_BODY)
         assert response.status_code == 207
 
-    async def test_total_failure_returns_400(self, meal_plan_client, mock_gen_service, mock_meal_plan_service):
+    async def test_total_failure_returns_400(
+        self, meal_plan_client, mock_gen_service, mock_meal_plan_service
+    ):
         mock_gen_service.get_current_menu.return_value = {"recipes": [{"id": 1, "name": "A"}]}
-        mock_meal_plan_service.save_menu.return_value = {"created": 0, "errors": ["all failed"], "total": 2}
+        mock_meal_plan_service.save_menu.return_value = {
+            "created": 0,
+            "errors": ["all failed"],
+            "total": 2,
+        }
         response = await meal_plan_client.post("/api/meal-plan", json=MEAL_PLAN_BODY)
         assert response.status_code == 400
 

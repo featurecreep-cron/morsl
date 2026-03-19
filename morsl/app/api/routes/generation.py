@@ -4,7 +4,14 @@ from logging import Logger
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from morsl.app.api.dependencies import get_config_service, get_credentials, get_generation_service, get_logger, get_settings_service, require_admin
+from morsl.app.api.dependencies import (
+    get_config_service,
+    get_credentials,
+    get_generation_service,
+    get_logger,
+    get_settings_service,
+    require_admin,
+)
 from morsl.app.api.models import GenerateRequest, GenerateResponse
 from morsl.constants import API_CACHE_TTL_MINUTES
 from morsl.services.config_service import ConfigService
@@ -23,12 +30,19 @@ async def generate_default(
     logger: Logger = Depends(get_logger),
 ) -> GenerateResponse:
     """Generate menu using the default profile."""
-    return await _start_generation(gen_service, config_service, settings_svc, "default", credentials, logger)
+    return await _start_generation(
+        gen_service, config_service, settings_svc, "default", credentials, logger
+    )
 
 
 # IMPORTANT: /generate/custom must come before /generate/{profile}
 # so that "custom" is not captured as a profile name.
-@router.post("/generate/custom", status_code=202, response_model=GenerateResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/generate/custom",
+    status_code=202,
+    response_model=GenerateResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def generate_custom(
     request: GenerateRequest,
     gen_service: GenerationService = Depends(get_generation_service),
@@ -41,7 +55,9 @@ async def generate_custom(
 
     config = request.model_dump()
     url, token = credentials
-    request_id = await gen_service.start_generation(config=config, url=url, token=token, logger=logger, profile_name="custom")
+    request_id = await gen_service.start_generation(
+        config=config, url=url, token=token, logger=logger, profile_name="custom"
+    )
     return GenerateResponse(request_id=request_id, status="generating")
 
 
@@ -55,7 +71,9 @@ async def generate_profile(
     logger: Logger = Depends(get_logger),
 ) -> GenerateResponse:
     """Generate menu using a named profile."""
-    return await _start_generation(gen_service, config_service, settings_svc, profile, credentials, logger)
+    return await _start_generation(
+        gen_service, config_service, settings_svc, profile, credentials, logger
+    )
 
 
 async def _start_generation(
@@ -72,12 +90,16 @@ async def _start_generation(
     try:
         config = config_service.load_profile(profile_name)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found") from None
+        raise HTTPException(
+            status_code=404, detail=f"Profile '{profile_name}' not found"
+        ) from None
 
     # Use global cache setting instead of per-profile value
     app_settings = settings_svc.get_all()
     config["cache"] = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
     url, token = credentials
-    request_id = await gen_service.start_generation(config=config, url=url, token=token, logger=logger, profile_name=profile_name)
+    request_id = await gen_service.start_generation(
+        config=config, url=url, token=token, logger=logger, profile_name=profile_name
+    )
     return GenerateResponse(request_id=request_id, status="generating")

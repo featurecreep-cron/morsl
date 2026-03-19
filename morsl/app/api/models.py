@@ -73,7 +73,7 @@ class MenuResponse(BaseModel):
             {"recipes": [r.model_dump() for r in self.recipes], "generated_at": self.generated_at},
             sort_keys=True,
         )
-        return hashlib.md5(content.encode()).hexdigest()[:12]
+        return hashlib.md5(content.encode()).hexdigest()[:12]  # noqa: S324
 
 
 class GenerationStatusResponse(BaseModel):

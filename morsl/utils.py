@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -16,7 +17,9 @@ from tzlocal import get_localzone
 from morsl.constants import API_CACHE_MAXSIZE, API_CACHE_TTL_MINUTES
 
 # Global API cache: default 512 entries, 240-minute TTL
-_api_cache: cachetools.TTLCache = cachetools.TTLCache(maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60)
+_api_cache: cachetools.TTLCache = cachetools.TTLCache(
+    maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60
+)
 _api_cache_lock = threading.Lock()
 
 
@@ -45,7 +48,13 @@ FuncType = Callable[..., Any]
 
 # logging methods
 def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False) -> logging.Logger:
-    log_levels: Dict[str, int] = {"CRITICAL": logging.CRITICAL, "ERROR": logging.ERROR, "WARNING": logging.WARNING, "INFO": logging.INFO, "DEBUG": logging.DEBUG}
+    log_levels: Dict[str, int] = {
+        "CRITICAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARNING": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+    }
     logger: logging.Logger = logging.getLogger("morsl")
     if logger.handlers:
         # Handlers configured by first call; log_to_stdout only takes effect
@@ -53,13 +62,10 @@ def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False)
         # Update stdout handler level on subsequent calls
         level = -1
         if isinstance(log, str):
-            try:
+            with contextlib.suppress(KeyError):
                 level = log_levels[log.upper()]
-            except KeyError:
-                pass
-        elif isinstance(log, int):
-            if 0 <= log <= 50:
-                level = log
+        elif isinstance(log, int) and 0 <= log <= 50:
+            level = log
         if level >= 0:
             for h in logger.handlers:
                 if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout:
@@ -70,12 +76,19 @@ def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False)
     logger.setLevel(logging.DEBUG)
 
     # Set up the two formatters
-    formatter_brief: logging.Formatter = logging.Formatter(fmt="[%(asctime)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S")
-    formatter_explicit: logging.Formatter = logging.Formatter(fmt="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s", datefmt="%H:%M:%S")
+    formatter_brief: logging.Formatter = logging.Formatter(
+        fmt="[%(asctime)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S"
+    )
+    formatter_explicit: logging.Formatter = logging.Formatter(
+        fmt="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     # Set up the file logger (skip in stdout-only mode, e.g. Docker)
     if not log_to_stdout:
-        fh: logging.FileHandler = logging.FileHandler(filename="morsl.log", encoding="utf-8", mode="w")
+        fh: logging.FileHandler = logging.FileHandler(
+            filename="morsl.log", encoding="utf-8", mode="w"
+        )
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter_explicit)
         logger.addHandler(fh)
@@ -92,16 +105,17 @@ def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False)
     ch_std.addFilter(InfoFilter())
     level: int = -1
     if isinstance(log, str):
-        try:
+        with contextlib.suppress(KeyError):
             level = log_levels[log.upper()]
-        except KeyError:
-            pass
-    elif isinstance(log, int):
-        if 0 <= log <= 50:
-            level = log
+    elif isinstance(log, int) and 0 <= log <= 50:
+        level = log
 
     if level < 0:
-        print("Valid logging levels specified by either key or value:{}".format("\n\t".join("{}: {}".format(key, value) for key, value in log_levels.items())))
+        print(
+            "Valid logging levels specified by either key or value:{}".format(
+                "\n\t".join("{}: {}".format(key, value) for key, value in log_levels.items())
+            )
+        )
         raise RuntimeError("Invalid logging level selected: {}".format(level))
     else:
         ch_std.setLevel(level)
@@ -123,7 +137,9 @@ def string_to_date(date_str: str) -> tuple[Union[datetime, bool], bool]:
     # Use re.match to check if the string matches the pattern
     if re.match(pattern, date_str):
         if date_str[:1] == "-":
-            return datetime.strptime(date_str[1:], "%Y-%m-%d").replace(tzinfo=get_localzone()), False
+            return datetime.strptime(date_str[1:], "%Y-%m-%d").replace(
+                tzinfo=get_localzone()
+            ), False
         else:
             return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=get_localzone()), True
     else:
@@ -139,7 +155,7 @@ def split_offset(s: str) -> tuple[bool, int, str]:
 
     if match:
         # Extract and assign values to variables
-        after: bool = not match.group(1) == "-"
+        after: bool = match.group(1) != "-"
         offset: int = int(match.group(2))
         interval: str = match.group(3).lower()  # Convert to lowercase for case-insensitivity
         return after, offset, interval
@@ -187,10 +203,10 @@ def cached(func: FuncType) -> FuncType:
                 pass
         result = func(self, *args, **kwargs)
         with _api_cache_lock:
-            try:
+            try:  # noqa: SIM105 — value too large for cache
                 _api_cache[key] = result
             except ValueError:
-                pass  # Value too large for cache
+                pass
         return result
 
     return wrapper

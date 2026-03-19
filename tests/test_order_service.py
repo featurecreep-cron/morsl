@@ -87,8 +87,22 @@ class TestOrderService:
     def test_get_orders(self, order_service, mock_api):
         order_service._api = mock_api
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01T12:00:00", "servings": 1, "note": ""},
-            {"id": 11, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri", "from_date": "2024-01-01T12:30:00", "servings": 2, "note": ""},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": "2024-01-01T12:00:00",
+                "servings": 1,
+                "note": "",
+            },
+            {
+                "id": 11,
+                "recipe": {"id": 2, "name": "Daiquiri"},
+                "title": "Daiquiri",
+                "from_date": "2024-01-01T12:30:00",
+                "servings": 2,
+                "note": "",
+            },
         ]
 
         orders = order_service.get_orders()
@@ -103,8 +117,22 @@ class TestOrderService:
     def test_get_orders_parses_customer_name(self, order_service, mock_api):
         order_service._api = mock_api
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01T12:00:00", "servings": 1, "note": "Ordered by Alice at 12:00:00"},
-            {"id": 11, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri", "from_date": "2024-01-01T12:30:00", "servings": 1, "note": "Ordered at 12:30:00"},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": "2024-01-01T12:00:00",
+                "servings": 1,
+                "note": "Ordered by Alice at 12:00:00",
+            },
+            {
+                "id": 11,
+                "recipe": {"id": 2, "name": "Daiquiri"},
+                "title": "Daiquiri",
+                "from_date": "2024-01-01T12:30:00",
+                "servings": 1,
+                "note": "Ordered at 12:30:00",
+            },
         ]
 
         orders = order_service.get_orders()
@@ -116,9 +144,30 @@ class TestOrderService:
     def test_get_order_counts(self, order_service, mock_api):
         order_service._api = mock_api
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01", "servings": 1, "note": ""},
-            {"id": 11, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01", "servings": 2, "note": ""},
-            {"id": 12, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri", "from_date": "2024-01-01", "servings": 1, "note": ""},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": "2024-01-01",
+                "servings": 1,
+                "note": "",
+            },
+            {
+                "id": 11,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": "2024-01-01",
+                "servings": 2,
+                "note": "",
+            },
+            {
+                "id": 12,
+                "recipe": {"id": 2, "name": "Daiquiri"},
+                "title": "Daiquiri",
+                "from_date": "2024-01-01",
+                "servings": 1,
+                "note": "",
+            },
         ]
 
         counts = order_service.get_order_counts()
@@ -128,8 +177,22 @@ class TestOrderService:
     def test_clear_orders(self, order_service, mock_api):
         order_service._api = mock_api
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": "2024-01-01", "servings": 1, "note": ""},
-            {"id": 11, "recipe": {"id": 2, "name": "Daiquiri"}, "title": "Daiquiri", "from_date": "2024-01-01", "servings": 1, "note": ""},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": "2024-01-01",
+                "servings": 1,
+                "note": "",
+            },
+            {
+                "id": 11,
+                "recipe": {"id": 2, "name": "Daiquiri"},
+                "title": "Daiquiri",
+                "from_date": "2024-01-01",
+                "servings": 1,
+                "note": "",
+            },
         ]
         count = order_service.clear_orders()
         assert count == 2
@@ -209,7 +272,14 @@ class TestServerOrderStorage:
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%dT%H:%M:%S")
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": "Ordered at 12:00:00"},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": today.strftime("%Y-%m-%d"),
+                "servings": 1,
+                "note": "Ordered at 12:00:00",
+            },
         ]
         order_service.store_order(
             {
@@ -254,7 +324,14 @@ class TestServerOrderStorage:
         today = datetime.now()
         today_str = today.strftime("%Y-%m-%dT%H:%M:%S")
         mock_api.get_meal_plans_by_type.return_value = [
-            {"id": 10, "recipe": {"id": 1, "name": "Mojito"}, "title": "Mojito", "from_date": today.strftime("%Y-%m-%d"), "servings": 1, "note": ""},
+            {
+                "id": 10,
+                "recipe": {"id": 1, "name": "Mojito"},
+                "title": "Mojito",
+                "from_date": today.strftime("%Y-%m-%d"),
+                "servings": 1,
+                "note": "",
+            },
         ]
         order_service.store_order(
             {
@@ -348,7 +425,10 @@ class TestParseCustomerName:
         assert OrderService._parse_customer_name("") is None
 
     def test_name_containing_at(self):
-        assert OrderService._parse_customer_name("Ordered by Pat at the bar at 14:30:00") == "Pat at the bar"
+        assert (
+            OrderService._parse_customer_name("Ordered by Pat at the bar at 14:30:00")
+            == "Pat at the bar"
+        )
 
     def test_unrecognized_format(self):
         assert OrderService._parse_customer_name("some random note") is None
