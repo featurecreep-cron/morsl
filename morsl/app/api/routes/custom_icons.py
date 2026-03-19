@@ -30,7 +30,9 @@ async def upload_custom_icon(
         raise HTTPException(status_code=400, detail="Only SVG files are accepted")
     content = await file.read()
     if len(content) > CUSTOM_ICON_MAX_SIZE:
-        raise HTTPException(status_code=400, detail=f"File too large (max {CUSTOM_ICON_MAX_SIZE // 1024}KB)")
+        raise HTTPException(
+            status_code=400, detail=f"File too large (max {CUSTOM_ICON_MAX_SIZE // 1024}KB)"
+        )
     try:
         result = svc.save_icon(file.filename, content)
     except Exception as e:

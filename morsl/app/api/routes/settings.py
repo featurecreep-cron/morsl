@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hmac
 import logging
 import os
@@ -107,7 +108,9 @@ def update_settings(
     # Credential keys must go through POST /credentials
     cred_in_body = set(body.keys()) & _CREDENTIAL_KEYS
     if cred_in_body:
-        raise HTTPException(400, f"Use POST /settings/credentials for: {', '.join(sorted(cred_in_body))}")
+        raise HTTPException(
+            400, f"Use POST /settings/credentials for: {', '.join(sorted(cred_in_body))}"
+        )
     # Revoke tokens if PIN value is actually changing
     if "pin" in body:
         current_pin = svc.get_all().get("pin", "")
@@ -130,7 +133,10 @@ def verify_pin(
 ) -> Dict[str, Any]:
     """Verify admin/kiosk PIN. Returns valid=true and a session token on success."""
     settings = svc.get_all()
-    if not (settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))):
+    if not (
+        settings.get("admin_pin_enabled")
+        or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))
+    ):
         return {"valid": True}
     stored_pin = settings.get("pin", "")
     if not stored_pin:
@@ -207,7 +213,9 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
     # Read and check size
     content = file.file.read()
     if len(content) > BRANDING_IMAGE_MAX_SIZE:
-        raise HTTPException(400, f"File too large (max {BRANDING_IMAGE_MAX_SIZE // 1024 // 1024}MB)")
+        raise HTTPException(
+            400, f"File too large (max {BRANDING_IMAGE_MAX_SIZE // 1024 // 1024}MB)"
+        )
 
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{prefix}-{int(time.time())}{ext}"
@@ -342,7 +350,17 @@ def reset_branding(
             logger.warning("Default icon regeneration failed: %s", e)
 
     # Reset branding settings to defaults
-    branding_keys = ["app_name", "slogan_header", "slogan_footer", "logo_url", "favicon_url", "loading_icon_url", "favicon_use_logo", "loading_icon_use_logo", "show_logo"]
+    branding_keys = [
+        "app_name",
+        "slogan_header",
+        "slogan_footer",
+        "logo_url",
+        "favicon_url",
+        "loading_icon_url",
+        "favicon_use_logo",
+        "loading_icon_use_logo",
+        "show_logo",
+    ]
     updates = {k: DEFAULTS[k] for k in branding_keys}
     return svc.update(updates)
 
@@ -360,20 +378,16 @@ def factory_reset(
     # 1. Delete all profiles
     try:
         for p in config_svc.list_profiles():
-            try:
+            with contextlib.suppress(Exception):
                 config_svc.delete_profile(p.name)
-            except Exception:
-                pass
     except Exception as e:
         errors.append(f"profiles: {e}")
 
     # 2. Delete all categories
     try:
         for cat in category_svc.list_categories():
-            try:
+            with contextlib.suppress(Exception):
                 category_svc.delete_category(cat["id"])
-            except Exception:
-                pass
     except Exception as e:
         errors.append(f"categories: {e}")
 
@@ -381,10 +395,8 @@ def factory_reset(
     try:
         scheduler_svc = get_scheduler_service(settings)
         for sched in scheduler_svc.list_schedules():
-            try:
+            with contextlib.suppress(Exception):
                 scheduler_svc.delete_schedule(sched["id"])
-            except Exception:
-                pass
     except Exception as e:
         errors.append(f"schedules: {e}")
 

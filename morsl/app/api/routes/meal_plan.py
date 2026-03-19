@@ -6,7 +6,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from morsl.app.api.dependencies import get_generation_service, get_meal_plan_service, get_settings_service, require_admin
+from morsl.app.api.dependencies import (
+    get_generation_service,
+    get_meal_plan_service,
+    get_settings_service,
+    require_admin,
+)
 from morsl.app.api.models import MealPlanSaveRequest
 from morsl.services.generation_service import GenerationService
 from morsl.services.meal_plan_service import MealPlanService

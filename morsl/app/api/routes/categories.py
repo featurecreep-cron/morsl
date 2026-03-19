@@ -20,7 +20,12 @@ def list_categories(
     return [CategoryResponse(**c) for c in svc.list_categories()]
 
 
-@router.post("/categories", response_model=CategoryResponse, status_code=201, dependencies=[Depends(require_admin)])
+@router.post(
+    "/categories",
+    response_model=CategoryResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
 def create_category(
     body: CategoryRequest,
     svc: CategoryService = Depends(get_category_service),
@@ -33,7 +38,11 @@ def create_category(
     return CategoryResponse(**category)
 
 
-@router.put("/categories/reorder", response_model=List[CategoryResponse], dependencies=[Depends(require_admin)])
+@router.put(
+    "/categories/reorder",
+    response_model=List[CategoryResponse],
+    dependencies=[Depends(require_admin)],
+)
 def reorder_categories(
     body: List[str],
     svc: CategoryService = Depends(get_category_service),
@@ -42,7 +51,9 @@ def reorder_categories(
     return [CategoryResponse(**c) for c in svc.reorder_categories(body)]
 
 
-@router.put("/categories/{cat_id}", response_model=CategoryResponse, dependencies=[Depends(require_admin)])
+@router.put(
+    "/categories/{cat_id}", response_model=CategoryResponse, dependencies=[Depends(require_admin)]
+)
 def update_category(
     cat_id: str,
     body: CategoryRequest,

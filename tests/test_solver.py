@@ -129,8 +129,8 @@ class TestSolverResult:
         picker = RecipePicker(sample_recipes, 3, logger=mock_logger)
         result = picker.solve()
         assert result.status == "optimal"
-        assert result.relaxed_constraints == []
-        assert result.warnings == []
+        assert result.relaxed_constraints == ()
+        assert result.warnings == ()
 
 
 @pytest.mark.slow
@@ -153,7 +153,7 @@ class TestSoftConstraints:
         picker.add_keyword_constraint(italian, 1, ">=", weight=100)
         result = picker.solve()
         assert len(result.recipes) == 5
-        assert result.relaxed_constraints == []
+        assert result.relaxed_constraints == ()
 
     def test_mixed_hard_and_soft(self, sample_recipes, mock_logger):
         """Hard constraint satisfied, soft constraint relaxed when needed."""
@@ -200,7 +200,7 @@ class TestProgressiveRelaxation:
         picker = RecipePicker(sample_recipes, 5, logger=mock_logger, min_choices=1)
         result = picker.solve()
         assert len(result.recipes) == 5
-        assert result.warnings == []
+        assert result.warnings == ()
 
 
 class TestBackwardCompatibility:
@@ -212,7 +212,7 @@ class TestBackwardCompatibility:
         result = picker.solve()
         selected_italian = [r for r in result.recipes if 10 in r.keywords]
         assert len(selected_italian) >= 2
-        assert result.relaxed_constraints == []
+        assert result.relaxed_constraints == ()
 
     def test_no_min_choices_identical(self, sample_recipes, mock_logger):
         """No min_choices means no progressive relaxation — infeasible raises immediately."""

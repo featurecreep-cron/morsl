@@ -17,7 +17,9 @@ class MealPlanService:
         """Delete old uncooked meal plans (scheduler path)."""
         self._api.cleanup_uncooked_meal_plans(meal_plan_type=meal_plan_type, days=days)
 
-    def create_from_menu(self, meal_plan_type_id: int, recipes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def create_from_menu(
+        self, meal_plan_type_id: int, recipes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Create meal plans for today from menu recipes (scheduler path)."""
         return self._api.create_meal_plans_from_menu(
             meal_plan_type_id=meal_plan_type_id,

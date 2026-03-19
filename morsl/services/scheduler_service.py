@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -117,7 +118,18 @@ class SchedulerService:
 
         # Validate on a copy before mutating the live schedule
         candidate = dict(schedule)
-        for key in ("profile", "template", "day_of_week", "hour", "minute", "enabled", "clear_before_generate", "create_meal_plan", "meal_plan_type", "cleanup_uncooked_days"):
+        for key in (
+            "profile",
+            "template",
+            "day_of_week",
+            "hour",
+            "minute",
+            "enabled",
+            "clear_before_generate",
+            "create_meal_plan",
+            "meal_plan_type",
+            "cleanup_uncooked_days",
+        ):
             if key in config:
                 candidate[key] = config[key]
 
@@ -166,14 +178,11 @@ class SchedulerService:
 
     def _remove_job(self, schedule_id: str) -> None:
         """Remove a job from the scheduler if it exists."""
-        try:
+        with contextlib.suppress(KeyError, JobLookupError):
             self._scheduler.remove_job(schedule_id)
-        except (KeyError, JobLookupError):
-            pass
 
     async def _run_scheduled_generation(self, schedule_id: str) -> None:
-        """Pipeline: clear → cleanup uncooked → generate → wait → create meal plans."""
-        _logger = logging.getLogger(__name__)
+        """Pipeline: clear → cleanup → generate → post-generate."""
         schedule = self._schedules.get(schedule_id)
         if not schedule:
             return
@@ -186,11 +195,23 @@ class SchedulerService:
         if not is_weekly and not self._generation_callback:
             return
 
-        # Step 1: Clear menu before generating if configured (profile mode only)
+        await self._run_pre_generate(schedule, is_weekly)
+
+        schedule["last_run"] = now().isoformat()
+        self._save()
+
+        if is_weekly:
+            await self._run_weekly_pipeline(schedule, template_name)
+        else:
+            await self._run_profile_pipeline(schedule)
+
+    async def _run_pre_generate(self, schedule: Dict[str, Any], is_weekly: bool) -> None:
+        """Clear menu and cleanup old meal plans before generation."""
+        _logger = logging.getLogger(__name__)
+
         if not is_weekly and schedule.get("clear_before_generate") and self._clear_callback:
             self._clear_callback()
 
-        # Step 2: Cleanup uncooked meal plans from prior days
         cleanup_days = schedule.get("cleanup_uncooked_days", 0)
         mp_type = schedule.get("meal_plan_type")
         if cleanup_days > 0 and mp_type and self._meal_plan_callback:
@@ -203,43 +224,46 @@ class SchedulerService:
                     },
                 )
             except Exception:
-                _logger.warning("Scheduled cleanup failed (non-fatal)", exc_info=True)
+                _logger.warning(
+                    "Scheduled cleanup failed (non-fatal)",
+                    exc_info=True,
+                )
 
-        # Step 3: Generate
-        schedule["last_run"] = now().isoformat()
-        self._save()
+    async def _run_weekly_pipeline(self, schedule: Dict[str, Any], template_name: str) -> None:
+        """Generate weekly plan and optionally save to Tandoor."""
+        _logger = logging.getLogger(__name__)
+        from datetime import date, timedelta
 
-        if is_weekly:
-            # Compute week_start as next Monday from now
-            from datetime import date, timedelta
+        today = date.today()
+        days_ahead = 7 - today.weekday()
+        if days_ahead == 7:
+            days_ahead = 0
+        week_start = today + timedelta(days=days_ahead)
+        await self._weekly_generation_callback(template_name, week_start)
 
-            today = date.today()
-            days_ahead = 7 - today.weekday()  # next Monday
-            if days_ahead == 7:
-                days_ahead = 0  # today is Monday
-            week_start = today + timedelta(days=days_ahead)
-            await self._weekly_generation_callback(template_name, week_start)
+        if schedule.get("create_meal_plan") and self._weekly_save_callback:
+            try:
+                await self._weekly_save_callback(template_name)
+            except Exception:
+                _logger.warning(
+                    "Scheduled weekly save failed (non-fatal)",
+                    exc_info=True,
+                )
 
-            # Step 4: Save weekly plan to Tandoor if configured
-            if schedule.get("create_meal_plan") and self._weekly_save_callback:
-                try:
-                    await self._weekly_save_callback(template_name)
-                except Exception:
-                    _logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
-        else:
-            await self._generation_callback(schedule["profile"])
+    async def _run_profile_pipeline(self, schedule: Dict[str, Any]) -> None:
+        """Generate from profile and optionally create meal plans."""
+        _logger = logging.getLogger(__name__)
+        await self._generation_callback(schedule["profile"])
 
-            # Step 4: Create meal plans from generated menu (profile mode)
-            if schedule.get("create_meal_plan") and mp_type and self._meal_plan_callback:
-                try:
-                    await self._meal_plan_callback(
-                        "create",
-                        {
-                            "meal_plan_type": mp_type,
-                        },
-                    )
-                except Exception:
-                    _logger.warning("Scheduled meal plan creation failed (non-fatal)", exc_info=True)
+        mp_type = schedule.get("meal_plan_type")
+        if schedule.get("create_meal_plan") and mp_type and self._meal_plan_callback:
+            try:
+                await self._meal_plan_callback("create", {"meal_plan_type": mp_type})
+            except Exception:
+                _logger.warning(
+                    "Scheduled meal plan creation failed (non-fatal)",
+                    exc_info=True,
+                )
 
     def _save(self) -> None:
         path = os.path.join(self.data_dir, "schedules.json")

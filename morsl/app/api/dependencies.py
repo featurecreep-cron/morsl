@@ -82,7 +82,9 @@ def get_history_service(settings: Settings = Depends(get_settings)) -> HistorySe
 def get_generation_service(settings: Settings = Depends(get_settings)) -> GenerationService:
     return _get_or_create(
         "generation",
-        lambda: GenerationService(data_dir=settings.data_dir, history_service=get_history_service(settings)),
+        lambda: GenerationService(
+            data_dir=settings.data_dir, history_service=get_history_service(settings)
+        ),
     )
 
 
@@ -169,7 +171,9 @@ def require_admin(
     - pin_timeout>0: tokens valid for that many seconds
     """
     settings = svc.get_all()
-    pin_active = settings.get("admin_pin_enabled") or (settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled"))
+    pin_active = settings.get("admin_pin_enabled") or (
+        settings.get("kiosk_enabled") and settings.get("kiosk_pin_enabled")
+    )
     if not pin_active or not settings.get("pin"):
         return  # No PIN configured or PIN empty — allow all
 
@@ -202,8 +206,12 @@ def get_template_service(settings: Settings = Depends(get_settings)) -> Template
     return _get_or_create("template", lambda: TemplateService(data_dir=settings.data_dir))
 
 
-def get_weekly_generation_service(settings: Settings = Depends(get_settings)) -> WeeklyGenerationService:
-    return _get_or_create("weekly_generation", lambda: WeeklyGenerationService(data_dir=settings.data_dir))
+def get_weekly_generation_service(
+    settings: Settings = Depends(get_settings),
+) -> WeeklyGenerationService:
+    return _get_or_create(
+        "weekly_generation", lambda: WeeklyGenerationService(data_dir=settings.data_dir)
+    )
 
 
 def get_logger(settings: Settings = Depends(get_settings)) -> Logger:

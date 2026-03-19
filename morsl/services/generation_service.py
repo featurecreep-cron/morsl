@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 from dataclasses import dataclass, field
@@ -38,7 +39,9 @@ class GenerationStatus:
 class GenerationService:
     """Manages asynchronous menu generation with state tracking."""
 
-    def __init__(self, data_dir: str = "data", history_service: Optional[HistoryService] = None) -> None:
+    def __init__(
+        self, data_dir: str = "data", history_service: Optional[HistoryService] = None
+    ) -> None:
         self.data_dir = data_dir
         self._history_service = history_service
         self._status = GenerationStatus()
@@ -94,7 +97,9 @@ class GenerationService:
             )
 
             loop = asyncio.get_running_loop()
-            self._current_task = loop.create_task(self._run_generation(config, url, token, logger, request_id, profile_name))
+            self._current_task = loop.create_task(
+                self._run_generation(config, url, token, logger, request_id, profile_name)
+            )
             return request_id
 
     async def _run_generation(
@@ -109,7 +114,9 @@ class GenerationService:
         """Run the solver in a thread pool and save results."""
         try:
             loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, self._sync_generate, config, url, token, logger)
+            result = await loop.run_in_executor(
+                None, self._sync_generate, config, url, token, logger
+            )
 
             result["profile"] = profile_name
 
@@ -162,7 +169,10 @@ class GenerationService:
         service.prepare_data()
 
         if len(service.recipes) < service.choices:
-            raise RuntimeError(f"Not enough recipes: {len(service.recipes)} available, {service.choices} requested")
+            raise RuntimeError(
+                f"Not enough recipes: {len(service.recipes)} available, "
+                f"{service.choices} requested"
+            )
 
         solver_result = service.select_recipes()
 
@@ -176,7 +186,10 @@ class GenerationService:
             "constraint_count": solver_result.constraint_count,
             "status": solver_result.status,
             "warnings": solver_result.warnings,
-            "relaxed_constraints": [{"label": rc.label, "slack_value": rc.slack_value, "weight": rc.weight} for rc in solver_result.relaxed_constraints],
+            "relaxed_constraints": [
+                {"label": rc.label, "slack_value": rc.slack_value, "weight": rc.weight}
+                for rc in solver_result.relaxed_constraints
+            ],
         }
 
     async def wait_for_completion(self, timeout: float = 300.0) -> GenerationStatus:
@@ -189,10 +202,8 @@ class GenerationService:
         """Cancel any in-flight generation task and wait for it to finish."""
         if self._current_task and not self._current_task.done():
             self._current_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
                 await asyncio.wait_for(asyncio.shield(self._current_task), timeout=timeout)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass
             self._status.state = GenerationState.IDLE
 
     def _cleanup_stale_temp_files(self) -> None:
@@ -201,10 +212,8 @@ class GenerationService:
             return
         for fname in os.listdir(self.data_dir):
             if fname.endswith(".tmp"):
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(os.path.join(self.data_dir, fname))
-                except OSError:
-                    pass
 
     def _save_menu(self, menu_data: Dict[str, Any]) -> None:
         """Atomic write and update in-memory cache."""

@@ -129,7 +129,8 @@ def generate_icons(source: Path, output_dir: Path) -> None:
             "    @media (prefers-color-scheme: dark) { rect { fill: #1a1a1a; } }\n"
             "  </style>\n"
             '  <rect width="32" height="32" rx="6"/>\n'
-            f'  <image width="24" height="24" x="4" y="4" href="data:image/png;base64,{b64_24}"/>\n'
+            f'  <image width="24" height="24" x="4" y="4"'
+            f' href="data:image/png;base64,{b64_24}"/>\n'
             "</svg>\n"
         )
     else:

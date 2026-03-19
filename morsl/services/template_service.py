@@ -127,7 +127,9 @@ class TemplateService:
 
     # ---- Expansion ----
 
-    def expand_slots(self, template: Dict[str, Any], week_start: date) -> Dict[str, List[Dict[str, Any]]]:
+    def expand_slots(
+        self, template: Dict[str, Any], week_start: date
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Resolve day names to calendar dates.
 
         week_start must be a Monday. Returns {date_str: [SlotAssignment, ...]}
@@ -135,7 +137,10 @@ class TemplateService:
         {"meal_type_id": int, "meal_type_name": str, "profile": str, "recipes_per_day": int}
         """
         if week_start.weekday() != 0:
-            raise ValueError(f"week_start must be a Monday, got {week_start.isoformat()} ({week_start.strftime('%A')})")
+            raise ValueError(
+                f"week_start must be a Monday, got "
+                f"{week_start.isoformat()} ({week_start.strftime('%A')})"
+            )
         result: Dict[str, List[Dict[str, Any]]] = {}
         for slot in template.get("slots", []):
             days = slot.get("days", [])

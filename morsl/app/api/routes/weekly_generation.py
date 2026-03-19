@@ -66,7 +66,9 @@ async def generate_weekly(
         try:
             week_start = date.fromisoformat(request.week_start)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid week_start date format (use YYYY-MM-DD)") from None
+            raise HTTPException(
+                status_code=400, detail="Invalid week_start date format (use YYYY-MM-DD)"
+            ) from None
 
     url, token = credentials
     try:
@@ -181,7 +183,9 @@ def save_weekly_plan(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
     if not plan:
-        raise HTTPException(status_code=404, detail=f"No plan found for template '{request.template}'")
+        raise HTTPException(
+            status_code=404, detail=f"No plan found for template '{request.template}'"
+        )
 
     result = meal_plan_svc.save_weekly_plan(plan, shared=request.shared)
     return WeeklySaveResponse(**result)

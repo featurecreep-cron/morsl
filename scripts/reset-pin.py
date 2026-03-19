@@ -6,10 +6,7 @@ import json
 from pathlib import Path
 
 settings_path = Path("data/settings.json")
-if settings_path.exists():
-    settings = json.loads(settings_path.read_text())
-else:
-    settings = {}
+settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
 
 settings["pin"] = ""
 settings["admin_pin_enabled"] = False

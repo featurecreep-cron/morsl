@@ -38,150 +38,171 @@ class _HealthCheckFilter(logging.Filter):
         return '"GET /health' not in msg
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Server starting up")
-
-    # Suppress healthcheck access-log spam (Docker checks every 30s)
-    access_logger = logging.getLogger("uvicorn.access")
-    access_logger.addFilter(_HealthCheckFilter())
-    settings = get_settings()
-
-    # Ensure data directories exist (may fail if volume is root-owned;
-    # the entrypoint script handles this, but guard here too)
-    for d in [UPLOADS_DIR, Path(settings.profiles_dir), Path(settings.data_dir, "templates"), Path(settings.data_dir, "weekly_plans")]:
+def _ensure_data_dirs(settings) -> None:
+    """Create data directories if they don't exist."""
+    for d in [
+        UPLOADS_DIR,
+        Path(settings.profiles_dir),
+        Path(settings.data_dir, "templates"),
+        Path(settings.data_dir, "weekly_plans"),
+    ]:
         try:
             d.mkdir(parents=True, exist_ok=True)
         except PermissionError:
-            logger.warning("Cannot create %s — check volume ownership (needs UID 1000)", d)
+            logger.warning(
+                "Cannot create %s — check volume ownership (needs UID 1000)",
+                d,
+            )
 
-    # Generate icons on startup if favicon.svg is missing (fresh container)
+
+def _generate_startup_icons(settings) -> None:
+    """Generate icons on first boot if favicon.svg is missing."""
     icons_dir = ICONS_DIR
-    if not (icons_dir / "favicon.svg").exists():
-        try:
-            from morsl.services.icon_service import generate_icons
-
-            settings_svc = get_settings_service(settings)
-            current = settings_svc.get_all()
-            favicon_url = current.get("favicon_url")
-            if favicon_url:
-                if favicon_url.startswith("/uploads/branding/"):
-                    source = UPLOADS_DIR / favicon_url.split("/")[-1]
-                else:
-                    source = (Path("web") / favicon_url.lstrip("/")).resolve()
-                    web_root = Path("web").resolve()
-                    if not str(source).startswith(str(web_root)):
-                        logger.warning("favicon_url points outside web/: %s", favicon_url)
-                        source = icons_dir / "default-favicon.svg"
-            else:
-                source = icons_dir / "default-favicon.svg"
-            if source.exists():
-                generate_icons(source, icons_dir)
-                logger.info("Generated startup icons from %s", source)
-        except Exception as e:
-            logger.warning("Startup icon generation failed (non-fatal): %s", e)
-
-    # Start scheduler
+    if (icons_dir / "favicon.svg").exists():
+        return
     try:
-        scheduler_svc = get_scheduler_service(settings)
+        from morsl.services.icon_service import generate_icons
 
-        async def generation_callback(profile: str) -> None:
-            try:
-                gen_svc = get_generation_service(settings)
-                app_logger = get_logger(settings)
-                config_service = get_config_service(settings)
-                config = config_service.load_profile(profile)
-                settings_svc = get_settings_service(settings)
-                url, token = resolve_credentials(settings, settings_svc)
-                await gen_svc.start_generation(
-                    config=config,
-                    url=url,
-                    token=token,
-                    logger=app_logger,
-                )
-                # Wait for generation to complete so downstream steps can use the result
-                await gen_svc.wait_for_completion()
-            except Exception:
-                logger.warning("Scheduled generation failed for profile '%s'", profile, exc_info=True)
+        settings_svc = get_settings_service(settings)
+        current = settings_svc.get_all()
+        source = _resolve_favicon_source(current.get("favicon_url"), icons_dir)
+        if source.exists():
+            generate_icons(source, icons_dir)
+            logger.info("Generated startup icons from %s", source)
+    except Exception as e:
+        logger.warning("Startup icon generation failed (non-fatal): %s", e)
 
-        async def meal_plan_callback(action: str, params: dict) -> None:
-            """Handle meal plan pipeline actions dispatched by the scheduler."""
+
+def _resolve_favicon_source(favicon_url, icons_dir: Path) -> Path:
+    """Determine the source file for favicon generation."""
+    if not favicon_url:
+        return icons_dir / "default-favicon.svg"
+    if favicon_url.startswith("/uploads/branding/"):
+        return UPLOADS_DIR / favicon_url.split("/")[-1]
+    source = (Path("web") / favicon_url.lstrip("/")).resolve()
+    web_root = Path("web").resolve()
+    if not str(source).startswith(str(web_root)):
+        logger.warning("favicon_url points outside web/: %s", favicon_url)
+        return icons_dir / "default-favicon.svg"
+    return source
+
+
+def _build_scheduler_callbacks(settings):
+    """Create the callback functions for the scheduler service."""
+
+    async def generation_callback(profile: str) -> None:
+        try:
+            gen_svc = get_generation_service(settings)
+            app_logger = get_logger(settings)
+            config_service = get_config_service(settings)
+            config = config_service.load_profile(profile)
+            settings_svc = get_settings_service(settings)
+            url, token = resolve_credentials(settings, settings_svc)
+            await gen_svc.start_generation(config=config, url=url, token=token, logger=app_logger)
+            await gen_svc.wait_for_completion()
+        except Exception:
+            logger.warning(
+                "Scheduled generation failed for profile '%s'",
+                profile,
+                exc_info=True,
+            )
+
+    async def meal_plan_callback(action: str, params: dict) -> None:
+        """Handle meal plan pipeline actions dispatched by the scheduler."""
+        settings_svc = get_settings_service(settings)
+        meal_plan_svc = get_meal_plan_service(settings, settings_svc)
+        if action == "cleanup":
+            await asyncio.to_thread(
+                meal_plan_svc.cleanup,
+                meal_plan_type=params["meal_plan_type"],
+                days=params["cleanup_days"],
+            )
+        elif action == "create":
+            gen_svc = get_generation_service(settings)
+            menu = gen_svc.get_current_menu()
+            if not menu or not menu.get("recipes"):
+                logger.warning("No current menu — skipping meal plan creation")
+                return
+            await asyncio.to_thread(
+                meal_plan_svc.create_from_menu,
+                meal_plan_type_id=params["meal_plan_type"],
+                recipes=menu["recipes"],
+            )
+
+    async def weekly_generation_callback(template_name: str, week_start=None) -> None:
+        try:
+            weekly_svc = get_weekly_generation_service(settings)
+            template_svc = get_template_service(settings)
+            config_svc = get_config_service(settings)
+            app_logger = get_logger(settings)
+            settings_svc = get_settings_service(settings)
+            gen_svc = get_generation_service(settings)
+            url, token = resolve_credentials(settings, settings_svc)
+            await weekly_svc.start_generation(
+                template_name=template_name,
+                template_service=template_svc,
+                config_service=config_svc,
+                url=url,
+                token=token,
+                app_logger=app_logger,
+                week_start=week_start,
+                generation_service=gen_svc,
+                settings_service=settings_svc,
+            )
+            await weekly_svc.wait_for_completion()
+        except Exception:
+            logger.warning(
+                "Scheduled weekly generation failed for '%s'",
+                template_name,
+                exc_info=True,
+            )
+
+    async def weekly_save_callback(template_name: str) -> None:
+        try:
+            weekly_svc = get_weekly_generation_service(settings)
+            plan = weekly_svc.get_plan(template_name)
+            if not plan:
+                logger.warning("No weekly plan — skipping save to Tandoor")
+                return
             settings_svc = get_settings_service(settings)
             meal_plan_svc = get_meal_plan_service(settings, settings_svc)
-            if action == "cleanup":
-                await asyncio.to_thread(
-                    meal_plan_svc.cleanup,
-                    meal_plan_type=params["meal_plan_type"],
-                    days=params["cleanup_days"],
-                )
-            elif action == "create":
-                gen_svc = get_generation_service(settings)
-                menu = gen_svc.get_current_menu()
-                if not menu or not menu.get("recipes"):
-                    logger.warning("No current menu — skipping meal plan creation")
-                    return
-                await asyncio.to_thread(
-                    meal_plan_svc.create_from_menu,
-                    meal_plan_type_id=params["meal_plan_type"],
-                    recipes=menu["recipes"],
-                )
+            await asyncio.to_thread(
+                meal_plan_svc.save_weekly_plan,
+                weekly_plan=plan,
+                shared=[],
+            )
+        except Exception:
+            logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
 
-        async def weekly_generation_callback(template_name: str, week_start=None) -> None:
-            try:
-                weekly_svc = get_weekly_generation_service(settings)
-                template_svc = get_template_service(settings)
-                config_svc = get_config_service(settings)
-                app_logger = get_logger(settings)
-                settings_svc = get_settings_service(settings)
-                gen_svc = get_generation_service(settings)
-                url, token = resolve_credentials(settings, settings_svc)
-                await weekly_svc.start_generation(
-                    template_name=template_name,
-                    template_service=template_svc,
-                    config_service=config_svc,
-                    url=url,
-                    token=token,
-                    app_logger=app_logger,
-                    week_start=week_start,
-                    generation_service=gen_svc,
-                    settings_service=settings_svc,
-                )
-                await weekly_svc.wait_for_completion()
-            except Exception:
-                logger.warning("Scheduled weekly generation failed for '%s'", template_name, exc_info=True)
+    return (
+        generation_callback,
+        meal_plan_callback,
+        weekly_generation_callback,
+        weekly_save_callback,
+    )
 
-        async def weekly_save_callback(template_name: str) -> None:
-            try:
-                weekly_svc = get_weekly_generation_service(settings)
-                plan = weekly_svc.get_plan(template_name)
-                if not plan:
-                    logger.warning("No weekly plan — skipping save to Tandoor")
-                    return
-                settings_svc = get_settings_service(settings)
-                meal_plan_svc = get_meal_plan_service(settings, settings_svc)
-                await asyncio.to_thread(
-                    meal_plan_svc.save_weekly_plan,
-                    weekly_plan=plan,
-                    shared=[],
-                )
-            except Exception:
-                logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
 
-        scheduler_svc.set_generation_callback(generation_callback)
-        scheduler_svc.set_clear_callback(get_generation_service(settings).clear_menu)
-        scheduler_svc.set_meal_plan_callback(meal_plan_callback)
-        scheduler_svc.set_weekly_generation_callback(weekly_generation_callback)
-        scheduler_svc.set_weekly_save_callback(weekly_save_callback)
-        scheduler_svc.start()
-        logger.info("Scheduler started")
-    except Exception:
-        logger.warning("Scheduler startup failed (non-fatal)", exc_info=True)
+def _setup_scheduler(settings) -> None:
+    """Wire up scheduler callbacks and start the scheduler."""
+    scheduler_svc = get_scheduler_service(settings)
+    (
+        gen_cb,
+        meal_plan_cb,
+        weekly_gen_cb,
+        weekly_save_cb,
+    ) = _build_scheduler_callbacks(settings)
 
-    yield
+    scheduler_svc.set_generation_callback(gen_cb)
+    scheduler_svc.set_clear_callback(get_generation_service(settings).clear_menu)
+    scheduler_svc.set_meal_plan_callback(meal_plan_cb)
+    scheduler_svc.set_weekly_generation_callback(weekly_gen_cb)
+    scheduler_svc.set_weekly_save_callback(weekly_save_cb)
+    scheduler_svc.start()
+    logger.info("Scheduler started")
 
-    # Shutdown — cancel any in-flight generation tasks
-    logger.info("Server shutting down, cancelling background tasks...")
+
+async def _shutdown_services(settings) -> None:
+    """Gracefully shut down generation services and scheduler."""
     try:
         gen_service = get_generation_service(settings)
         await gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
@@ -194,13 +215,33 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Weekly generation shutdown error", exc_info=True)
 
-    # Stop scheduler
     try:
         scheduler_svc = get_scheduler_service(settings)
         scheduler_svc.stop()
     except Exception:
         logger.warning("Scheduler shutdown error", exc_info=True)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Server starting up")
+
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.addFilter(_HealthCheckFilter())
+    settings = get_settings()
+
+    _ensure_data_dirs(settings)
+    _generate_startup_icons(settings)
+
+    try:
+        _setup_scheduler(settings)
+    except Exception:
+        logger.warning("Scheduler startup failed (non-fatal)", exc_info=True)
+
+    yield
+
+    logger.info("Server shutting down, cancelling background tasks...")
+    await _shutdown_services(settings)
     logger.info("Shutdown complete")
 
 
@@ -208,7 +249,9 @@ APP_VERSION = os.environ.get("MORSL_VERSION", "dev")
 
 app = FastAPI(
     title="Morsl",
-    description="API for generating menus from Tandoor recipes\n\n[Back to Admin](/admin) | [Menu](/)",
+    description=(
+        "API for generating menus from Tandoor recipes" "\n\n[Back to Admin](/admin) | [Menu](/)"
+    ),
     version=APP_VERSION,
     lifespan=lifespan,
 )
@@ -219,7 +262,11 @@ app.add_middleware(GZipMiddleware, minimum_size=GZIP_MIN_SIZE)
 @app.middleware("http")
 async def no_cache_static_assets(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.endswith((".css", ".js", ".html")) or request.url.path in ("/", "/admin", "/setup"):
+    if request.url.path.endswith((".css", ".js", ".html")) or request.url.path in (
+        "/",
+        "/admin",
+        "/setup",
+    ):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -233,7 +280,6 @@ def health_check(
     settings_svc=Depends(get_settings_service),
     scheduler=Depends(get_scheduler_service),
 ) -> dict:
-    # Check credentials from env or settings.json
     has_env_creds = bool(settings.tandoor_url and settings.tandoor_token)
     if not has_env_creds:
         all_s = settings_svc.get_all()
@@ -241,7 +287,6 @@ def health_check(
     else:
         has_ui_creds = False
 
-    # Check scheduler
     try:
         scheduler_running = scheduler.is_running
     except Exception:
@@ -256,7 +301,7 @@ def health_check(
 
 
 def _needs_setup() -> bool:
-    """Check if first-run setup is needed (no credentials or no profiles)."""
+    """Check if first-run setup is needed."""
     svc = get_settings_service(get_settings())
     settings = get_settings()
     has_env = bool(settings.tandoor_url and settings.tandoor_token)
@@ -314,7 +359,11 @@ def dynamic_manifest() -> JSONResponse:
 # Mount branding uploads from data/branding/ at the existing URL path
 try:
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads/branding", StaticFiles(directory=str(UPLOADS_DIR)), name="branding")
+    app.mount(
+        "/uploads/branding",
+        StaticFiles(directory=str(UPLOADS_DIR)),
+        name="branding",
+    )
 except (FileNotFoundError, RuntimeError, PermissionError):
     logger.info("data/branding/ mount skipped — directory not available")
 

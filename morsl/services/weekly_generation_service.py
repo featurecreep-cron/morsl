@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -97,7 +98,10 @@ class WeeklyGenerationService:
                 raise RuntimeError("A weekly generation is already in progress")
 
             # Check single-menu generation isn't running
-            if generation_service and generation_service.get_status().state == GenerationState.GENERATING:
+            if (
+                generation_service
+                and generation_service.get_status().state == GenerationState.GENERATING
+            ):
                 raise RuntimeError("A single-menu generation is in progress")
 
             request_id = str(uuid4())
@@ -195,7 +199,7 @@ class WeeklyGenerationService:
             try:
                 app_settings = settings_service.get_all()
                 cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         # 3. Run each profile sequentially for dedup
@@ -236,7 +240,11 @@ class WeeklyGenerationService:
 
             # Check if enough recipes
             if len(service.recipes) < total_needed:
-                msg = f"Profile '{profile_name}': only {len(service.recipes)} recipes available, {total_needed} requested"
+                msg = (
+                    f"Profile '{profile_name}': only "
+                    f"{len(service.recipes)} recipes available, "
+                    f"{total_needed} requested"
+                )
                 all_warnings.append(msg)
                 if service.min_choices and len(service.recipes) >= service.min_choices:
                     service.choices = len(service.recipes)
@@ -281,7 +289,9 @@ class WeeklyGenerationService:
         # Build per-profile queues (solver output order)
         profile_queues: Dict[str, deque] = {}
         for profile_name, recipes in profile_recipes.items():
-            profile_queues[profile_name] = deque(detail_map[r.id] for r in recipes if r.id in detail_map)
+            profile_queues[profile_name] = deque(
+                detail_map[r.id] for r in recipes if r.id in detail_map
+            )
 
         for date_str in sorted(expanded.keys()):
             day_of_week = _DAY_NAMES[date.fromisoformat(date_str).weekday()]
@@ -362,7 +372,7 @@ class WeeklyGenerationService:
             try:
                 app_settings = settings_service.get_all()
                 cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
         loop = asyncio.get_running_loop()
@@ -408,7 +418,9 @@ class WeeklyGenerationService:
 
         if len(service.recipes) < recipes_per_day:
             if len(service.recipes) == 0:
-                raise RuntimeError(f"No recipes available for profile '{profile_name}' after dedup")
+                raise RuntimeError(
+                    f"No recipes available for profile '{profile_name}' after dedup"
+                )
             service.choices = len(service.recipes)
 
         solver_result = service.select_recipes()
@@ -426,10 +438,8 @@ class WeeklyGenerationService:
         """Cancel any in-flight generation task and wait for cleanup."""
         if self._current_task and not self._current_task.done():
             self._current_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
                 await asyncio.wait_for(asyncio.shield(self._current_task), timeout=timeout)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass
             self._status.state = GenerationState.IDLE
 
     def _save_plan(self, template_name: str, plan_data: Dict[str, Any]) -> None:
