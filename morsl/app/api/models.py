@@ -200,6 +200,7 @@ class HistoryEntryResponse(BaseModel):
     recipes: List[HistoryRecipeSummary] = []
     relaxed_constraints: List[RelaxedConstraintResponse] = []
     warnings: List[str] = []
+    error: Optional[str] = None
 
 
 class HistoryListResponse(BaseModel):
