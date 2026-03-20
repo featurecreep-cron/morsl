@@ -3,8 +3,10 @@ name: CI
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches: [develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
