@@ -250,7 +250,7 @@ APP_VERSION = os.environ.get("MORSL_VERSION", "dev")
 app = FastAPI(
     title="Morsl",
     description=(
-        "API for generating menus from Tandoor recipes" "\n\n[Back to Admin](/admin) | [Menu](/)"
+        "API for generating menus from Tandoor recipes\n\n[Back to Admin](/admin) | [Menu](/)"
     ),
     version=APP_VERSION,
     lifespan=lifespan,
