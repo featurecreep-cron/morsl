@@ -15,7 +15,7 @@ from morsl.models import (
     make_recipe,
 )
 from morsl.solver import RecipePicker
-from morsl.tandoor_api import TandoorAPI
+from morsl.tandoor_api import TandoorAPI, TandoorError
 from morsl.utils import format_date
 
 
@@ -179,7 +179,7 @@ class MenuService:
         for fd_id in item_ids:
             try:
                 food_list.append(make_food(self.tandoor.get_food(fd_id)))
-            except Exception:
+            except TandoorError:
                 self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
         constraint["foods"] = food_list
 
