@@ -41,6 +41,17 @@ These are non-negotiable. Violations are caught by `tests/test_architecture.py`.
 
 Run `/code-review morsl/{module}` on every module after completing a phase.
 
+## Branching Strategy
+
+- **`main`** — production and GitHub default branch. Every push auto-releases a new version + Docker image. Branch-protected (PR required).
+- **`develop`** — integration branch for development. CI runs on every push.
+- **Feature branches** — off `develop` for multi-commit or risky changes.
+- **Release flow:** merge `develop` → `main` via PR when ready to ship.
+
+Never push directly to `main`. All work lands on `develop` first.
+
+**When to merge to main:** When develop has a coherent set of shippable changes — a completed feature, a batch of related fixes, or end-of-session with tested work. Every merge to main triggers an auto-release, so don't merge mid-feature or with known broken state. Small batches are fine; the goal is "every release is a version someone could run."
+
 ## Dev Commands
 
 ```bash
