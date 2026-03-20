@@ -534,7 +534,7 @@ class TandoorAPI:
                     created += 1
                 else:
                     errors.append(f"{recipe['name']}: {resp.status_code} {resp.text[:100]}")
-            except Exception as e:
+            except requests.RequestException as e:
                 errors.append(f"{recipe['name']}: {e}")
         self.logger.info(f"Created {created}/{len(recipes)} meal plan entries")
         return {"created": created, "errors": errors, "total": len(recipes)}

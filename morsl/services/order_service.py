@@ -7,7 +7,7 @@ import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from morsl.tandoor_api import TandoorAPI
+from morsl.tandoor_api import TandoorAPI, TandoorError
 from morsl.utils import now
 
 
@@ -54,7 +54,7 @@ class OrderService:
             api = self._get_api()
             try:
                 mt = api.get_meal_type(meal_type_id)
-            except Exception:
+            except TandoorError:
                 self.logger.warning(
                     f"Configured meal type {meal_type_id} not found, "
                     "falling back to first available"

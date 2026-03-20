@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from morsl.models import Recipe
+from morsl.models import make_recipe as _make_recipe
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def make_recipe(
     """Factory to create Recipe objects with configurable fields."""
     if keywords is None:
         keywords = []
-    return Recipe(
+    return _make_recipe(
         {
             "id": id,
             "name": name,
