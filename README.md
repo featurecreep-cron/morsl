@@ -41,6 +41,8 @@ services:
       - TANDOOR_URL=http://your-tandoor-address:port  # e.g. http://192.168.1.50:8080
       - TANDOOR_TOKEN=your-api-token
       - TZ=America/New_York
+      - PUID=1000  # match your host user: id -u
+      - PGID=1000  # match your host group: id -g
     volumes:
       - morsl-data:/app/data
     restart: unless-stopped
@@ -119,6 +121,8 @@ Your data (profiles, schedules, branding, settings) is stored in the volume and 
 | `TZ` | `UTC` | Timezone for schedules and meal plans |
 | `LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_TO_STDOUT` | `1` (Docker) | Send logs to stdout instead of file |
+| `PUID` | `1000` | User ID for file ownership (see below) |
+| `PGID` | `1000` | Group ID for file ownership (see below) |
 
 Both `TANDOOR_URL` and `TANDOOR_TOKEN` can also be configured through the setup wizard.
 
@@ -187,7 +191,7 @@ pytest
 
 The Docker image uses `python:3.12-slim` rather than Alpine because CairoSVG and Pango require system libraries that are simpler to install on Debian.
 
-The image runs as UID 1000 by default. To change this, rebuild with `--build-arg UID=<your-uid> --build-arg GID=<your-gid>`.
+The image runs as UID 1000 by default. Set `PUID` and `PGID` environment variables to match your host user — no rebuild needed. This follows the [linuxserver.io convention](https://docs.linuxserver.io/general/understanding-puid-and-pgid/).
 
 ### Project structure
 

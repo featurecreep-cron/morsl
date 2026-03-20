@@ -23,11 +23,11 @@ LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/mors
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.url="https://github.com/featurecreep-cron/morsl"
 
-# Runtime-only native libs (no dev headers, no build tools, no curl)
+# Runtime-only native libs + gosu for PUID/PGID support
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
-        libgdk-pixbuf-2.0-0 shared-mime-info && \
+        libgdk-pixbuf-2.0-0 shared-mime-info gosu && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy virtualenv from builder
@@ -45,13 +45,10 @@ COPY docker-entrypoint.sh /usr/local/bin/
 # Create writable dirs for runtime data
 RUN mkdir -p data/branding data/custom-icons data/profiles data/templates data/weekly_plans web/icons
 
-# Non-root user with configurable UID/GID
-ARG UID=1000
-ARG GID=1000
-RUN groupadd -g $GID appgroup && \
-    useradd -r -u $UID -g $GID -s /bin/false --no-create-home appuser && \
+# Default non-root user (overridden at runtime by PUID/PGID if set)
+RUN groupadd -g 1000 appgroup && \
+    useradd -r -u 1000 -g 1000 -s /bin/false --no-create-home appuser && \
     chown -R appuser:appgroup data web/icons
-USER appuser
 
 ARG APP_VERSION=dev
 ENV MORSL_VERSION=$APP_VERSION
