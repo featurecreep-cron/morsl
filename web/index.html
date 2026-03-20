@@ -567,7 +567,7 @@
                  loading="lazy" @error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'">
             <div class="modal-placeholder" x-show="!selectedRecipe?.image" x-html="placeholderSvg(selectedRecipe)"></div>
             <h2 id="user-recipe-title" x-text="selectedRecipe?.name"></h2>
-            <p class="modal-description" x-show="selectedRecipe?.description" x-text="selectedRecipe?.description"></p>
+            <p class="modal-description" x-show="selectedRecipe?.description && settings.show_descriptions !== false" x-text="selectedRecipe?.description"></p>
             <div class="modal-rating-wrapper" x-show="selectedRecipe && settings.ratings_enabled !== false">
                 <span class="modal-rating-label" x-text="selectedRecipe?.rating ? 'Your rating' : 'Tap to rate'"></span>
                 <div class="modal-rating" role="group" :aria-label="selectedRecipe?.rating ? 'Your rating' : 'Tap to rate'">
@@ -584,8 +584,8 @@
                 <span x-show="selectedRecipe?.working_time" x-text="'Prep: ' + selectedRecipe?.working_time + ' min'"></span>
                 <span x-show="selectedRecipe?.cooking_time" x-text="'Cook: ' + selectedRecipe?.cooking_time + ' min'"></span>
             </div>
-            <div class="modal-columns" x-show="selectedRecipe?.steps?.length">
-                <div class="modal-col-ingredients">
+            <div class="modal-columns" x-show="selectedRecipe?.steps?.length && (settings.show_ingredients !== false || settings.show_instructions === true)">
+                <div class="modal-col-ingredients" x-show="settings.show_ingredients !== false">
                     <h3>Ingredients</h3>
                     <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length">
                         <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'modal-col-ing-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
@@ -593,7 +593,7 @@
                         </template>
                     </ul>
                 </div>
-                <div class="modal-col-instructions">
+                <div class="modal-col-instructions" x-show="settings.show_instructions === true">
                     <h3>Instructions</h3>
                     <template x-for="(step, sIdx) in (selectedRecipe?.steps || [])" :key="'cust-step-' + sIdx">
                         <div class="modal-step">
@@ -607,7 +607,7 @@
                     </template>
                 </div>
             </div>
-            <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length && !selectedRecipe?.steps?.length">
+            <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length && !selectedRecipe?.steps?.length && settings.show_ingredients !== false">
                 <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'modal-ing-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
                     <li x-text="formatIngredient(ing)"></li>
                 </template>
