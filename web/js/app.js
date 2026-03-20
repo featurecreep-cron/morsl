@@ -367,13 +367,13 @@ function menuApp() {
                     this.applyMenuData(await res.json());
                     this.state = 'ready';
                 } else if (res.status === 404) {
-                    // No server menu — clear stale localStorage shelves
+                    // No server menu — check if generation failed
                     this.shelves = [];
                     this.activeDeckName = null;
                     this.recipes = [];
                     this.currentRecipes = [];
                     this.saveShelves();
-                    this.state = 'ready';
+                    await this._checkGenerationStatus();
                 } else {
                     this.state = 'error';
                     this.errorMessage = 'Failed to load menu';
@@ -382,6 +382,27 @@ function menuApp() {
                 this.state = 'error';
                 this.errorMessage = 'Cannot reach server';
             }
+        },
+
+        async _checkGenerationStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (res.ok) {
+                    const status = await res.json();
+                    if (status.state === 'error') {
+                        this.state = 'error';
+                        this.errorMessage = status.error || 'Generation failed';
+                        return;
+                    } else if (status.state === 'generating') {
+                        this.state = 'generating';
+                        this.startStatusPolling();
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Fall through to ready state
+            }
+            this.state = 'ready';
         },
 
         applyMenuData(data) {
@@ -501,6 +522,16 @@ function menuApp() {
             } catch (e) {
                 this.state = 'error';
                 this.errorMessage = 'Cannot reach server';
+            }
+        },
+
+        retryGeneration() {
+            if (this.activeProfile) {
+                this.switchProfile(this.activeProfile);
+            } else if (this.visibleProfiles.length > 0) {
+                this.switchProfile(this.visibleProfiles[0].name);
+            } else {
+                this.loadMenu();
             }
         },
 

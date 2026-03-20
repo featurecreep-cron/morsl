@@ -126,3 +126,23 @@ class TestSchedulerService:
         jobs = svc._scheduler.get_jobs()
         assert len(jobs) == 1
         svc.stop()
+
+    @pytest.mark.asyncio
+    async def test_clear_before_generate_ignored(self, tmp_path):
+        """clear_before_generate should NOT clear the menu before generation.
+
+        Clearing before generation risks data loss if generation fails — the user
+        loses their existing menu. Success already overwrites atomically.
+        """
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+
+        schedule = svc.create_schedule(
+            {"profile": "gin", "clear_before_generate": True, "enabled": True}
+        )
+        await svc._run_scheduled_generation(schedule["id"])
+
+        gen_mock.assert_called_once()
+        # clear_callback was removed from SchedulerService entirely
+        assert not hasattr(svc, "_clear_callback")

@@ -540,3 +540,19 @@ class TestGenerationService:
                 loop.run_until_complete(self._async_start(svc, {}, mock_logger))
             finally:
                 loop.close()
+
+    def test_clear_menu(self, tmp_path):
+        menu_data = {"recipes": [{"id": 1, "name": "Test"}]}
+        (tmp_path / "current_menu.json").write_text(json.dumps(menu_data))
+        svc = GenerationService(data_dir=str(tmp_path))
+        assert svc.get_current_menu() is not None
+
+        result = svc.clear_menu()
+        assert result is True
+        assert svc.get_current_menu() is None
+        assert not (tmp_path / "current_menu.json").exists()
+
+    def test_clear_menu_nothing_to_clear(self, tmp_path):
+        svc = GenerationService(data_dir=str(tmp_path))
+        result = svc.clear_menu()
+        assert result is False
