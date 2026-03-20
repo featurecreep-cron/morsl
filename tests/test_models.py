@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from morsl.models import Book, Keyword, Recipe
+from morsl.models import Recipe, make_book, make_keyword
 
 from .conftest import make_recipe
 
@@ -31,24 +31,24 @@ class TestRecipeEquality:
 
 class TestRecipesWithKeyword:
     def test_filters_matching_keywords(self, sample_recipes):
-        kw_italian = Keyword({"id": 10, "name": "Italian"})
+        kw_italian = make_keyword({"id": 10, "name": "Italian"})
         result = Recipe.recipes_with_keyword(sample_recipes, [kw_italian])
         assert all(10 in r.keywords for r in result)
         assert len(result) == 3  # Pasta Carbonara, Pizza, Lasagna
 
     def test_multiple_keywords(self, sample_recipes):
-        kw_italian = Keyword({"id": 10, "name": "Italian"})
-        kw_japanese = Keyword({"id": 40, "name": "Japanese"})
+        kw_italian = make_keyword({"id": 10, "name": "Italian"})
+        kw_japanese = make_keyword({"id": 40, "name": "Japanese"})
         result = Recipe.recipes_with_keyword(sample_recipes, [kw_italian, kw_japanese])
         assert len(result) == 5  # 3 Italian + 2 Japanese
 
     def test_no_matching_keywords(self, sample_recipes):
-        kw_none = Keyword({"id": 999, "name": "Nonexistent"})
+        kw_none = make_keyword({"id": 999, "name": "Nonexistent"})
         result = Recipe.recipes_with_keyword(sample_recipes, [kw_none])
         assert len(result) == 0
 
     def test_empty_recipes(self):
-        kw = Keyword({"id": 10, "name": "Italian"})
+        kw = make_keyword({"id": 10, "name": "Italian"})
         result = Recipe.recipes_with_keyword([], [kw])
         assert len(result) == 0
 
@@ -104,20 +104,20 @@ class TestRecipesWithRating:
 
 class TestKeywordModel:
     def test_keyword_equality(self):
-        k1 = Keyword({"id": 1, "name": "A"})
-        k2 = Keyword({"id": 1, "name": "B"})
+        k1 = make_keyword({"id": 1, "name": "A"})
+        k2 = make_keyword({"id": 1, "name": "B"})
         assert k1 == k2
 
     def test_keyword_repr(self):
-        k = Keyword({"id": 1, "name": "Italian"})
+        k = make_keyword({"id": 1, "name": "Italian"})
         assert "Italian" in repr(k)
 
 
 class TestBookModel:
     def test_book_with_filter(self):
-        b = Book({"id": 1, "name": "Favorites", "filter": {"id": 5}})
+        b = make_book({"id": 1, "name": "Favorites", "filter": {"id": 5}})
         assert b.filter == 5
 
     def test_book_without_filter(self):
-        b = Book({"id": 1, "name": "Favorites"})
+        b = make_book({"id": 1, "name": "Favorites"})
         assert b.filter is None

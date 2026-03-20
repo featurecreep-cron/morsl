@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, List
-
-if TYPE_CHECKING:
-    from morsl.tandoor_api import TandoorAPI
+from typing import Optional
 
 
+# eq=False on all subclasses prevents dataclass-generated __eq__ from
+# shadowing the id-based equality defined here.
+@dataclass(frozen=True, eq=False)
 class TandoorEntity:
     id: int
     name: str
@@ -28,92 +27,71 @@ class TandoorEntity:
         return self.name
 
 
+@dataclass(frozen=True, eq=False)
 class Food(TandoorEntity):
-    def __init__(self, data: dict) -> None:
-        self.id = data.get("id")
-        self.name = data.get("name")
-        self.recipe = data.get("recipe")
-        self.shopping = data.get("shopping")
-        self.onhand = data.get("food_onhand")
-        self.ignore_shopping = data.get("ignore_shopping")
-        self.substitute_onhand = data.get("substitute_onhand")
+    recipe: Optional[int] = None
+    shopping: Optional[bool] = None
+    onhand: Optional[bool] = None
+    ignore_shopping: Optional[bool] = None
+    substitute_onhand: Optional[bool] = None
 
 
+# Unit and Keyword are structurally identical but semantically distinct —
+# the solver and constraint system need to distinguish them by type.
+@dataclass(frozen=True, eq=False)
 class Unit(TandoorEntity):
-    def __init__(self, data: dict) -> None:
-        self.id = data.get("id")
-        self.name = data.get("name")
+    pass
 
 
+@dataclass(frozen=True, eq=False)
+class Keyword(TandoorEntity):
+    pass
+
+
+@dataclass(frozen=True, eq=False)
+class Book(TandoorEntity):
+    filter: Optional[int] = None
+
+
+@dataclass(frozen=True, eq=False)
 class Recipe(TandoorEntity):
-    def __init__(self, data: dict, get_food: bool = False) -> None:
-        self.id = data["id"]
-        self.name = data["name"]
-        self.description = data["description"]
-        self.new = data["new"]
-        self.servings = data["servings"]
-        self.keywords = [kw["id"] for kw in data["keywords"]]
-        self.keyword_names = {kw["id"]: kw.get("name", "") for kw in data["keywords"]}
-        try:
-            self.cookedon = datetime.fromisoformat(data["last_cooked"])
-        except (ValueError, TypeError):
-            self.cookedon = None
-        self.createdon = datetime.fromisoformat(data["created_at"])
-        self.rating = data["rating"]
-        self.ingredients = []
+    description: str = ""
+    new: bool = False
+    servings: int = 1
+    keywords: tuple[int, ...] = ()
+    # Frozen dataclasses can't use field(default_factory=dict), so we use
+    # None + __post_init__ to avoid sharing a mutable default across instances.
+    keyword_names: dict[int, str] = None  # type: ignore[assignment]
+    cookedon: Optional[datetime] = None
+    createdon: Optional[datetime] = None
+    rating: float = 0
+
+    def __post_init__(self) -> None:
+        if self.keyword_names is None:
+            object.__setattr__(self, "keyword_names", {})
 
     @staticmethod
-    def recipes_with_keyword(recipes: List["Recipe"], keywords: List["Keyword"]) -> List["Recipe"]:
+    def recipes_with_keyword(recipes: list[Recipe], keywords: list[Keyword]) -> list[Recipe]:
         """Return recipes containing any of the given keywords."""
-        return [r for r in recipes if any(k in r.keywords for k in [x.id for x in keywords])]
+        kw_ids = {k.id for k in keywords}
+        return [r for r in recipes if kw_ids.intersection(r.keywords)]
 
     @staticmethod
     def recipes_with_date(
-        recipes: List["Recipe"], field: str, date: datetime, after: bool = True
-    ) -> List["Recipe"]:
+        recipes: list[Recipe], field: str, date: datetime, after: bool = True
+    ) -> list[Recipe]:
         """Return recipes where *field* (createdon/cookedon) is before/after *date*."""
         if after:
             return [r for r in recipes if (d := getattr(r, field, None)) is not None and d > date]
-
         else:
             return [r for r in recipes if (d := getattr(r, field, None)) is not None and d < date]
 
     @staticmethod
-    def recipes_with_rating(recipes: List["Recipe"], rating: int) -> List["Recipe"]:
+    def recipes_with_rating(recipes: list[Recipe], rating: int) -> list[Recipe]:
         """Return recipes matching *rating*. Negative means <= abs(rating)."""
-        lessthan = rating < 0
-        if lessthan:
+        if rating < 0:
             return [r for r in recipes if 0 < (r.rating or 0) <= abs(rating)]
-        else:
-            return [r for r in recipes if (r.rating or 0) >= rating]
-
-    def add_details(self, api: "TandoorAPI") -> None:
-        """Populate self.ingredients, substituting on-hand foods where possible."""
-        recipe = api.get_recipe_details(self.id)
-        for f in [i["food"] for s in recipe["steps"] for i in s["ingredients"]]:
-            if f is None:
-                continue
-            if not f["food_onhand"]:
-                onhand_substitutes = api.get_food_substitutes(f["id"], substitute="food")
-                if onhand_substitutes:
-                    f = api.get_food(random.choice(onhand_substitutes)["id"])
-            self.ingredients.append(Food(f))
-
-
-class Keyword(TandoorEntity):
-    def __init__(self, data: dict) -> None:
-        self.id = data["id"]
-        self.name = data["name"]
-
-
-class Book(TandoorEntity):
-    def __init__(self, data: dict) -> None:
-        self.id = data["id"]
-        self.name = data["name"]
-        if f := data.get("filter"):
-            self.filter = f.get("id", None)
-        else:
-            self.filter = None
+        return [r for r in recipes if (r.rating or 0) >= rating]
 
 
 @dataclass(frozen=True)
@@ -131,3 +109,50 @@ class SolverResult:
     relaxed_constraints: tuple[RelaxedConstraint, ...] = ()
     warnings: tuple[str, ...] = ()
     status: str = "optimal"
+
+
+# -- Factory functions for constructing from Tandoor API dicts --
+
+
+def make_food(data: dict) -> Food:
+    """Create a Food from a Tandoor API response dict."""
+    return Food(
+        id=data["id"],
+        name=data["name"],
+        recipe=data.get("recipe"),
+        shopping=data.get("shopping"),
+        onhand=data.get("food_onhand"),
+        ignore_shopping=data.get("ignore_shopping"),
+        substitute_onhand=data.get("substitute_onhand"),
+    )
+
+
+def make_keyword(data: dict) -> Keyword:
+    """Create a Keyword from a Tandoor API response dict."""
+    return Keyword(id=data["id"], name=data["name"])
+
+
+def make_book(data: dict) -> Book:
+    """Create a Book from a Tandoor API response dict."""
+    f = data.get("filter")
+    return Book(id=data["id"], name=data["name"], filter=f.get("id") if f else None)
+
+
+def make_recipe(data: dict) -> Recipe:
+    """Create a Recipe from a Tandoor API response dict."""
+    try:
+        cookedon = datetime.fromisoformat(data["last_cooked"]) if data.get("last_cooked") else None
+    except (ValueError, TypeError):
+        cookedon = None
+    return Recipe(
+        id=data["id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        new=data.get("new", False),
+        servings=data.get("servings", 1),
+        keywords=tuple(kw["id"] for kw in data.get("keywords", [])),
+        keyword_names={kw["id"]: kw.get("name", "") for kw in data.get("keywords", [])},
+        cookedon=cookedon,
+        createdon=datetime.fromisoformat(data["created_at"]),
+        rating=data.get("rating", 0) or 0,  # API returns null for unrated
+    )
