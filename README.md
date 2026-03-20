@@ -95,11 +95,16 @@ Your data (profiles, schedules, branding, settings) is stored in the volume and 
 ## Features
 
 - **Multiple profiles** — "Weeknight Dinner," "Breakfast," "Weekend Projects" — each with its own rules
+
+![Profile editor — keyword filters, requirement levels, flexible rules](docs/screenshot-profile-editor.png)
+
 - **Smart filtering** — filter by keywords, minimum rating, ingredients, date ranges, recipe books. Rules can be strict (must match) or flexible (prefer but don't require)
 - **Household menu** — shareable page where your family browses and orders, no accounts needed
 - **Live order notifications** — the admin panel updates instantly when someone places an order
 - **Tandoor meal plan sync** — push selections back to Tandoor
 - **Weekly plans** — plan your whole week: assign different profiles to different days and meals. Monday breakfast from "Quick Breakfast," Monday dinner from "Weeknight Dinner," Saturday dinner from "Weekend Projects" — all generated at once
+
+![Weekly planner — assign profiles to days and meal types](docs/screenshot-weekly-planner.png)
 - **Scheduled generation** — automatic menu refresh on a schedule
 - **Custom branding** — your own logo, favicon, app name, and slogans
 - **Mobile-friendly** — responsive layout, QR codes for easy sharing from desktop
