@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 from typing import Any, Dict, List
 
-from morsl.tandoor_api import TandoorAPI
+from morsl.tandoor_api import TandoorAPI, TandoorError
 
 
 def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
@@ -99,7 +99,7 @@ def fetch_recipe_details(
             recipe_data["ingredients"], recipe_data["steps"] = _extract_steps_and_ingredients(
                 api, details, logger
             )
-        except Exception as e:
+        except (TandoorError, KeyError, ValueError) as e:
             logger.warning("Failed to fetch details for recipe %s: %s", r.id, e)
         return recipe_data
 
