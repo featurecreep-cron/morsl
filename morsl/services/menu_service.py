@@ -10,6 +10,34 @@ from morsl.tandoor_api import TandoorAPI
 from morsl.utils import format_date
 
 
+def _build_rating_condition(c: Dict[str, Any]):
+    """Build a rating filter condition from constraint dict."""
+    min_rating = c.get("min")
+    max_rating = c.get("max")
+    if c.get("unrated", False):
+        return 0
+    if min_rating is not None and max_rating is not None:
+        return [min_rating, max_rating]
+    if min_rating is not None:
+        return min_rating
+    if max_rating is not None:
+        return -max_rating  # negative means "at most"
+    return None
+
+
+def _resolve_date_recipes(recipes, c: Dict[str, Any], date_field: str) -> list:
+    """Resolve recipes matching a within_days/older_than_days date constraint."""
+    within_days = c.get("within_days")
+    older_than_days = c.get("older_than_days")
+    if within_days is not None:
+        d, _ = format_date(f"{within_days}d")
+        return Recipe.recipes_with_date(recipes, date_field, d, after=True)
+    if older_than_days is not None:
+        d, _ = format_date(f"-{older_than_days}d")
+        return Recipe.recipes_with_date(recipes, date_field, d, after=False)
+    return list(recipes)
+
+
 def _apply_date_filters(recipes: List[Recipe], constraint: Dict[str, Any]) -> List[Recipe]:
     """Apply cooked_date and created_date filters from a parsed constraint."""
     if cooked_date := constraint.get("cooked_date"):
@@ -179,11 +207,80 @@ class MenuService:
         self.prepare_recipes()
         self.prepare_constraints()
 
+    def _apply_keyword_constraint(self, c, exclude, weight) -> None:
+        found = Recipe.recipes_with_keyword(self.recipes, c.get("keywords", []))
+        found = _apply_date_filters(found, c)
+        self.recipe_picker.add_keyword_constraint(
+            found,
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
+    def _apply_food_constraint(self, c, exclude, weight) -> None:
+        self.recipe_picker.add_food_constraint(
+            c.get("matching_recipes", []),
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
+    def _apply_book_constraint(self, c, exclude, weight) -> None:
+        self.recipe_picker.add_book_constraint(
+            c.get("matching_recipes", []),
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
+    def _apply_rating_constraint(self, c, exclude, weight) -> None:
+        found = _apply_date_filters(list(self.recipes), c)
+        rating_condition = _build_rating_condition(c)
+        found = Recipe.recipes_with_rating(found, rating_condition)
+        self.recipe_picker.add_rating_constraints(
+            found,
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
+    def _apply_date_constraint(self, c, date_field, exclude, weight) -> None:
+        found = _resolve_date_recipes(self.recipes, c, date_field)
+        found = _apply_date_filters(found, c)
+        adder = (
+            self.recipe_picker.add_cookedon_constraints
+            if date_field == "cookedon"
+            else self.recipe_picker.add_createdon_constraints
+        )
+        adder(
+            found,
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
     def select_recipes(self) -> SolverResult:
         """Run the solver with all constraints."""
         self.recipe_picker = RecipePicker(
             self.recipes, self.choices, logger=self.logger, min_choices=self.min_choices
         )
+
+        handlers = {
+            "keyword": self._apply_keyword_constraint,
+            "food": self._apply_food_constraint,
+            "book": self._apply_book_constraint,
+            "rating": self._apply_rating_constraint,
+        }
 
         for c in self.constraints:
             ctype = c.get("type")
@@ -191,121 +288,9 @@ class MenuService:
             soft = c.get("soft", False)
             weight = 1 if soft else int(c.get("weight", 0))
 
-            if ctype == "keyword":
-                found_recipes = Recipe.recipes_with_keyword(self.recipes, c.get("keywords", []))
-                found_recipes = _apply_date_filters(found_recipes, c)
-                self.recipe_picker.add_keyword_constraint(
-                    found_recipes,
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
-
-            elif ctype == "food":
-                self.recipe_picker.add_food_constraint(
-                    c.get("matching_recipes", []),
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
-
-            elif ctype == "book":
-                self.recipe_picker.add_book_constraint(
-                    c.get("matching_recipes", []),
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
-
-            elif ctype == "rating":
-                found_recipes = _apply_date_filters(list(self.recipes), c)
-
-                # Build rating condition
-                min_rating = c.get("min")
-                max_rating = c.get("max")
-                unrated = c.get("unrated", False)
-
-                if unrated:
-                    rating_condition = 0
-                elif min_rating is not None and max_rating is not None:
-                    rating_condition = [min_rating, max_rating]
-                elif min_rating is not None:
-                    rating_condition = min_rating
-                elif max_rating is not None:
-                    rating_condition = -max_rating  # negative means "at most"
-                else:
-                    rating_condition = None
-
-                found_recipes = Recipe.recipes_with_rating(found_recipes, rating_condition)
-                self.recipe_picker.add_rating_constraints(
-                    found_recipes,
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
-
-            elif ctype == "cookedon":
-                within_days = c.get("within_days")
-                older_than_days = c.get("older_than_days")
-
-                if within_days is not None:
-                    d, _ = format_date(f"{within_days}d")
-                    found_recipes = Recipe.recipes_with_date(
-                        self.recipes, "cookedon", d, after=True
-                    )
-                elif older_than_days is not None:
-                    d, _ = format_date(f"-{older_than_days}d")
-                    found_recipes = Recipe.recipes_with_date(
-                        self.recipes, "cookedon", d, after=False
-                    )
-                else:
-                    found_recipes = list(self.recipes)
-
-                found_recipes = _apply_date_filters(found_recipes, c)
-
-                self.recipe_picker.add_cookedon_constraints(
-                    found_recipes,
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
-
-            elif ctype == "createdon":
-                within_days = c.get("within_days")
-                older_than_days = c.get("older_than_days")
-
-                if within_days is not None:
-                    d, _ = format_date(f"{within_days}d")
-                    found_recipes = Recipe.recipes_with_date(
-                        self.recipes, "createdon", d, after=True
-                    )
-                elif older_than_days is not None:
-                    d, _ = format_date(f"-{older_than_days}d")
-                    found_recipes = Recipe.recipes_with_date(
-                        self.recipes, "createdon", d, after=False
-                    )
-                else:
-                    found_recipes = list(self.recipes)
-
-                found_recipes = _apply_date_filters(found_recipes, c)
-
-                self.recipe_picker.add_createdon_constraints(
-                    found_recipes,
-                    c["count"],
-                    c["operator"],
-                    exclude=exclude,
-                    weight=weight,
-                    upper_bound=c.get("upper_bound"),
-                )
+            if ctype in handlers:
+                handlers[ctype](c, exclude, weight)
+            elif ctype in ("cookedon", "createdon"):
+                self._apply_date_constraint(c, ctype, exclude, weight)
 
         return self.recipe_picker.solve()
