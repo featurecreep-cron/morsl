@@ -10,6 +10,55 @@ from typing import Any, Dict, List
 from morsl.tandoor_api import TandoorAPI
 
 
+def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
+    """Resolve on-hand food substitution for a single ingredient."""
+    if food_obj.get("food_onhand"):
+        return food_obj
+    try:
+        subs = api.get_food_substitutes(food_obj["id"], substitute="food")
+        if subs:
+            return api.get_food(random.choice(subs)["id"])
+    except (KeyError, IndexError, TypeError) as e:
+        logger.debug("Substitute lookup failed for food %s: %s", food_obj.get("id"), e)
+    except Exception as e:
+        logger.warning(
+            "Unexpected error in substitute lookup for food %s: %s", food_obj.get("id"), e
+        )
+    return food_obj
+
+
+def _extract_steps_and_ingredients(
+    api: TandoorAPI, details: dict, logger: Logger
+) -> tuple[list, list]:
+    """Extract ingredients and steps from a Tandoor recipe details response."""
+    ingredients = []
+    steps = []
+    for step in details.get("steps", []):
+        for ing in step.get("ingredients", []):
+            food_obj = ing.get("food")
+            if not food_obj or not food_obj.get("name"):
+                continue
+            food_obj = _resolve_food(api, food_obj, logger)
+            ingredients.append(
+                {
+                    "amount": ing.get("amount"),
+                    "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
+                    "food": food_obj["name"],
+                }
+            )
+        instruction = step.get("instruction", "").strip()
+        if instruction:
+            steps.append(
+                {
+                    "name": step.get("name", ""),
+                    "instruction": instruction,
+                    "time": step.get("time", 0),
+                    "order": step.get("order", 0),
+                }
+            )
+    return ingredients, steps
+
+
 def fetch_recipe_details(
     api: TandoorAPI,
     recipes: tuple | list,
@@ -42,52 +91,16 @@ def fetch_recipe_details(
             recipe_data["image"] = details.get("image")
             recipe_data["working_time"] = details.get("working_time")
             recipe_data["cooking_time"] = details.get("cooking_time")
-            # Enrich keywords with names from detailed response
             detail_kws = details.get("keywords", [])
             if detail_kws:
                 recipe_data["keywords"] = [
                     {"id": kw["id"], "name": kw.get("name", "")} for kw in detail_kws
                 ]
-            for step in details.get("steps", []):
-                for ing in step.get("ingredients", []):
-                    food_obj = ing.get("food")
-                    if not food_obj or not food_obj.get("name"):
-                        continue
-                    # On-hand substitution: if food is not on hand,
-                    # try to find an on-hand substitute
-                    if not food_obj.get("food_onhand"):
-                        try:
-                            subs = api.get_food_substitutes(food_obj["id"], substitute="food")
-                            if subs:
-                                food_obj = api.get_food(random.choice(subs)["id"])
-                        except (KeyError, IndexError, TypeError) as e:
-                            logger.debug(
-                                f"Substitute lookup failed for food {food_obj.get('id')}: {e}"
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Unexpected error in substitute lookup "
-                                f"for food {food_obj.get('id')}: {e}"
-                            )
-                    recipe_data["ingredients"].append(
-                        {
-                            "amount": ing.get("amount"),
-                            "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
-                            "food": food_obj["name"],
-                        }
-                    )
-                instruction = step.get("instruction", "").strip()
-                if instruction:
-                    recipe_data["steps"].append(
-                        {
-                            "name": step.get("name", ""),
-                            "instruction": instruction,
-                            "time": step.get("time", 0),
-                            "order": step.get("order", 0),
-                        }
-                    )
+            recipe_data["ingredients"], recipe_data["steps"] = _extract_steps_and_ingredients(
+                api, details, logger
+            )
         except Exception as e:
-            logger.warning(f"Failed to fetch details for recipe {r.id}: {e}")
+            logger.warning("Failed to fetch details for recipe %s: %s", r.id, e)
         return recipe_data
 
     with ThreadPoolExecutor(max_workers=5) as pool:

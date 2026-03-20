@@ -95,6 +95,25 @@ class TestLayerViolation:
                         lines.add(child.lineno)
         return lines
 
+    @staticmethod
+    def _extract_morsl_imports(tree, tc_lines):
+        """Yield (lineno, module_name) for all morsl imports outside TYPE_CHECKING."""
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            if node.lineno in tc_lines:
+                continue
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("morsl.")
+            ):
+                yield node.lineno, node.module
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("morsl."):
+                        yield node.lineno, alias.name
+
     def test_no_upward_imports(self):
         """Modules must not import from a layer above them."""
         violations = []
@@ -107,35 +126,13 @@ class TestLayerViolation:
             tree = ast.parse(path.read_text())
             tc_lines = self._type_checking_lines(tree)
 
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.Import, ast.ImportFrom)) and node.lineno in tc_lines:
-                    continue
-
-                imported_module = None
-                if isinstance(node, ast.ImportFrom) and node.module:
-                    if node.module.startswith("morsl."):
-                        imported_module = node.module
-                elif isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name.startswith("morsl."):
-                            target_layer = self._get_layer(alias.name)
-                            if target_layer is not None and target_layer > src_layer:
-                                violations.append(
-                                    f"{path.name}:{node.lineno} "
-                                    f"imports {alias.name} "
-                                    f"(layer {target_layer}) "
-                                    f"from layer {src_layer}"
-                                )
-
-                if imported_module:
-                    target_layer = self._get_layer(imported_module)
-                    if target_layer is not None and target_layer > src_layer:
-                        violations.append(
-                            f"{path.name}:{node.lineno} "
-                            f"imports {imported_module} "
-                            f"(layer {target_layer}) "
-                            f"from layer {src_layer}"
-                        )
+            for lineno, imported_module in self._extract_morsl_imports(tree, tc_lines):
+                target_layer = self._get_layer(imported_module)
+                if target_layer is not None and target_layer > src_layer:
+                    violations.append(
+                        f"{path.name}:{lineno} imports {imported_module} "
+                        f"(layer {target_layer}) from layer {src_layer}"
+                    )
         assert not violations, "Upward layer imports detected:\n" + "\n".join(violations)
 
 

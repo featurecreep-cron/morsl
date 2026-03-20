@@ -366,6 +366,33 @@ def reset_branding(
 
 
 @router.post("/factory-reset", dependencies=[Depends(require_admin)])
+def _reset_step(errors: list, label: str, fn) -> None:
+    """Run a factory reset step, collecting errors instead of raising."""
+    try:
+        fn()
+    except Exception as e:
+        errors.append(f"{label}: {e}")
+
+
+def _delete_all_items(list_fn, delete_fn, id_fn) -> None:
+    """Delete all items from a service, suppressing per-item errors."""
+    for item in list_fn():
+        with contextlib.suppress(Exception):
+            delete_fn(id_fn(item))
+
+
+def _delete_file_if_exists(path: Path) -> None:
+    if path.exists():
+        path.unlink()
+
+
+def _regenerate_default_icons() -> None:
+    if DEFAULT_FAVICON_PATH.exists():
+        from morsl.services.icon_service import generate_icons
+
+        generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
+
+
 def factory_reset(
     settings: Settings = Depends(get_settings),
     svc: SettingsService = Depends(get_settings_service),
@@ -373,78 +400,59 @@ def factory_reset(
     category_svc: CategoryService = Depends(get_category_service),
 ) -> Dict[str, str]:
     """Erase all server-side data and return to first-run state."""
-    errors = []
+    errors: list = []
+    data_dir = Path(settings.data_dir)
 
-    # 1. Delete all profiles
-    try:
-        for p in config_svc.list_profiles():
-            with contextlib.suppress(Exception):
-                config_svc.delete_profile(p.name)
-    except Exception as e:
-        errors.append(f"profiles: {e}")
+    _reset_step(
+        errors,
+        "profiles",
+        lambda: _delete_all_items(
+            config_svc.list_profiles,
+            config_svc.delete_profile,
+            lambda p: p.name,
+        ),
+    )
+    _reset_step(
+        errors,
+        "categories",
+        lambda: _delete_all_items(
+            category_svc.list_categories,
+            category_svc.delete_category,
+            lambda c: c["id"],
+        ),
+    )
+    _reset_step(
+        errors,
+        "schedules",
+        lambda: _delete_all_items(
+            get_scheduler_service(settings).list_schedules,
+            get_scheduler_service(settings).delete_schedule,
+            lambda s: s["id"],
+        ),
+    )
+    _reset_step(errors, "history", lambda: get_history_service(settings).clear())
+    _reset_step(errors, "menu", lambda: get_generation_service(settings).clear_menu())
 
-    # 2. Delete all categories
-    try:
-        for cat in category_svc.list_categories():
-            with contextlib.suppress(Exception):
-                category_svc.delete_category(cat["id"])
-    except Exception as e:
-        errors.append(f"categories: {e}")
-
-    # 3. Delete all schedules
-    try:
-        scheduler_svc = get_scheduler_service(settings)
-        for sched in scheduler_svc.list_schedules():
-            with contextlib.suppress(Exception):
-                scheduler_svc.delete_schedule(sched["id"])
-    except Exception as e:
-        errors.append(f"schedules: {e}")
-
-    # 4. Clear generation history
-    try:
-        history_svc = get_history_service(settings)
-        history_svc.clear()
-    except Exception as e:
-        errors.append(f"history: {e}")
-
-    # 5. Clear current menu
-    try:
-        gen_svc = get_generation_service(settings)
-        gen_svc.clear_menu()
-    except Exception as e:
-        errors.append(f"menu: {e}")
-
-    # 6. Remove branding uploads
     _remove_uploads("logo")
     _remove_uploads("favicon-source")
     _remove_uploads("loading-icon")
 
-    # 7. Delete icon mappings
-    try:
-        icon_mappings_path = Path(settings.data_dir) / "icon-mappings.json"
-        if icon_mappings_path.exists():
-            icon_mappings_path.unlink()
-    except Exception as e:
-        errors.append(f"icon-mappings: {e}")
+    _reset_step(
+        errors,
+        "icon-mappings",
+        lambda: _delete_file_if_exists(
+            data_dir / "icon-mappings.json",
+        ),
+    )
+    _reset_step(errors, "icons", _regenerate_default_icons)
 
-    # 8. Regenerate default favicon icons
-    if DEFAULT_FAVICON_PATH.exists():
-        try:
-            from morsl.services.icon_service import generate_icons
+    def _clear_settings():
+        path = data_dir / "settings.json"
+        if path.exists():
+            path.write_text("{}")
 
-            generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
-        except Exception as e:
-            logger.warning("Default icon regeneration failed: %s", e)
+    _reset_step(errors, "settings", _clear_settings)
 
-    # 9. Reset settings.json to defaults (wipe credentials + all settings)
-    try:
-        settings_path = Path(settings.data_dir) / "settings.json"
-        if settings_path.exists():
-            settings_path.write_text("{}")
-    except Exception as e:
-        errors.append(f"settings: {e}")
-
-    # 10. Reset all singleton services so they pick up clean state
     reset_all_singletons()
     revoke_admin_tokens()
 

@@ -27,6 +27,39 @@ _VALID_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
+def _distribute_to_slots(
+    expanded: Dict[str, list],
+    profile_recipes: Dict[str, list],
+    detail_map: Dict[int, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Distribute solved recipes into day/meal slots in solver output order."""
+    profile_queues: Dict[str, deque] = {}
+    for profile_name, recipes in profile_recipes.items():
+        profile_queues[profile_name] = deque(
+            detail_map[r.id] for r in recipes if r.id in detail_map
+        )
+
+    days_result: Dict[str, Dict[str, Any]] = {}
+    for date_str in sorted(expanded.keys()):
+        day_of_week = _DAY_NAMES[date.fromisoformat(date_str).weekday()]
+        day_meals: Dict[str, Dict[str, Any]] = {}
+
+        for assignment in expanded[date_str]:
+            queue = profile_queues.get(assignment["profile"], deque())
+            slot_recipes = [queue.popleft() for _ in range(assignment["recipes_per_day"]) if queue]
+            day_meals[str(assignment["meal_type_id"])] = {
+                "meal_type_name": assignment["meal_type_name"],
+                "profile": assignment["profile"],
+                "recipes": slot_recipes,
+            }
+
+        days_result[date_str] = {
+            "day_of_week": day_of_week,
+            "meals": day_meals,
+        }
+    return days_result
+
+
 def _validate_template_name(name: str) -> None:
     """Reject names that could escape the plans directory (path traversal)."""
     if not name or not _VALID_NAME_RE.match(name):
@@ -169,6 +202,76 @@ class WeeklyGenerationService:
             self._status.completed_at = now()
             self._status.error = str(e)
 
+    def _generate_for_profile(
+        self,
+        profile_name: str,
+        total_needed: int,
+        config_service: ConfigService,
+        url: str,
+        token: str,
+        app_logger: logging.Logger,
+        cache_minutes: int,
+        deduplicate: bool,
+        exclude_ids: set,
+    ) -> Dict[str, Any]:
+        """Generate recipes for a single profile, returning results and warnings."""
+        self._status.profile_progress[profile_name] = "generating"
+        warnings: List[str] = []
+
+        try:
+            config = config_service.load_profile(profile_name)
+        except FileNotFoundError:
+            msg = f"Profile '{profile_name}' not found, skipping"
+            self._status.profile_progress[profile_name] = "error"
+            return {
+                "slot_result": {"status": "error", "warnings": [msg]},
+                "warnings": [msg],
+                "recipes": None,
+            }
+
+        config["choices"] = total_needed
+        config["cache"] = cache_minutes
+
+        service = MenuService(url=url, token=token, config=config, logger=app_logger)
+        service.prepare_data()
+
+        if deduplicate and exclude_ids:
+            original_count = len(service.recipes)
+            service.recipes = [r for r in service.recipes if r.id not in exclude_ids]
+            if len(service.recipes) < original_count:
+                app_logger.info(
+                    "Dedup: filtered %d recipes from pool for profile '%s'",
+                    original_count - len(service.recipes),
+                    profile_name,
+                )
+
+        if len(service.recipes) < total_needed:
+            msg = (
+                f"Profile '{profile_name}': only "
+                f"{len(service.recipes)} recipes available, "
+                f"{total_needed} requested"
+            )
+            warnings.append(msg)
+            if len(service.recipes) == 0:
+                self._status.profile_progress[profile_name] = "error"
+                return {
+                    "slot_result": {"status": "error", "warnings": [msg]},
+                    "warnings": warnings,
+                    "recipes": None,
+                }
+            service.choices = len(service.recipes)
+
+        solver_result = service.select_recipes()
+        if solver_result.warnings:
+            warnings.extend(solver_result.warnings)
+
+        self._status.profile_progress[profile_name] = "complete"
+        return {
+            "slot_result": {"status": solver_result.status, "warnings": solver_result.warnings},
+            "warnings": warnings,
+            "recipes": list(solver_result.recipes),
+        }
+
     def _sync_generate(
         self,
         template_name: str,
@@ -205,71 +308,27 @@ class WeeklyGenerationService:
         # 3. Run each profile sequentially for dedup
         all_warnings: List[str] = []
         exclude_ids: set = set()
-        profile_recipes: Dict[str, list] = {}  # profile -> list of Recipe objects
+        profile_recipes: Dict[str, list] = {}
         slot_results: Dict[str, Dict[str, Any]] = {}
 
         for profile_name, total_needed in sorted_profiles:
-            self._status.profile_progress[profile_name] = "generating"
-
-            try:
-                config = config_service.load_profile(profile_name)
-            except FileNotFoundError:
-                msg = f"Profile '{profile_name}' not found, skipping"
-                all_warnings.append(msg)
-                self._status.profile_progress[profile_name] = "error"
-                slot_results[profile_name] = {"status": "error", "warnings": [msg]}
-                continue
-
-            # Override choices to total needed for this profile
-            config["choices"] = total_needed
-            config["cache"] = cache_minutes
-
-            service = MenuService(url=url, token=token, config=config, logger=app_logger)
-            service.prepare_data()
-
-            # Dedup: filter out already-selected recipe IDs
-            if deduplicate and exclude_ids:
-                original_count = len(service.recipes)
-                service.recipes = [r for r in service.recipes if r.id not in exclude_ids]
-                if len(service.recipes) < original_count:
-                    app_logger.info(
-                        "Dedup: filtered %d recipes from pool for profile '%s'",
-                        original_count - len(service.recipes),
-                        profile_name,
-                    )
-
-            # Check if enough recipes
-            if len(service.recipes) < total_needed:
-                msg = (
-                    f"Profile '{profile_name}': only "
-                    f"{len(service.recipes)} recipes available, "
-                    f"{total_needed} requested"
-                )
-                all_warnings.append(msg)
-                if service.min_choices and len(service.recipes) >= service.min_choices:
-                    service.choices = len(service.recipes)
-                elif len(service.recipes) == 0:
-                    self._status.profile_progress[profile_name] = "error"
-                    slot_results[profile_name] = {"status": "error", "warnings": [msg]}
-                    continue
-                else:
-                    service.choices = len(service.recipes)
-
-            solver_result = service.select_recipes()
-
-            slot_results[profile_name] = {
-                "status": solver_result.status,
-                "warnings": solver_result.warnings,
-            }
-            if solver_result.warnings:
-                all_warnings.extend(solver_result.warnings)
-
-            # Collect selected recipes for dedup
-            profile_recipes[profile_name] = list(solver_result.recipes)
-            if deduplicate:
-                exclude_ids.update(r.id for r in solver_result.recipes)
-
-            self._status.profile_progress[profile_name] = "complete"
+            result = self._generate_for_profile(
+                profile_name,
+                total_needed,
+                config_service,
+                url,
+                token,
+                app_logger,
+                cache_minutes,
+                deduplicate,
+                exclude_ids,
+            )
+            slot_results[profile_name] = result["slot_result"]
+            all_warnings.extend(result["warnings"])
+            if result["recipes"] is not None:
+                profile_recipes[profile_name] = result["recipes"]
+                if deduplicate:
+                    exclude_ids.update(r.id for r in result["recipes"])
 
         # 4. Fetch recipe details for ALL selected recipes
         all_recipe_objs = []
@@ -283,41 +342,12 @@ class WeeklyGenerationService:
         for detail in details_list:
             detail_map[detail["id"]] = detail
 
-        # 5. Distribute recipes to day/meal slots in solver output order
-        days_result: Dict[str, Dict[str, Any]] = {}
-
-        # Build per-profile queues (solver output order)
-        profile_queues: Dict[str, deque] = {}
-        for profile_name, recipes in profile_recipes.items():
-            profile_queues[profile_name] = deque(
-                detail_map[r.id] for r in recipes if r.id in detail_map
-            )
-
-        for date_str in sorted(expanded.keys()):
-            day_of_week = _DAY_NAMES[date.fromisoformat(date_str).weekday()]
-            day_meals: Dict[str, Dict[str, Any]] = {}
-
-            for assignment in expanded[date_str]:
-                mt_id = str(assignment["meal_type_id"])
-                profile_name = assignment["profile"]
-                recipes_per_day = assignment["recipes_per_day"]
-
-                queue = profile_queues.get(profile_name, deque())
-                slot_recipes = []
-                for _ in range(recipes_per_day):
-                    if queue:
-                        slot_recipes.append(queue.popleft())
-
-                day_meals[mt_id] = {
-                    "meal_type_name": assignment["meal_type_name"],
-                    "profile": profile_name,
-                    "recipes": slot_recipes,
-                }
-
-            days_result[date_str] = {
-                "day_of_week": day_of_week,
-                "meals": day_meals,
-            }
+        # 5. Distribute recipes to day/meal slots
+        days_result = _distribute_to_slots(
+            expanded,
+            profile_recipes,
+            detail_map,
+        )
 
         return {
             "template": template_name,

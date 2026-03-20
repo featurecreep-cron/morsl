@@ -87,98 +87,109 @@ def _resolve_favicon_source(favicon_url, icons_dir: Path) -> Path:
     return source
 
 
-def _build_scheduler_callbacks(settings):
-    """Create the callback functions for the scheduler service."""
+def _resolve_scheduler_services(settings):
+    """Common service resolution for scheduler callbacks."""
+    settings_svc = get_settings_service(settings)
+    url, token = resolve_credentials(settings, settings_svc)
+    return settings_svc, get_logger(settings), url, token
 
-    async def generation_callback(profile: str) -> None:
-        try:
-            gen_svc = get_generation_service(settings)
-            app_logger = get_logger(settings)
-            config_service = get_config_service(settings)
-            config = config_service.load_profile(profile)
-            settings_svc = get_settings_service(settings)
-            url, token = resolve_credentials(settings, settings_svc)
-            await gen_svc.start_generation(config=config, url=url, token=token, logger=app_logger)
-            await gen_svc.wait_for_completion()
-        except Exception:
-            logger.warning(
-                "Scheduled generation failed for profile '%s'",
-                profile,
-                exc_info=True,
-            )
 
-    async def meal_plan_callback(action: str, params: dict) -> None:
-        """Handle meal plan pipeline actions dispatched by the scheduler."""
+async def _sched_generation(settings, profile: str) -> None:
+    try:
+        _, app_logger, url, token = _resolve_scheduler_services(settings)
+        config = get_config_service(settings).load_profile(profile)
+        gen_svc = get_generation_service(settings)
+        await gen_svc.start_generation(
+            config=config,
+            url=url,
+            token=token,
+            logger=app_logger,
+        )
+        await gen_svc.wait_for_completion()
+    except Exception:
+        logger.warning(
+            "Scheduled generation failed for profile '%s'",
+            profile,
+            exc_info=True,
+        )
+
+
+async def _sched_meal_plan(settings, action: str, params: dict) -> None:
+    settings_svc = get_settings_service(settings)
+    meal_plan_svc = get_meal_plan_service(settings, settings_svc)
+    if action == "cleanup":
+        await asyncio.to_thread(
+            meal_plan_svc.cleanup,
+            meal_plan_type=params["meal_plan_type"],
+            days=params["cleanup_days"],
+        )
+    elif action == "create":
+        menu = get_generation_service(settings).get_current_menu()
+        if not menu or not menu.get("recipes"):
+            logger.warning("No current menu — skipping meal plan creation")
+            return
+        await asyncio.to_thread(
+            meal_plan_svc.create_from_menu,
+            meal_plan_type_id=params["meal_plan_type"],
+            recipes=menu["recipes"],
+        )
+
+
+async def _sched_weekly_generation(
+    settings,
+    template_name: str,
+    week_start=None,
+) -> None:
+    try:
+        settings_svc, app_logger, url, token = _resolve_scheduler_services(settings)
+        await get_weekly_generation_service(settings).start_generation(
+            template_name=template_name,
+            template_service=get_template_service(settings),
+            config_service=get_config_service(settings),
+            url=url,
+            token=token,
+            app_logger=app_logger,
+            week_start=week_start,
+            generation_service=get_generation_service(settings),
+            settings_service=settings_svc,
+        )
+        await get_weekly_generation_service(settings).wait_for_completion()
+    except Exception:
+        logger.warning(
+            "Scheduled weekly generation failed for '%s'",
+            template_name,
+            exc_info=True,
+        )
+
+
+async def _sched_weekly_save(settings, template_name: str) -> None:
+    try:
+        plan = get_weekly_generation_service(settings).get_plan(template_name)
+        if not plan:
+            logger.warning("No weekly plan — skipping save to Tandoor")
+            return
         settings_svc = get_settings_service(settings)
         meal_plan_svc = get_meal_plan_service(settings, settings_svc)
-        if action == "cleanup":
-            await asyncio.to_thread(
-                meal_plan_svc.cleanup,
-                meal_plan_type=params["meal_plan_type"],
-                days=params["cleanup_days"],
-            )
-        elif action == "create":
-            gen_svc = get_generation_service(settings)
-            menu = gen_svc.get_current_menu()
-            if not menu or not menu.get("recipes"):
-                logger.warning("No current menu — skipping meal plan creation")
-                return
-            await asyncio.to_thread(
-                meal_plan_svc.create_from_menu,
-                meal_plan_type_id=params["meal_plan_type"],
-                recipes=menu["recipes"],
-            )
+        await asyncio.to_thread(
+            meal_plan_svc.save_weekly_plan,
+            weekly_plan=plan,
+            shared=[],
+        )
+    except Exception:
+        logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
 
-    async def weekly_generation_callback(template_name: str, week_start=None) -> None:
-        try:
-            weekly_svc = get_weekly_generation_service(settings)
-            template_svc = get_template_service(settings)
-            config_svc = get_config_service(settings)
-            app_logger = get_logger(settings)
-            settings_svc = get_settings_service(settings)
-            gen_svc = get_generation_service(settings)
-            url, token = resolve_credentials(settings, settings_svc)
-            await weekly_svc.start_generation(
-                template_name=template_name,
-                template_service=template_svc,
-                config_service=config_svc,
-                url=url,
-                token=token,
-                app_logger=app_logger,
-                week_start=week_start,
-                generation_service=gen_svc,
-                settings_service=settings_svc,
-            )
-            await weekly_svc.wait_for_completion()
-        except Exception:
-            logger.warning(
-                "Scheduled weekly generation failed for '%s'",
-                template_name,
-                exc_info=True,
-            )
 
-    async def weekly_save_callback(template_name: str) -> None:
-        try:
-            weekly_svc = get_weekly_generation_service(settings)
-            plan = weekly_svc.get_plan(template_name)
-            if not plan:
-                logger.warning("No weekly plan — skipping save to Tandoor")
-                return
-            settings_svc = get_settings_service(settings)
-            meal_plan_svc = get_meal_plan_service(settings, settings_svc)
-            await asyncio.to_thread(
-                meal_plan_svc.save_weekly_plan,
-                weekly_plan=plan,
-                shared=[],
-            )
-        except Exception:
-            logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
-
+def _build_scheduler_callbacks(settings):
+    """Create bound callback functions for the scheduler service."""
     return (
-        generation_callback,
-        meal_plan_callback,
-        weekly_generation_callback,
-        weekly_save_callback,
+        lambda profile: _sched_generation(settings, profile),
+        lambda action, params: _sched_meal_plan(settings, action, params),
+        lambda template_name, week_start=None: _sched_weekly_generation(
+            settings,
+            template_name,
+            week_start,
+        ),
+        lambda template_name: _sched_weekly_save(settings, template_name),
     )
 
 

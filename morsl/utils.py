@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
@@ -48,26 +47,29 @@ class InfoFilter(logging.Filter):
 FuncType = Callable[..., Any]
 
 
+_LOG_LEVELS: Dict[str, int] = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+}
+
+
+def _resolve_log_level(log: Union[str, int]) -> int:
+    """Convert a string or int log level to a numeric level. Returns -1 if invalid."""
+    if isinstance(log, str):
+        return _LOG_LEVELS.get(log.upper(), -1)
+    if isinstance(log, int) and 0 <= log <= 50:
+        return log
+    return -1
+
+
 # logging methods
 def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False) -> logging.Logger:
-    log_levels: Dict[str, int] = {
-        "CRITICAL": logging.CRITICAL,
-        "ERROR": logging.ERROR,
-        "WARNING": logging.WARNING,
-        "INFO": logging.INFO,
-        "DEBUG": logging.DEBUG,
-    }
     logger: logging.Logger = logging.getLogger("morsl")
     if logger.handlers:
-        # Handlers configured by first call; log_to_stdout only takes effect
-        # on initial setup (singleton pattern — all callers share one Settings).
-        # Update stdout handler level on subsequent calls
-        level = -1
-        if isinstance(log, str):
-            with contextlib.suppress(KeyError):
-                level = log_levels[log.upper()]
-        elif isinstance(log, int) and 0 <= log <= 50:
-            level = log
+        level = _resolve_log_level(log)
         if level >= 0:
             for h in logger.handlers:
                 if isinstance(h, logging.StreamHandler) and h.stream is sys.stdout:
@@ -105,24 +107,15 @@ def setup_logging(log: Union[str, int] = "INFO", *, log_to_stdout: bool = False)
     ch_std: logging.StreamHandler = logging.StreamHandler(stream=sys.stdout)
     ch_std.setFormatter(formatter_brief)
     ch_std.addFilter(InfoFilter())
-    level: int = -1
-    if isinstance(log, str):
-        with contextlib.suppress(KeyError):
-            level = log_levels[log.upper()]
-    elif isinstance(log, int) and 0 <= log <= 50:
-        level = log
+    level = _resolve_log_level(log)
 
     if level < 0:
-        print(
-            "Valid logging levels specified by either key or value:{}".format(
-                "\n\t".join("{}: {}".format(key, value) for key, value in log_levels.items())
-            )
-        )
-        raise RuntimeError("Invalid logging level selected: {}".format(level))
-    else:
-        ch_std.setLevel(level)
-        logger.addHandler(ch_std)
-        logger.loglevel = level
+        valid = "\n\t".join(f"{k}: {v}" for k, v in _LOG_LEVELS.items())
+        raise RuntimeError(f"Invalid logging level selected: {log}\nValid levels:\n\t{valid}")
+
+    ch_std.setLevel(level)
+    logger.addHandler(ch_std)
+    logger.loglevel = level
     return logger
 
 
