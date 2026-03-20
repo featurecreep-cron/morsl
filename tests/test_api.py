@@ -194,6 +194,11 @@ class TestMenuEndpoints:
         assert len(data["recipes"]) == 1
         assert "version" in data
 
+    async def test_delete_menu(self, settings_client, mock_gen_service):
+        response = await settings_client.delete("/api/menu")
+        assert response.status_code == 204
+        mock_gen_service.clear_menu.assert_called_once()
+
     async def test_status_idle(self, client, mock_gen_service):
         response = await client.get("/api/status")
         assert response.status_code == 200
