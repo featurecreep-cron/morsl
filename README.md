@@ -150,7 +150,9 @@ API documentation is available at `/docs` (interactive) and `/redoc` (reference)
 
 ### Security
 
-Morsl has no built-in authentication by default. If you're only using it at home on your local network, this is fine. If you're exposing it to the internet, put it behind a reverse proxy with authentication (Authelia, Authentik, etc.) or enable the admin PIN in Settings.
+Morsl has no built-in authentication by default. If you're only using it at home on your local network, this is fine. The optional admin PIN (Settings) keeps household members out of the admin panel — it is **not** a substitute for real authentication.
+
+If you're exposing Morsl to the internet, put it behind a reverse proxy with proper authentication (Authelia, Authentik, Cloudflare Access, etc.).
 
 **Forgot your PIN?** Two options:
 
