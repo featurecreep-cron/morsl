@@ -157,6 +157,30 @@ class GenerationService:
             self._status.completed_at = now()
             self._status.error = str(e)
 
+            # Record failed generation in history
+            if self._history_service:
+                duration_ms = 0
+                if self._status.started_at and self._status.completed_at:
+                    delta = self._status.completed_at - self._status.started_at
+                    duration_ms = int(delta.total_seconds() * 1000)
+                self._history_service.add_entry(
+                    {
+                        "id": str(uuid4()),
+                        "generated_at": now().isoformat(),
+                        "duration_ms": duration_ms,
+                        "profile": profile_name,
+                        "request_id": request_id,
+                        "recipe_count": 0,
+                        "requested_count": int(config.get("choices", 0)),
+                        "constraint_count": len(config.get("constraints", [])),
+                        "status": "error",
+                        "error": str(e),
+                        "recipes": [],
+                        "relaxed_constraints": [],
+                        "warnings": [],
+                    }
+                )
+
     @staticmethod
     def _sync_generate(
         config: Dict[str, Any],

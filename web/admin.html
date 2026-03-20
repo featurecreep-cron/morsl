@@ -363,9 +363,15 @@
 
                         <div x-show="expandedHistoryId === h.id" x-transition:enter.opacity.duration.150ms
                              class="history-detail" @click.stop>
-                            <div class="history-detail-row">
+                            <template x-if="h.error">
+                                <div class="history-detail-row" style="color:var(--error, #e74c3c);">
+                                    <strong>Error:</strong>
+                                    <span x-text="h.error"></span>
+                                </div>
+                            </template>
+                            <div class="history-detail-row" x-show="h.recipes && h.recipes.length > 0">
                                 <strong>Recipes:</strong>
-                                <span x-text="h.recipes.map(r => r.name).join(', ')"></span>
+                                <span x-text="(h.recipes || []).map(r => r.name).join(', ')"></span>
                             </div>
                             <div class="history-detail-row" x-show="h.constraint_count">
                                 <strong>Constraints:</strong>
