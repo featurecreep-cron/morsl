@@ -503,12 +503,12 @@ function adminApp() {
             }
         },
 
-        clearRecipes() {
+        clearMenu() {
             this.confirmModal = {
                 show: true,
-                title: 'Clear All Recipes?',
-                message: 'This will remove all recipes from the current menu. This cannot be undone.',
-                confirmText: 'Clear All',
+                title: 'Clear Menu?',
+                message: 'This will remove the current menu.',
+                confirmText: 'Clear',
                 onConfirm: async () => {
                     try {
                         const res = await this.adminFetch('/api/menu', { method: 'DELETE' });
@@ -519,7 +519,7 @@ function adminApp() {
                             this.menuMeta = {};
                         }
                     } catch (e) {
-                        this.showError('Failed to clear recipes: ' + e.message);
+                        this.showError('Failed to clear menu: ' + e.message);
                     }
                 },
             };
