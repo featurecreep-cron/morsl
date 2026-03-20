@@ -43,10 +43,14 @@ docker build .                          # verify build
 docker compose -f docker-compose.dev.yml up  # run locally with build context
 ```
 
+## Test policy
+
+New features and bug fixes must include tests. PRs that reduce coverage or skip tests for new behavior will be asked to add them before merge.
+
 ## PR process
 
-1. Fork the repo and create a branch from `main`.
+1. Fork the repo and create a branch from `develop`.
 2. Make your changes. Add tests for new behavior.
 3. Ensure `pytest`, `ruff check .`, `ruff format --check .`, and `docker build .` all pass.
-4. Open a PR against `main`. Fill in the template.
+4. Open a PR against `develop`. Fill in the template.
 5. CI must pass before merge.

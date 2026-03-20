@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from morsl.models import Recipe, RelaxedConstraint, SolverResult
+from morsl.models import RelaxedConstraint, SolverResult, make_recipe
 from morsl.solver import RecipePicker
 
 
@@ -78,7 +78,7 @@ class TestExcludeAndIntersect:
 
     def test_intersect_pool_food(self, sample_recipes, mock_logger):
         # food/book constraints intersect with the recipe pool first
-        extra_recipe = Recipe(
+        extra_recipe = make_recipe(
             {
                 "id": 999,
                 "name": "Unknown",

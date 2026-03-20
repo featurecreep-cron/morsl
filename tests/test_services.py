@@ -342,9 +342,9 @@ class TestOnHandSubstitution:
     """Tests for on-hand food substitution in GenerationService._sync_generate()."""
 
     def _make_solver_result(self):
-        from morsl.models import Recipe, SolverResult
+        from morsl.models import SolverResult, make_recipe
 
-        r = Recipe(
+        r = make_recipe(
             {
                 "id": 1,
                 "name": "Mojito",
