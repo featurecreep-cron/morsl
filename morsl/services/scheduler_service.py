@@ -27,7 +27,6 @@ class SchedulerService:
         self._schedules: Dict[str, Dict[str, Any]] = {}
         self._scheduler = AsyncIOScheduler(timezone=self._timezone)
         self._generation_callback: Optional[Callable[..., Any]] = None
-        self._clear_callback: Optional[Callable[[], None]] = None
         self._meal_plan_callback: Optional[Callable[..., Any]] = None
         self._weekly_generation_callback: Optional[Callable[..., Any]] = None
         self._weekly_save_callback: Optional[Callable[..., Any]] = None
@@ -36,10 +35,6 @@ class SchedulerService:
     def set_generation_callback(self, callback: Callable[..., Any]) -> None:
         """Set the async callback for triggering generation."""
         self._generation_callback = callback
-
-    def set_clear_callback(self, callback: Callable[[], None]) -> None:
-        """Set callback that clears current menu before generation."""
-        self._clear_callback = callback
 
     def set_meal_plan_callback(self, callback: Callable[..., Any]) -> None:
         """Set async callback for meal plan operations (cleanup/create)."""
@@ -208,11 +203,13 @@ class SchedulerService:
         self._save()
 
     async def _run_pre_generate(self, schedule: Dict[str, Any], is_weekly: bool) -> None:
-        """Clear menu and cleanup old meal plans before generation."""
+        """Cleanup old meal plans before generation.
 
-        if not is_weekly and schedule.get("clear_before_generate") and self._clear_callback:
-            self._clear_callback()
-
+        Note: clear_before_generate is intentionally ignored. Successful generation
+        atomically overwrites the old menu via _save_menu(). Clearing before generation
+        risks data loss if generation fails — the user loses their existing menu with
+        nothing to replace it.
+        """
         cleanup_days = schedule.get("cleanup_uncooked_days", 0)
         mp_type = schedule.get("meal_plan_type")
         if cleanup_days > 0 and mp_type and self._meal_plan_callback:

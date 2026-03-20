@@ -68,7 +68,7 @@ class GenerationService:
             return json.load(f)
 
     def clear_menu(self) -> bool:
-        """Delete current_menu.json. Returns True if a file was removed."""
+        """Delete current_menu.json and clear cache. Returns True if a file was removed."""
         self._cached_menu = None
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         if os.path.isfile(menu_path):

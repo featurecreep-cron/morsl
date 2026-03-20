@@ -211,13 +211,8 @@
                         <span class="toggle-track"></span>
                     </label>
                 </div>
-                <div class="settings-row">
-                    <div class="settings-label">Clear Local Menu<small>Start fresh — clear the current menu before generating</small></div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" x-model="scheduleForm.clear_before_generate">
-                        <span class="toggle-track"></span>
-                    </label>
-                </div>
+                <!-- clear_before_generate removed: generation always overwrites atomically.
+                     Clearing before generation risks data loss if generation fails. -->
                 </div>
                 <!-- Advanced: meal plan integration -->
                 <div x-show="tierVisible('standard')">
@@ -278,17 +273,20 @@
         </section>
 
         <!-- Current Menu -->
-        <section class="admin-section" x-show="recipes.length > 0">
+        <section class="admin-section">
             <h2 class="section-title">
                 Current Menu
             </h2>
             <div style="margin-bottom: 0.75rem;">
-                <button class="btn-generate btn-secondary" @click="clearRecipes()"
+                <button class="btn-generate btn-secondary" @click="clearMenu()"
                         style="height:30px; font-size:0.85rem;">
-                    Clear All Recipes
+                    Clear Menu
                 </button>
             </div>
-            <div class="menu-grid">
+            <template x-if="recipes.length === 0">
+                <p class="text-muted" style="opacity:0.6; font-size:0.9rem;">No menu generated.</p>
+            </template>
+            <div class="menu-grid" x-show="recipes.length > 0">
                 <template x-for="recipe in recipes" :key="recipe.id">
                     <div class="menu-card" @click="openRecipe(recipe)">
                         <img class="menu-card-image" x-show="recipe.image"

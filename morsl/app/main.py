@@ -204,7 +204,6 @@ def _setup_scheduler(settings) -> None:
     ) = _build_scheduler_callbacks(settings)
 
     scheduler_svc.set_generation_callback(gen_cb)
-    scheduler_svc.set_clear_callback(get_generation_service(settings).clear_menu)
     scheduler_svc.set_meal_plan_callback(meal_plan_cb)
     scheduler_svc.set_weekly_generation_callback(weekly_gen_cb)
     scheduler_svc.set_weekly_save_callback(weekly_save_cb)
