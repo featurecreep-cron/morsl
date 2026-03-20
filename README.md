@@ -174,6 +174,37 @@ Either way, restart the container afterward, then set a new PIN from admin setti
 
 ---
 
+## Backup and Restore
+
+All Morsl data lives in the `data` volume. To back up:
+
+```bash
+docker compose stop morsl
+docker run --rm -v morsl-data:/data -v $(pwd):/backup alpine tar czf /backup/morsl-backup.tar.gz -C /data .
+docker compose start morsl
+```
+
+To restore on a new server:
+
+```bash
+docker run --rm -v morsl-data:/data -v $(pwd):/backup alpine tar xzf /backup/morsl-backup.tar.gz -C /data
+docker compose up -d
+```
+
+**What's in the volume:**
+
+| File/Directory | Contents |
+|---|---|
+| `settings.json` | App settings, Tandoor credentials (base64-encoded token), PIN |
+| `profiles/` | Recipe filtering profiles (one JSON per profile) |
+| `templates/` | Weekly meal plan templates |
+| `weekly_plans/` | Generated weekly plans |
+| `history.json` | Generation history |
+| `schedules.json` | Automatic generation schedules |
+| `branding/` | Uploaded logo, favicon, loading icon |
+
+---
+
 ## Development
 
 <details>
