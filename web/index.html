@@ -180,11 +180,16 @@
                 <p>Create a profile to start generating menus</p>
                 <a href="/admin#profiles" class="empty-state-btn">Create Profile</a>
             </div>
-            <!-- Empty state: profiles exist but no recipes generated -->
-            <div class="empty-state" x-show="profiles.length > 0 && mainCarouselRecipes.length === 0 && shelves.length === 0 && state === 'ready'">
-                <h2>No recipes yet</h2>
+            <!-- Empty state: profiles exist and visible — tap one to generate -->
+            <div class="empty-state" x-show="visibleProfiles.length > 0 && mainCarouselRecipes.length === 0 && shelves.length === 0 && state === 'ready'">
+                <h2>No menu generated</h2>
                 <p>Tap a profile above to generate your menu</p>
-                <a href="/admin#generate" class="empty-state-btn">Generate Your First Menu</a>
+            </div>
+            <!-- Empty state: profiles exist but none visible on this page -->
+            <div class="empty-state" x-show="profiles.length > 0 && visibleProfiles.length === 0 && mainCarouselRecipes.length === 0 && shelves.length === 0 && state === 'ready'">
+                <h2>No menu available</h2>
+                <p>Generate a menu from the admin page</p>
+                <a href="/admin#generate" class="empty-state-btn">Go to Admin</a>
             </div>
 
             <!-- Carousel wrapper -->
@@ -524,7 +529,7 @@
     <!-- Error state -->
     <div class="error-state" x-show="state === 'error'">
         <p x-text="errorMessage || 'Something went wrong'"></p>
-        <button class="retry-btn" @click="loadMenu()">Try Again</button>
+        <button class="retry-btn" @click="retryGeneration()">Try Again</button>
     </div>
 
     <!-- Hamburger navigation (hidden when kiosk uses a gesture) -->
