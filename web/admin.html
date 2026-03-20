@@ -1236,6 +1236,44 @@
             </h2>
             <div x-show="!settingsLoaded" class="tag-empty">Loading settings...</div>
             <div x-show="settingsLoaded" class="settings-grid">
+                <!-- Tandoor Connection -->
+                <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
+                    <div class="settings-label">
+                        Tandoor Connection
+                        <small x-show="credEnvLocked">Credentials are set via environment variables and cannot be changed here.</small>
+                        <small x-show="!credEnvLocked">URL and API token for your Tandoor instance.</small>
+                    </div>
+                    <div x-show="!credEditing && !credEnvLocked" style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <span style="font-size:0.85rem; color:var(--text-muted);" x-text="settings.tandoor_url || 'Not configured'"></span>
+                        <span x-show="settings.has_tandoor_token" style="font-size:0.75rem; color:var(--accent);">&#10003; Token saved</span>
+                        <button class="btn btn-sm" @click="credEditing = true; credUrl = settings.tandoor_url || ''; credToken = ''; credTestResult = null; credError = '';" style="margin-left:auto;">Change</button>
+                    </div>
+                    <div x-show="credEnvLocked" style="display:flex; align-items:center; gap:0.5rem;">
+                        <span style="font-size:0.85rem; color:var(--text-muted);" x-text="settings.tandoor_url || 'Set via TANDOOR_URL'"></span>
+                        <span style="font-size:0.75rem; color:var(--accent);">&#10003; ENV</span>
+                    </div>
+                    <div x-show="credEditing" style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <input type="url" class="drawer-input" x-model="credUrl" placeholder="https://tandoor.example.com" style="width:100%;">
+                        <input type="password" class="drawer-input" x-model="credToken" placeholder="API token (leave blank to keep current)" style="width:100%;">
+                        <div x-show="credTestResult" style="font-size:0.85rem; padding:0.3rem 0;"
+                             :style="credTestResult?.success ? 'color:var(--accent)' : 'color:var(--error, #e74c3c)'">
+                            <span x-show="credTestResult?.success">&#10003; Connection successful</span>
+                            <span x-show="credTestResult && !credTestResult.success" x-text="'&#10007; ' + (credTestResult.error || 'Connection failed')"></span>
+                        </div>
+                        <p x-show="credError" x-text="credError" style="font-size:0.85rem; color:var(--error, #e74c3c);"></p>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button class="btn btn-sm" :disabled="!credUrl || credTesting" @click="testCredentials()">
+                                <span x-show="!credTesting">Test Connection</span>
+                                <span x-show="credTesting">Testing...</span>
+                            </button>
+                            <button class="btn btn-sm btn-primary" :disabled="!credTestResult?.success || credSaving" @click="saveCredentials()">
+                                <span x-show="!credSaving">Save</span>
+                                <span x-show="credSaving">Saving...</span>
+                            </button>
+                            <button class="btn btn-sm" @click="credEditing = false;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="settings-row">
                     <div class="settings-label">
                         Save to Tandoor Meal Plans

@@ -95,11 +95,16 @@ Your data (profiles, schedules, branding, settings) is stored in the volume and 
 ## Features
 
 - **Multiple profiles** — "Weeknight Dinner," "Breakfast," "Weekend Projects" — each with its own rules
+
+![Profile editor — keyword filters, requirement levels, flexible rules](docs/screenshot-profile-editor.png)
+
 - **Smart filtering** — filter by keywords, minimum rating, ingredients, date ranges, recipe books. Rules can be strict (must match) or flexible (prefer but don't require)
 - **Household menu** — shareable page where your family browses and orders, no accounts needed
 - **Live order notifications** — the admin panel updates instantly when someone places an order
 - **Tandoor meal plan sync** — push selections back to Tandoor
 - **Weekly plans** — plan your whole week: assign different profiles to different days and meals. Monday breakfast from "Quick Breakfast," Monday dinner from "Weeknight Dinner," Saturday dinner from "Weekend Projects" — all generated at once
+
+![Weekly planner — assign profiles to days and meal types](docs/screenshot-weekly-planner.png)
 - **Scheduled generation** — automatic menu refresh on a schedule
 - **Custom branding** — your own logo, favicon, app name, and slogans
 - **Mobile-friendly** — responsive layout, QR codes for easy sharing from desktop
@@ -145,7 +150,9 @@ API documentation is available at `/docs` (interactive) and `/redoc` (reference)
 
 ### Security
 
-Morsl has no built-in authentication by default. If you're only using it at home on your local network, this is fine. If you're exposing it to the internet, put it behind a reverse proxy with authentication (Authelia, Authentik, etc.) or enable the admin PIN in Settings.
+Morsl has no built-in authentication by default. If you're only using it at home on your local network, this is fine. The optional admin PIN (Settings) keeps household members out of the admin panel — it is **not** a substitute for real authentication.
+
+If you're exposing Morsl to the internet, put it behind a reverse proxy with proper authentication (Authelia, Authentik, Cloudflare Access, etc.).
 
 **Forgot your PIN?** Two options:
 
@@ -164,6 +171,37 @@ Morsl has no built-in authentication by default. If you're only using it at home
    ```
 
 Either way, restart the container afterward, then set a new PIN from admin settings.
+
+---
+
+## Backup and Restore
+
+All Morsl data lives in the `data` volume. To back up:
+
+```bash
+docker compose stop morsl
+docker run --rm -v morsl-data:/data -v $(pwd):/backup alpine tar czf /backup/morsl-backup.tar.gz -C /data .
+docker compose start morsl
+```
+
+To restore on a new server:
+
+```bash
+docker run --rm -v morsl-data:/data -v $(pwd):/backup alpine tar xzf /backup/morsl-backup.tar.gz -C /data
+docker compose up -d
+```
+
+**What's in the volume:**
+
+| File/Directory | Contents |
+|---|---|
+| `settings.json` | App settings, Tandoor credentials (base64-encoded token), PIN |
+| `profiles/` | Recipe filtering profiles (one JSON per profile) |
+| `templates/` | Weekly meal plan templates |
+| `weekly_plans/` | Generated weekly plans |
+| `history.json` | Generation history |
+| `schedules.json` | Automatic generation schedules |
+| `branding/` | Uploaded logo, favicon, loading icon |
 
 ---
 
