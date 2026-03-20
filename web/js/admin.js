@@ -59,6 +59,16 @@ function adminApp() {
         settings: {},
         settingsLoaded: false,
 
+        // Credential editing
+        credEditing: false,
+        credEnvLocked: false,
+        credUrl: '',
+        credToken: '',
+        credTesting: false,
+        credSaving: false,
+        credTestResult: null,
+        credError: '',
+
         // Icon mappings
         iconMappings: { keyword_icons: {}, food_icons: {} },
         newKwName: '',
@@ -2052,8 +2062,64 @@ function adminApp() {
                     this._updateFaviconLinks();
                     this.renderQrPreviews();
                 }
+                // Check if credentials are locked by env vars
+                const statusRes = await fetch('/api/settings/setup-status');
+                if (statusRes.ok) {
+                    const status = await statusRes.json();
+                    this.credEnvLocked = status.has_env_credentials;
+                }
             } catch (e) {
                 console.warn('Failed to load settings:', e);
+            }
+        },
+
+        async testCredentials() {
+            if (!this.credUrl) return;
+            // If no new token, we can't test (need the token for the API call)
+            if (!this.credToken) {
+                this.credError = 'Enter a token to test the connection.';
+                return;
+            }
+            this.credTesting = true;
+            this.credTestResult = null;
+            this.credError = '';
+            try {
+                const res = await this.adminFetch('/api/settings/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: this.credUrl, token: this.credToken }),
+                });
+                this.credTestResult = res.ok
+                    ? await res.json()
+                    : { success: false, error: 'Server error' };
+            } catch {
+                this.credTestResult = { success: false, error: 'Cannot reach server' };
+            } finally {
+                this.credTesting = false;
+            }
+        },
+
+        async saveCredentials() {
+            if (!this.credTestResult?.success) return;
+            this.credSaving = true;
+            this.credError = '';
+            try {
+                const res = await this.adminFetch('/api/settings/credentials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: this.credUrl, token: this.credToken }),
+                });
+                if (res.ok) {
+                    this.credEditing = false;
+                    await this.loadSettings();
+                    this.reloadPrompt('Tandoor credentials updated — reload to apply');
+                } else {
+                    this.credError = 'Failed to save credentials.';
+                }
+            } catch {
+                this.credError = 'Failed to save credentials. Please try again.';
+            } finally {
+                this.credSaving = false;
             }
         },
 
