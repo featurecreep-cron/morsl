@@ -2892,6 +2892,10 @@ select.drawer-input option {
     color: #f87171;
 }
 
+.history-status.status-error {
+    color: #f87171;
+}
+
 .history-expand {
     margin-left: auto;
     opacity: 0.5;

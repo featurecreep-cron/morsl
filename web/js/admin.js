@@ -231,7 +231,11 @@ function adminApp() {
         // ---- Icons ----
 
         formatSolverStatus(s) {
-            return ({ optimal: 'Generated successfully', infeasible: 'Could not generate \u2014 rules too strict' })[s] || s || '';
+            return ({
+                optimal: 'Generated successfully',
+                infeasible: 'Could not generate \u2014 rules too strict',
+                error: 'Failed',
+            })[s] || s || '';
         },
 
         resolveIcon(key) {

@@ -300,14 +300,14 @@
                         <div class="menu-card-body">
                             <h3 x-text="recipe.name"></h3>
                             <div class="menu-card-meta">
-                                <span class="stars-interactive" @click.stop>
+                                <span class="stars-interactive" @click.stop x-show="settings.admin_show_ratings !== false">
                                     <template x-for="i in 5" :key="i">
                                         <span class="star-btn" @click.stop="setRating(recipe.id, i)"
                                               :class="{ filled: i <= Math.round(recipe.rating || 0) }"
                                               x-text="i <= Math.round(recipe.rating || 0) ? '\u2605' : '\u2606'"></span>
                                     </template>
                                 </span>
-                                <span x-text="(recipe.ingredients || []).length + ' ing.'"></span>
+                                <span x-show="settings.admin_show_ingredients !== false" x-text="(recipe.ingredients || []).length + ' ing.'"></span>
                             </div>
                         </div>
                     </div>
@@ -363,9 +363,15 @@
 
                         <div x-show="expandedHistoryId === h.id" x-transition:enter.opacity.duration.150ms
                              class="history-detail" @click.stop>
-                            <div class="history-detail-row">
+                            <template x-if="h.error">
+                                <div class="history-detail-row" style="color:var(--error, #e74c3c);">
+                                    <strong>Error:</strong>
+                                    <span x-text="h.error"></span>
+                                </div>
+                            </template>
+                            <div class="history-detail-row" x-show="h.recipes && h.recipes.length > 0">
                                 <strong>Recipes:</strong>
-                                <span x-text="h.recipes.map(r => r.name).join(', ')"></span>
+                                <span x-text="(h.recipes || []).map(r => r.name).join(', ')"></span>
                             </div>
                             <div class="history-detail-row" x-show="h.constraint_count">
                                 <strong>Constraints:</strong>
@@ -1172,16 +1178,17 @@
             </div>
         </section>
 
-        <!-- Display & Features (Standard tier) -->
+        <!-- Menu Card Display (Standard tier) -->
         <section class="admin-section" x-show="tierVisible('standard')" x-transition>
             <h2 class="section-title">
-                Display & Features
+                Menu Card Display
             </h2>
+            <small class="section-help">Controls what customers see on the menu page.</small>
             <div x-show="settingsLoaded" class="settings-grid">
                 <div class="settings-row">
                     <div class="settings-label">
                         Show Ratings
-                        <small>Display existing star ratings on recipe cards</small>
+                        <small>Display star ratings on menu cards</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox"
@@ -1193,7 +1200,7 @@
                 <div class="settings-row">
                     <div class="settings-label">
                         Show Ingredients
-                        <small>Display ingredient lists on recipe cards</small>
+                        <small>Display ingredient lists on menu cards</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox"
@@ -1205,12 +1212,24 @@
                 <div class="settings-row">
                     <div class="settings-label">
                         Show Descriptions
-                        <small>Display recipe descriptions on recipe cards</small>
+                        <small>Display recipe descriptions on menu cards</small>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox"
                                :checked="settings.show_descriptions !== false"
                                @change="toggleSetting('show_descriptions', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Instructions
+                        <small>Display cooking instructions in the recipe popup</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.show_instructions === true"
+                               @change="toggleSetting('show_instructions', $event.target.checked)">
                         <span class="toggle-track"></span>
                     </label>
                 </div>
@@ -1223,6 +1242,64 @@
                         <input type="checkbox"
                                :checked="settings.ratings_enabled !== false"
                                @change="toggleSetting('ratings_enabled', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Card Display (Standard tier) -->
+        <section class="admin-section" x-show="tierVisible('standard')" x-transition>
+            <h2 class="section-title">
+                Admin Card Display
+            </h2>
+            <small class="section-help">Controls what you see on admin recipe cards.</small>
+            <div x-show="settingsLoaded" class="settings-grid">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Ratings
+                        <small>Display star ratings on admin cards</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.admin_show_ratings !== false"
+                               @change="toggleSetting('admin_show_ratings', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Ingredients
+                        <small>Display ingredient count on admin cards</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.admin_show_ingredients !== false"
+                               @change="toggleSetting('admin_show_ingredients', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Descriptions
+                        <small>Display recipe descriptions in admin modal</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.admin_show_descriptions !== false"
+                               @change="toggleSetting('admin_show_descriptions', $event.target.checked)">
+                        <span class="toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        Show Instructions
+                        <small>Display cooking instructions in admin modal</small>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox"
+                               :checked="settings.admin_show_instructions !== false"
+                               @change="toggleSetting('admin_show_instructions', $event.target.checked)">
                         <span class="toggle-track"></span>
                     </label>
                 </div>
@@ -1510,7 +1587,7 @@
             <button class="modal-close" @click="closeRecipe()" aria-label="Close">&times;</button>
             <img x-show="selectedRecipe?.image" :src="selectedRecipe?.image" :alt="selectedRecipe?.name" class="modal-image">
             <h2 id="admin-recipe-title" x-text="selectedRecipe?.name"></h2>
-            <div class="modal-rating" x-show="selectedRecipe" role="group" aria-label="Rate this recipe">
+            <div class="modal-rating" x-show="selectedRecipe && settings.admin_show_ratings !== false" role="group" aria-label="Rate this recipe">
                 <template x-for="i in 5" :key="i">
                     <button class="star-btn" @click="setRating(selectedRecipe?.id, i)"
                           :class="{ filled: i <= Math.round(selectedRecipe?.rating || 0) }"
@@ -1520,9 +1597,9 @@
                           style="cursor:pointer; font-size:1.5rem; background:none; border:none; padding:0;"></button>
                 </template>
             </div>
-            <p class="modal-description" x-show="selectedRecipe?.description" x-text="selectedRecipe?.description"></p>
-            <div class="modal-columns" x-show="selectedRecipe?.steps?.length">
-                <div class="modal-col-ingredients">
+            <p class="modal-description" x-show="selectedRecipe?.description && settings.admin_show_descriptions !== false" x-text="selectedRecipe?.description"></p>
+            <div class="modal-columns" x-show="selectedRecipe?.steps?.length && (settings.admin_show_ingredients !== false || settings.admin_show_instructions !== false)">
+                <div class="modal-col-ingredients" x-show="settings.admin_show_ingredients !== false">
                     <h3>Ingredients</h3>
                     <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length">
                         <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'admin-modal-ing-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
@@ -1530,7 +1607,7 @@
                         </template>
                     </ul>
                 </div>
-                <div class="modal-col-instructions">
+                <div class="modal-col-instructions" x-show="settings.admin_show_instructions !== false">
                     <h3>Instructions</h3>
                     <template x-for="(step, sIdx) in (selectedRecipe?.steps || [])" :key="'step-' + sIdx">
                         <div class="modal-step">
@@ -1544,7 +1621,7 @@
                     </template>
                 </div>
             </div>
-            <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length && !selectedRecipe?.steps?.length">
+            <ul class="ingredient-list" x-show="selectedRecipe?.ingredients?.length && !selectedRecipe?.steps?.length && settings.admin_show_ingredients !== false">
                 <template x-for="(ing, ingIdx) in (selectedRecipe?.ingredients || [])" :key="'admin-modal-ing-simple-' + (selectedRecipe?.id || '0') + '-' + ingIdx">
                     <li x-text="formatIngredient(ing)"></li>
                 </template>
