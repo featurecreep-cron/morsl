@@ -345,6 +345,5 @@ class TestNoDirectFileWritesInRoutes:
                         ):
                             violations.append(f"{path.name}:{node.lineno}")
         assert not violations, (
-            "Direct file write in route module "
-            "(use a service instead):\n" + "\n".join(violations)
+            "Direct file write in route module (use a service instead):\n" + "\n".join(violations)
         )
