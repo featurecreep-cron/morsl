@@ -4,7 +4,16 @@ from logging import Logger
 from typing import Any, Dict, List, Optional
 
 from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
-from morsl.models import Book, Food, Keyword, Recipe, SolverResult
+from morsl.models import (
+    Book,
+    Food,
+    Recipe,
+    SolverResult,
+    make_book,
+    make_food,
+    make_keyword,
+    make_recipe,
+)
 from morsl.solver import RecipePicker
 from morsl.tandoor_api import TandoorAPI
 from morsl.utils import format_date
@@ -122,15 +131,15 @@ class MenuService:
 
         if not recipes_param and not filters_param and not plan_type:
             for r in self.tandoor.get_recipes(all_recipes=True):
-                self.recipes.append(Recipe(r))
+                self.recipes.append(make_recipe(r))
         else:
             for r in self.tandoor.get_recipes(params=recipes_param, filters=filters_param):
-                self.recipes.append(Recipe(r))
+                self.recipes.append(make_recipe(r))
             mp_date = self.config.get("mp_date")
             for r in self.tandoor.get_mealplan_recipes(
                 mealtype_id=plan_type, date=mp_date, params=recipes_param
             ):
-                self.recipes.append(Recipe(r))
+                self.recipes.append(make_recipe(r))
         self.recipes = list(set(self.recipes))
 
     def prepare_constraints(self) -> None:
@@ -158,7 +167,7 @@ class MenuService:
             else:
                 kw_tree.append(self.tandoor.get_keyword(kw_id))
 
-        constraint["keywords"] = list({Keyword(k) for k in kw_tree})
+        constraint["keywords"] = list({make_keyword(k) for k in kw_tree})
 
     def _prepare_food_constraint(self, constraint: Dict[str, Any]) -> None:
         """Fetch food data and find matching recipes."""
@@ -169,7 +178,7 @@ class MenuService:
         food_list: List[Food] = []
         for fd_id in item_ids:
             try:
-                food_list.append(Food(self.tandoor.get_food(fd_id)))
+                food_list.append(make_food(self.tandoor.get_food(fd_id)))
             except Exception:
                 self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
         constraint["foods"] = food_list
@@ -178,7 +187,7 @@ class MenuService:
         params: Dict[str, List[int]] = {"foods_or": item_ids, "foods_or_not": except_ids}
         found_recipes: List[Recipe] = []
         for r in self.tandoor.get_recipes(params=params):
-            found_recipes.append(Recipe(r))
+            found_recipes.append(make_recipe(r))
 
         self.logger.info(
             f"Food constraint {[f.name for f in food_list]}: {len(found_recipes)} recipes found"
@@ -192,13 +201,13 @@ class MenuService:
 
         book_list: List[Book] = []
         for bk_id in item_ids:
-            book_list.append(Book(self.tandoor.get_book(bk_id)))
+            book_list.append(make_book(self.tandoor.get_book(bk_id)))
         constraint["books"] = book_list
 
         found_recipes: List[Recipe] = []
         for bk in book_list:
             for r in self.tandoor.get_book_recipes(bk):
-                found_recipes.append(Recipe(r))
+                found_recipes.append(make_recipe(r))
 
         constraint["matching_recipes"] = _apply_date_filters(found_recipes, constraint)
 
