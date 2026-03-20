@@ -50,6 +50,8 @@ Run `/code-review morsl/{module}` on every module after completing a phase.
 
 Never push directly to `main`. All work lands on `develop` first.
 
+**When to merge to main:** When develop has a coherent set of shippable changes — a completed feature, a batch of related fixes, or end-of-session with tested work. Every merge to main triggers an auto-release, so don't merge mid-feature or with known broken state. Small batches are fine; the goal is "every release is a version someone could run."
+
 ## Dev Commands
 
 ```bash
