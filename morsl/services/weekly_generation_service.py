@@ -19,7 +19,7 @@ from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
 from morsl.services.template_service import TemplateService
 from morsl.tandoor_api import TandoorAPI
-from morsl.utils import atomic_write_json, now
+from morsl.utils import atomic_write_json, now, safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class WeeklyGenerationService:
     def get_plan(self, template_name: str) -> Optional[Dict[str, Any]]:
         """Load a generated weekly plan from disk."""
         _validate_template_name(template_name)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         if not os.path.isfile(path):
             return None
         try:
@@ -107,7 +107,7 @@ class WeeklyGenerationService:
     def clear_plan(self, template_name: str) -> bool:
         """Delete a weekly plan file. Returns True if removed."""
         _validate_template_name(template_name)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         if os.path.isfile(path):
             os.unlink(path)
             return True
@@ -476,5 +476,5 @@ class WeeklyGenerationService:
         """Atomic write of weekly plan."""
         _validate_template_name(template_name)
         os.makedirs(self.plans_dir, exist_ok=True)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         atomic_write_json(path, plan_data)

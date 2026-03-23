@@ -24,6 +24,19 @@ _api_cache: cachetools.TTLCache = cachetools.TTLCache(
 _api_cache_lock = threading.Lock()
 
 
+def safe_path(base_dir: str, *parts: str) -> str:
+    """Join path components and verify the result stays within base_dir.
+
+    Prevents path traversal by resolving symlinks and checking containment.
+    """
+    joined = os.path.join(base_dir, *parts)
+    resolved = os.path.realpath(joined)
+    base_resolved = os.path.realpath(base_dir)
+    if not (resolved == base_resolved or resolved.startswith(base_resolved + os.sep)):
+        raise ValueError(f"Path escapes base directory: {joined}")
+    return resolved
+
+
 def atomic_write_json(path: str, data: Any) -> None:
     """Write JSON to file atomically via temp file + os.replace()."""
     dir_path = os.path.dirname(path) or "."

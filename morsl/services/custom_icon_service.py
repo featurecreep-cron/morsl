@@ -8,6 +8,8 @@ from defusedxml import ElementTree as ET
 from py_svg_hush import filter_svg
 from slugify import slugify
 
+from morsl.utils import safe_path
+
 _VALID_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -51,12 +53,12 @@ class CustomIconService:
         # Deduplicate
         base_slug = slug
         counter = 2
-        while os.path.exists(os.path.join(self.icons_dir, f"{slug}.svg")):
+        while os.path.exists(safe_path(self.icons_dir, f"{slug}.svg")):
             slug = f"{base_slug}-{counter}"
             counter += 1
 
         sanitized = _sanitize_svg(content)
-        path = os.path.join(self.icons_dir, f"{slug}.svg")
+        path = safe_path(self.icons_dir, f"{slug}.svg")
         with open(path, "w") as f:
             f.write(sanitized)
 
@@ -70,7 +72,7 @@ class CustomIconService:
     def get_svg(self, name: str) -> str:
         """Return SVG content for the given icon name. Raises FileNotFoundError."""
         self._validate_name(name)
-        path = os.path.join(self.icons_dir, f"{name}.svg")
+        path = safe_path(self.icons_dir, f"{name}.svg")
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Custom icon not found: {name}")
         with open(path) as f:
@@ -95,10 +97,10 @@ class CustomIconService:
             raise ValueError(f"Invalid new name: {new_slug}")
         if old_name == new_slug:
             return {"key": f"custom:{old_name}", "name": old_name}
-        old_path = os.path.join(self.icons_dir, f"{old_name}.svg")
+        old_path = safe_path(self.icons_dir, f"{old_name}.svg")
         if not os.path.isfile(old_path):
             raise FileNotFoundError(f"Custom icon not found: {old_name}")
-        new_path = os.path.join(self.icons_dir, f"{new_slug}.svg")
+        new_path = safe_path(self.icons_dir, f"{new_slug}.svg")
         if os.path.exists(new_path):
             raise ValueError(f"Icon '{new_slug}' already exists")
         os.rename(old_path, new_path)
@@ -107,7 +109,7 @@ class CustomIconService:
     def delete_icon(self, name: str) -> None:
         """Delete a custom icon file. Raises FileNotFoundError."""
         self._validate_name(name)
-        path = os.path.join(self.icons_dir, f"{name}.svg")
+        path = safe_path(self.icons_dir, f"{name}.svg")
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Custom icon not found: {name}")
         os.unlink(path)
