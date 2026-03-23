@@ -125,6 +125,73 @@ class TestMenuService:
         assert len(service.recipes) == 1
         assert service.recipes[0].id == 1
 
+    def test_parse_makenow_constraint(self, mock_logger):
+        """Test parsing a makenow constraint."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {"type": "makenow", "count": 3, "operator": ">="},
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert len(service.constraints) == 1
+        assert service.constraints[0]["type"] == "makenow"
+        assert service.constraints[0]["count"] == 3
+
+    def test_prepare_makenow_constraint(self, mock_logger):
+        """Test that makenow constraint fetches on-hand recipes from Tandoor."""
+        pool_recipes = [
+            {
+                "id": 1,
+                "name": "R1",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 3.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+            {
+                "id": 2,
+                "name": "R2",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 4.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+        ]
+        # Only recipe 1 is makeable with on-hand ingredients
+        onhand_recipes = [pool_recipes[0]]
+
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {"type": "makenow", "count": 1, "operator": ">="},
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
+            api = MockAPI.return_value
+            api.get_recipes.side_effect = lambda **kwargs: (
+                onhand_recipes if kwargs.get("params", {}).get("makenow") else pool_recipes
+            )
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+            service.prepare_recipes()
+            service.prepare_constraints()
+
+        assert len(service.constraints[0]["matching_recipes"]) == 1
+        assert service.constraints[0]["matching_recipes"][0].id == 1
+
 
 class TestConfigService:
     def test_load_profile(self, tmp_path):
