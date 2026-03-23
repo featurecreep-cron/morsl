@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class ConfigService:
     def create_profile(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new profile. Raises if it already exists."""
         _validate_profile_name(name)
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if os.path.isfile(json_path):
             raise FileExistsError(f"Profile already exists: {name}")
         os.makedirs(self.profiles_dir, exist_ok=True)
@@ -82,7 +82,7 @@ class ConfigService:
     def update_profile(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing profile."""
         _validate_profile_name(name)
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"Profile not found: {name}")
         os.makedirs(self.profiles_dir, exist_ok=True)
@@ -92,7 +92,7 @@ class ConfigService:
     def delete_profile(self, name: str) -> None:
         """Delete a profile."""
         _validate_profile_name(name)
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"Profile not found: {name}")
         os.unlink(json_path)
@@ -102,7 +102,7 @@ class ConfigService:
     def load_profile(self, name: str) -> Dict[str, Any]:
         """Load a profile by name, merging with base.json if it exists."""
         _validate_profile_name(name)
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"Profile not found: {json_path}")
 
@@ -121,7 +121,7 @@ class ConfigService:
     def get_profile_raw(self, name: str) -> Dict[str, Any]:
         """Load a profile's raw config without base merging or defaults."""
         _validate_profile_name(name)
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"Profile not found: {name}")
         with open(json_path) as f:
@@ -203,7 +203,7 @@ class ConfigService:
 
     def clear_default_profile(self, name: str) -> None:
         """Remove the default flag from a single profile."""
-        json_path = os.path.join(self.profiles_dir, f"{name}.json")
+        json_path = safe_path(self.profiles_dir, f"{name}.json")
         if not os.path.isfile(json_path):
             return
         try:
