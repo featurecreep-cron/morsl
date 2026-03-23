@@ -9,7 +9,7 @@ import pytest
 from morsl.constants import API_CACHE_TTL_MINUTES
 from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationService, GenerationState
-from morsl.services.menu_service import MenuService
+from morsl.services.menu_service import MenuService, _build_rating_condition
 
 
 class TestMenuService:
@@ -191,6 +191,91 @@ class TestMenuService:
 
         assert len(service.constraints[0]["matching_recipes"]) == 1
         assert service.constraints[0]["matching_recipes"][0].id == 1
+
+    def test_prepare_recipes_with_filters(self, mock_logger):
+        """Test that filters config passes CustomFilter IDs to Tandoor."""
+        config = {"choices": 2, "cache": 0, "filters": [42, 99], "constraints": []}
+        mock_recipe_data = [
+            {
+                "id": 1,
+                "name": "R1",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 3.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+        ]
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
+            api = MockAPI.return_value
+            api.get_recipes.return_value = mock_recipe_data
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+            service.prepare_recipes()
+            api.get_recipes.assert_called_once_with(params=None, filters=[42, 99])
+        assert len(service.recipes) == 1
+
+    def test_parse_date_constraint_cooked(self, mock_logger):
+        """Test parsing cooked date constraint with older_than_days."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "cookedon",
+                    "count": 2,
+                    "operator": ">=",
+                    "cooked": {"older_than_days": 7},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["cooked_date"] is not None
+        assert service.constraints[0]["cooked_after"] is False
+
+    def test_parse_date_constraint_created_within(self, mock_logger):
+        """Test parsing created date constraint with within_days."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "createdon",
+                    "count": 1,
+                    "operator": ">=",
+                    "created": {"within_days": 30},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["created_date"] is not None
+        assert service.constraints[0]["created_after"] is True
+
+
+class TestBuildRatingCondition:
+    def test_unrated(self):
+        assert _build_rating_condition({"unrated": True}) == 0
+
+    def test_min_and_max(self):
+        assert _build_rating_condition({"min": 3, "max": 5}) == [3, 5]
+
+    def test_min_only(self):
+        assert _build_rating_condition({"min": 4}) == 4
+
+    def test_max_only(self):
+        assert _build_rating_condition({"max": 3}) == -3
+
+    def test_no_rating(self):
+        assert _build_rating_condition({}) is None
 
 
 class TestConfigService:
