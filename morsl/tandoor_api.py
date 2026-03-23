@@ -275,6 +275,12 @@ class TandoorAPI:
         self.logger.debug(f"Returning book {book.id}: {book.name} with {len(recipes)} recipes.")
         return recipes
 
+    @cached
+    def get_custom_filters(self, **kwargs) -> List[Dict[str, Any]]:
+        """Fetch all saved custom filters from Tandoor."""
+        url = f"{self.url}custom-filter/"
+        return self.get_paged_results(url, {"page_size": self.page_size}, **kwargs)
+
     def get_mealplan_recipes(
         self,
         mealtype_id: Optional[Union[List[int], int]] = None,
