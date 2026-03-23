@@ -153,6 +153,8 @@ class MenuService:
                 self._prepare_food_constraint(constraint)
             elif ctype == "book":
                 self._prepare_book_constraint(constraint)
+            elif ctype == "makenow":
+                self._prepare_makenow_constraint(constraint)
             # rating, cookedon, createdon don't need API prep
 
     def _prepare_keyword_constraint(self, constraint: Dict[str, Any]) -> None:
@@ -248,6 +250,24 @@ class MenuService:
             upper_bound=c.get("upper_bound"),
         )
 
+    def _prepare_makenow_constraint(self, constraint: Dict[str, Any]) -> None:
+        """Fetch recipes that can be made with on-hand ingredients."""
+        recipes = self.tandoor.get_recipes(params={"makenow": True})
+        found = [make_recipe(r) for r in recipes]
+        found = [r for r in found if r in self.recipes]
+        found = _apply_date_filters(found, constraint)
+        constraint["matching_recipes"] = found
+
+    def _apply_makenow_constraint(self, c, exclude, weight) -> None:
+        self.recipe_picker.add_book_constraint(
+            c.get("matching_recipes", []),
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+        )
+
     def _apply_rating_constraint(self, c, exclude, weight) -> None:
         found = _apply_date_filters(list(self.recipes), c)
         rating_condition = _build_rating_condition(c)
@@ -289,6 +309,7 @@ class MenuService:
             "food": self._apply_food_constraint,
             "book": self._apply_book_constraint,
             "rating": self._apply_rating_constraint,
+            "makenow": self._apply_makenow_constraint,
         }
 
         for c in self.constraints:

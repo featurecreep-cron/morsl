@@ -91,6 +91,16 @@ def search_books(
     return _proxy_get(api_url, token, params=params)
 
 
+@router.get("/custom-filters", dependencies=[Depends(require_admin)])
+def list_custom_filters(
+    credentials: tuple[str, str] = Depends(get_credentials),
+) -> Any:
+    """Proxy custom filter listing from Tandoor."""
+    url, token = credentials
+    api_url = f"{url.rstrip('/')}/api/custom-filter/"
+    return _proxy_get(api_url, token, params={"page_size": 100})
+
+
 @router.get("/meal-types")
 def list_meal_types(
     credentials: tuple[str, str] = Depends(get_credentials),
