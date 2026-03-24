@@ -46,7 +46,7 @@ def atomic_write_json(path: str, data: Any) -> None:
         with os.fdopen(fd, "w") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, path)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise

@@ -221,7 +221,7 @@ class SchedulerService:
                         "cleanup_days": cleanup_days,
                     },
                 )
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled cleanup failed (non-fatal)",
                     exc_info=True,
@@ -242,7 +242,7 @@ class SchedulerService:
         if schedule.get("create_meal_plan") and self._weekly_save_callback:
             try:
                 await self._weekly_save_callback(template_name)
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled weekly save failed (non-fatal)",
                     exc_info=True,
@@ -257,7 +257,7 @@ class SchedulerService:
         if schedule.get("create_meal_plan") and mp_type and self._meal_plan_callback:
             try:
                 await self._meal_plan_callback("create", {"meal_plan_type": mp_type})
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled meal plan creation failed (non-fatal)",
                     exc_info=True,
