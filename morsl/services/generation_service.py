@@ -151,7 +151,7 @@ class GenerationService:
                     }
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: broad-except — state machine must capture any failure
             logger.warning("Menu generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()

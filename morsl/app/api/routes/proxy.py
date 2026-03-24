@@ -188,7 +188,7 @@ def set_rating(
     }
     try:
         requests.post(cook_log_url, headers=headers, json=cook_log_data, timeout=DEFAULT_TIMEOUT)
-    except Exception as e:
+    except requests.RequestException as e:
         logger.warning(f"Failed to create cook log for recipe {recipe_id}: {e}")
 
     if response.content:
