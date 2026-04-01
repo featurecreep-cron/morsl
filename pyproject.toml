@@ -7,7 +7,7 @@ license = "MIT"
 authors = [{ name = "Cron", email = "cron@featurecreep.dev" }]
 keywords = ["meal-planning", "tandoor", "menu-generator", "docker", "self-hosted"]
 dependencies = [
-    "requests==2.32.5",
+    "requests==2.33.0",
     "pulp==2.9.0",
     "tzlocal==5.3.1",
     "fastapi>=0.110",
