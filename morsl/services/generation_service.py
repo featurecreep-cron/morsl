@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -48,6 +49,8 @@ class GenerationService:
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
         self._cached_menu: Optional[Dict[str, Any]] = None
+        self._subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
+        self._sub_lock = threading.Lock()
         self._cleanup_stale_temp_files()
         # Load menu into cache on startup
         self._cached_menu = self._load_menu_from_disk()
@@ -73,6 +76,7 @@ class GenerationService:
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         if os.path.isfile(menu_path):
             os.unlink(menu_path)
+            self._notify_subscribers({"type": "menu_cleared"})
             return True
         return False
 
@@ -83,6 +87,7 @@ class GenerationService:
         token: str,
         logger: Logger,
         profile_name: str = "default",
+        clear_others: bool = False,
     ) -> str:
         """Start menu generation in the background. Returns request_id."""
         async with self._lock:
@@ -95,10 +100,13 @@ class GenerationService:
                 request_id=request_id,
                 started_at=now(),
             )
+            self._notify_subscribers({"type": "generating"})
 
             loop = asyncio.get_running_loop()
             self._current_task = loop.create_task(
-                self._run_generation(config, url, token, logger, request_id, profile_name)
+                self._run_generation(
+                    config, url, token, logger, request_id, profile_name, clear_others
+                )
             )
             return request_id
 
@@ -110,6 +118,7 @@ class GenerationService:
         logger: Logger,
         request_id: str,
         profile_name: str = "default",
+        clear_others: bool = False,
     ) -> None:
         """Run the solver in a thread pool and save results."""
         try:
@@ -121,7 +130,7 @@ class GenerationService:
             result["profile"] = profile_name
 
             # Save to disk atomically
-            self._save_menu(result)
+            self._save_menu(result, clear_others=clear_others)
 
             self._status.state = GenerationState.COMPLETE
             self._status.completed_at = now()
@@ -151,7 +160,7 @@ class GenerationService:
                     }
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: broad-except — state machine must capture any failure
             logger.warning("Menu generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
@@ -239,8 +248,28 @@ class GenerationService:
                 with contextlib.suppress(OSError):
                     os.unlink(os.path.join(self.data_dir, fname))
 
-    def _save_menu(self, menu_data: Dict[str, Any]) -> None:
+    def subscribe(self) -> asyncio.Queue[Dict[str, Any]]:
+        """Create a new SSE subscriber queue for menu change events."""
+        q: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=64)
+        with self._sub_lock:
+            self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
+        """Remove subscriber queue."""
+        with self._sub_lock, contextlib.suppress(ValueError):
+            self._subscribers.remove(q)
+
+    def _notify_subscribers(self, event: Dict[str, Any]) -> None:
+        """Push event to all SSE subscribers (non-blocking)."""
+        with self._sub_lock:
+            for q in self._subscribers:
+                with contextlib.suppress(asyncio.QueueFull):
+                    q.put_nowait(event)
+
+    def _save_menu(self, menu_data: Dict[str, Any], *, clear_others: bool = False) -> None:
         """Atomic write and update in-memory cache."""
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         atomic_write_json(menu_path, menu_data)
         self._cached_menu = menu_data
+        self._notify_subscribers({"type": "menu_updated", "clear_others": clear_others})

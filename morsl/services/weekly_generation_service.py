@@ -196,7 +196,7 @@ class WeeklyGenerationService:
             self._status.completed_at = now()
             self._status.warnings = result.get("warnings", [])
 
-        except Exception as e:
+        except Exception as e:  # noqa: broad-except — state machine must capture any failure
             logger.warning("Weekly generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
@@ -299,11 +299,8 @@ class WeeklyGenerationService:
         # Get global cache setting
         cache_minutes = API_CACHE_TTL_MINUTES
         if settings_service:
-            try:
-                app_settings = settings_service.get_all()
-                cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:  # noqa: S110
-                pass
+            app_settings = settings_service.get_all()
+            cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         # 3. Run each profile sequentially for dedup
         all_warnings: List[str] = []
@@ -399,11 +396,8 @@ class WeeklyGenerationService:
         # Get global cache setting
         cache_minutes = API_CACHE_TTL_MINUTES
         if settings_service:
-            try:
-                app_settings = settings_service.get_all()
-                cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:  # noqa: S110
-                pass
+            app_settings = settings_service.get_all()
+            cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         loop = asyncio.get_running_loop()
         new_recipes = await loop.run_in_executor(

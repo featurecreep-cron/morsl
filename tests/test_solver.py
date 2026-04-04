@@ -221,3 +221,77 @@ class TestBackwardCompatibility:
         picker.add_keyword_constraint(italian, 8, ">=")
         with pytest.raises(RuntimeError, match="No solution found"):
             picker.solve()
+
+
+class TestDateConstraints:
+    """Test add_cookedon_constraints and add_createdon_constraints."""
+
+    def test_cookedon_gte_constraint(self, sample_recipes, mock_logger):
+        """cookedon constraint with >= selects recently-cooked recipes."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_cookedon_constraints(cooked, 2, ">=")
+        result = picker.solve()
+        sel_cooked = [r for r in result.recipes if r.cookedon is not None]
+        assert len(sel_cooked) >= 2
+
+    def test_cookedon_lte_constraint(self, sample_recipes, mock_logger):
+        """cookedon constraint with <= caps cooked recipes."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # 8 of 10 recipes have been cooked; allow at most 4 in selection of 5
+        picker.add_cookedon_constraints(cooked, 4, "<=")
+        result = picker.solve()
+        sel_cooked = [r for r in result.recipes if r.cookedon is not None]
+        assert len(sel_cooked) <= 4
+
+    def test_createdon_gte_constraint(self, sample_recipes, mock_logger):
+        """createdon constraint with >= selects recipes created in date range."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_createdon_constraints(recent, 2, ">=")
+        result = picker.solve()
+        sel_recent = [r for r in result.recipes if r.createdon and r.createdon >= cutoff]
+        assert len(sel_recent) >= 2
+
+    def test_cookedon_exclude(self, sample_recipes, mock_logger):
+        """exclude=True inverts cooked set — constrains never-cooked recipes."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # exclude=True: constraint applies to never-cooked recipes
+        picker.add_cookedon_constraints(cooked, 1, ">=", exclude=True)
+        result = picker.solve()
+        sel_uncooked = [r for r in result.recipes if r.cookedon is None]
+        assert len(sel_uncooked) >= 1
+
+    def test_cookedon_uses_correct_label(self, sample_recipes, mock_logger):
+        """Verify the constraint label is 'cookedon'."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_cookedon_constraints(cooked, 1, ">=")
+        assert picker._constraint_specs[-1]["label"] == "cookedon"
+
+    def test_createdon_uses_correct_label(self, sample_recipes, mock_logger):
+        """Verify the constraint label is 'createdon'."""
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_createdon_constraints(sample_recipes[:3], 1, ">=")
+        assert picker._constraint_specs[-1]["label"] == "createdon"
+
+    def test_date_constraints_no_intersect_pool(self, sample_recipes, mock_logger):
+        """Date constraints use intersect_pool=False (unlike food/book)."""
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_cookedon_constraints(sample_recipes[:3], 1, ">=")
+        assert picker._constraint_specs[-1]["intersect_pool"] is False
+
+    def test_cookedon_soft_constraint(self, sample_recipes, mock_logger):
+        """Cookedon constraint with weight > 0 behaves as soft constraint."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # Impossible: require 10 cooked recipes in selection of 5
+        picker.add_cookedon_constraints(cooked, 10, ">=", weight=50)
+        result = picker.solve()
+        assert len(result.recipes) == 5
+        assert len(result.relaxed_constraints) > 0

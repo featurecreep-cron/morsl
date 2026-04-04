@@ -102,7 +102,7 @@ def resolve_credentials(settings: Settings, settings_svc: SettingsService) -> tu
     if url and token_b64:
         try:
             token = base64.b64decode(token_b64).decode()
-        except Exception:
+        except (ValueError, UnicodeDecodeError):
             raise HTTPException(500, "Stored Tandoor token is corrupt (invalid base64)") from None
         return url, token
     raise HTTPException(500, "TANDOOR_URL and TANDOOR_TOKEN must be configured")

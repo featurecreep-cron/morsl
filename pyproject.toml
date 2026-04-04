@@ -67,6 +67,8 @@ ignore = [
 ]
 fixable = ["ALL"]
 
+external = ["broad-except", "direct-service"]  # custom architectural lint markers
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "S"]
 "morsl/app/api/routes/*.py" = ["B008"]  # FastAPI Depends() in defaults
