@@ -3,25 +3,46 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-import requests
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from morsl.app.api.dependencies import get_credentials, get_settings_service, require_admin
 from morsl.app.api.models import MealTypeCreateRequest, RatingRequest
-from morsl.constants import DEFAULT_TIMEOUT
+from morsl.constants import HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT
 from morsl.services.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["proxy"])
 
+_TIMEOUT = httpx.Timeout(
+    connect=HTTP_CONNECT_TIMEOUT,
+    read=HTTP_READ_TIMEOUT,
+    write=HTTP_READ_TIMEOUT,
+    pool=HTTP_READ_TIMEOUT,
+)
 
-def _proxy_get(url: str, token: str, params: Optional[Dict[str, Any]] = None) -> Any:
-    """Forward a GET request to the Tandoor API."""
-    headers = {
+# Module-level shared client — created lazily on first use
+_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=_TIMEOUT)
+    return _client
+
+
+def _headers(token: str) -> Dict[str, str]:
+    return {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
-    response = requests.get(url, headers=headers, params=params, timeout=DEFAULT_TIMEOUT)
+
+
+async def _proxy_get(url: str, token: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    """Forward a GET request to the Tandoor API."""
+    client = _get_client()
+    response = await client.get(url, headers=_headers(token), params=params)
     if response.status_code != 200:
         raise HTTPException(
             status_code=response.status_code,
@@ -31,40 +52,40 @@ def _proxy_get(url: str, token: str, params: Optional[Dict[str, Any]] = None) ->
 
 
 @router.get("/recipe/{recipe_id}")
-def get_recipe(
+async def get_recipe(
     recipe_id: int,
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy to Tandoor recipe details."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/recipe/{recipe_id}"
-    return _proxy_get(api_url, token)
+    return await _proxy_get(api_url, token)
 
 
 @router.get("/foods", dependencies=[Depends(require_admin)])
-def search_foods(
+async def search_foods(
     search: str = Query(default=""),
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy food search to Tandoor."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/food/"
-    return _proxy_get(api_url, token, params={"query": search, "page_size": 50})
+    return await _proxy_get(api_url, token, params={"query": search, "page_size": 50})
 
 
 @router.get("/foods/{food_id}", dependencies=[Depends(require_admin)])
-def get_food(
+async def get_food(
     food_id: int,
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy to Tandoor food details by ID."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/food/{food_id}/"
-    return _proxy_get(api_url, token)
+    return await _proxy_get(api_url, token)
 
 
 @router.get("/keywords", dependencies=[Depends(require_admin)])
-def list_keywords(
+async def list_keywords(
     search: str = Query(default=""),
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
@@ -74,11 +95,11 @@ def list_keywords(
     params: Dict[str, Any] = {"page_size": 200}
     if search:
         params["query"] = search
-    return _proxy_get(api_url, token, params=params)
+    return await _proxy_get(api_url, token, params=params)
 
 
 @router.get("/books", dependencies=[Depends(require_admin)])
-def search_books(
+async def search_books(
     search: str = Query(default=""),
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
@@ -88,46 +109,42 @@ def search_books(
     params: Dict[str, Any] = {"page_size": 50}
     if search:
         params["query"] = search
-    return _proxy_get(api_url, token, params=params)
+    return await _proxy_get(api_url, token, params=params)
 
 
 @router.get("/custom-filters", dependencies=[Depends(require_admin)])
-def list_custom_filters(
+async def list_custom_filters(
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy custom filter listing from Tandoor."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/custom-filter/"
-    return _proxy_get(api_url, token, params={"page_size": 100})
+    return await _proxy_get(api_url, token, params={"page_size": 100})
 
 
 @router.get("/meal-types")
-def list_meal_types(
+async def list_meal_types(
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy meal type listing from Tandoor."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/meal-type/"
-    return _proxy_get(api_url, token)
+    return await _proxy_get(api_url, token)
 
 
 @router.post("/meal-types", dependencies=[Depends(require_admin)])
-def create_meal_type(
+async def create_meal_type(
     body: MealTypeCreateRequest,
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Create a new meal type in Tandoor."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/meal-type/"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
-    response = requests.post(
+    client = _get_client()
+    response = await client.post(
         api_url,
-        headers=headers,
+        headers=_headers(token),
         json={"name": body.name, "color": body.color or "#FF5722"},
-        timeout=DEFAULT_TIMEOUT,
     )
     if response.status_code not in (200, 201):
         raise HTTPException(
@@ -138,17 +155,17 @@ def create_meal_type(
 
 
 @router.get("/users", dependencies=[Depends(require_admin)])
-def list_users(
+async def list_users(
     credentials: tuple[str, str] = Depends(get_credentials),
 ) -> Any:
     """Proxy user listing from Tandoor."""
     url, token = credentials
     api_url = f"{url.rstrip('/')}/api/user/"
-    return _proxy_get(api_url, token)
+    return await _proxy_get(api_url, token)
 
 
 @router.patch("/recipe/{recipe_id}/rating")
-def set_rating(
+async def set_rating(
     recipe_id: int,
     body: RatingRequest,
     credentials: tuple[str, str] = Depends(get_credentials),
@@ -162,16 +179,12 @@ def set_rating(
         return {"status": "ok", "rating": body.rating}
 
     url, token = credentials
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
+    hdrs = _headers(token)
+    client = _get_client()
 
     # Update the recipe's rating
     api_url = f"{url.rstrip('/')}/api/recipe/{recipe_id}/"
-    response = requests.patch(
-        api_url, headers=headers, json={"rating": body.rating}, timeout=DEFAULT_TIMEOUT
-    )
+    response = await client.patch(api_url, headers=hdrs, json={"rating": body.rating})
     if response.status_code not in (200, 204):
         raise HTTPException(
             status_code=response.status_code,
@@ -187,8 +200,8 @@ def set_rating(
         "comment": comment,
     }
     try:
-        requests.post(cook_log_url, headers=headers, json=cook_log_data, timeout=DEFAULT_TIMEOUT)
-    except requests.RequestException as e:
+        await client.post(cook_log_url, headers=hdrs, json=cook_log_data)
+    except httpx.HTTPError as e:
         logger.warning(f"Failed to create cook log for recipe {recipe_id}: {e}")
 
     if response.content:

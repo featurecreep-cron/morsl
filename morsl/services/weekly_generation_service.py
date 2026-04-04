@@ -87,19 +87,24 @@ class WeeklyGenerationService:
         self._status = WeeklyGenerationStatus()
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
+        self._plan_cache: Dict[str, Dict[str, Any]] = {}
 
     def get_status(self) -> WeeklyGenerationStatus:
         return self._status
 
     def get_plan(self, template_name: str) -> Optional[Dict[str, Any]]:
-        """Load a generated weekly plan from disk."""
+        """Load a generated weekly plan (cached in memory after first read)."""
         _validate_template_name(template_name)
+        if template_name in self._plan_cache:
+            return self._plan_cache[template_name]
         path = safe_path(self.plans_dir, f"{template_name}.json")
         if not os.path.isfile(path):
             return None
         try:
             with open(path) as f:
-                return json.load(f)
+                plan = json.load(f)
+            self._plan_cache[template_name] = plan
+            return plan
         except json.JSONDecodeError:
             logger.warning("Corrupted weekly plan file: %s", path)
             return None
@@ -107,6 +112,7 @@ class WeeklyGenerationService:
     def clear_plan(self, template_name: str) -> bool:
         """Delete a weekly plan file. Returns True if removed."""
         _validate_template_name(template_name)
+        self._plan_cache.pop(template_name, None)
         path = safe_path(self.plans_dir, f"{template_name}.json")
         if os.path.isfile(path):
             os.unlink(path)
@@ -472,3 +478,4 @@ class WeeklyGenerationService:
         os.makedirs(self.plans_dir, exist_ok=True)
         path = safe_path(self.plans_dir, f"{template_name}.json")
         atomic_write_json(path, plan_data)
+        self._plan_cache[template_name] = plan_data

@@ -167,7 +167,7 @@ class TestRequestsConstraint:
 class TestHttpxConstraint:
     """import httpx only in settings route and proxy."""
 
-    _ALLOWED = {"settings.py"}
+    _ALLOWED = {"settings.py", "proxy.py"}
 
     def test_httpx_only_in_allowed_files(self):
         violations = []

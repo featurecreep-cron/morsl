@@ -6,7 +6,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
 from morsl.utils import atomic_write_json, safe_path
@@ -44,6 +44,7 @@ class ConfigService:
 
     def __init__(self, profiles_dir: str = "data/profiles") -> None:
         self.profiles_dir = profiles_dir
+        self._profiles_cache: Optional[List[ProfileInfo]] = None
         self._migrate_profile_categories()
 
     def _migrate_profile_categories(self) -> None:
@@ -77,6 +78,7 @@ class ConfigService:
             raise FileExistsError(f"Profile already exists: {name}")
         os.makedirs(self.profiles_dir, exist_ok=True)
         self._write_json(json_path, config)
+        self._invalidate_profiles_cache()
         return self._apply_defaults(config)
 
     def update_profile(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -87,6 +89,7 @@ class ConfigService:
             raise FileNotFoundError(f"Profile not found: {name}")
         os.makedirs(self.profiles_dir, exist_ok=True)
         self._write_json(json_path, config)
+        self._invalidate_profiles_cache()
         return self._apply_defaults(config)
 
     def delete_profile(self, name: str) -> None:
@@ -96,6 +99,7 @@ class ConfigService:
         if not os.path.isfile(json_path):
             raise FileNotFoundError(f"Profile not found: {name}")
         os.unlink(json_path)
+        self._invalidate_profiles_cache()
 
     # ---- Loading ----
 
@@ -127,8 +131,13 @@ class ConfigService:
         with open(json_path) as f:
             return json.load(f)
 
+    def _invalidate_profiles_cache(self) -> None:
+        self._profiles_cache = None
+
     def list_profiles(self) -> List[ProfileInfo]:
-        """Scan profiles directory and return metadata for each profile."""
+        """Scan profiles directory and return metadata for each profile (cached)."""
+        if self._profiles_cache is not None:
+            return list(self._profiles_cache)
         profiles: List[ProfileInfo] = []
         if not os.path.isdir(self.profiles_dir):
             return profiles
@@ -175,7 +184,8 @@ class ConfigService:
                 logger.warning(f"Skipping profile '{name}': {e}")
                 continue
 
-        return profiles
+        self._profiles_cache = profiles
+        return list(profiles)
 
     def set_default_profile(self, name: str) -> None:
         """Mark a profile as default, clearing the flag from all others."""
@@ -200,6 +210,7 @@ class ConfigService:
                         self._write_json(json_path, data)
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning(f"Failed to update default flag for '{pname}': {e}")
+        self._invalidate_profiles_cache()
 
     def clear_default_profile(self, name: str) -> None:
         """Remove the default flag from a single profile."""
@@ -211,6 +222,7 @@ class ConfigService:
                 data = json.load(f)
             if data.pop("default", None):
                 self._write_json(json_path, data)
+                self._invalidate_profiles_cache()
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Failed to clear default flag for '{name}': {e}")
 
