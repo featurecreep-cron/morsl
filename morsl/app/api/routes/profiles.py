@@ -145,12 +145,12 @@ def preview_profile(
     config["cache"] = settings_svc.get_all().get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
     try:
-        service = MenuService(url=url, token=token, config=config, logger=logger)
+        service = MenuService(url=url, token=token, config=config, logger=logger)  # noqa: direct-service — preview creates one-off service with request-scoped config
         service.prepare_data()
         return {
             "matching_count": len(service.recipes),
             "choices": config.get("choices", DEFAULT_CHOICES),
         }
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning(f"Preview failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from None

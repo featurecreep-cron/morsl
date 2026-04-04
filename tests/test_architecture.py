@@ -317,6 +317,83 @@ class TestSyncCoreModules:
         assert not violations, "asyncio imported in sync core module:\n" + "\n".join(violations)
 
 
+class TestNoBroadExcept:
+    """Broad except clauses must be explicitly grandfathered.
+
+    New modules should catch specific exceptions. Existing usage is
+    grandfathered where justified (state machines, startup/shutdown,
+    HTTP error handlers).
+    """
+
+    def test_no_broad_except(self):
+        violations = []
+        for path in _all_source_files():
+            for i, line in enumerate(path.read_text().splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("except Exception") and "broad-except" not in line:
+                    violations.append(f"{path.name}:{i}: {stripped}")
+        assert not violations, (
+            "Broad except clause in non-grandfathered module "
+            "(use a specific exception or add # noqa: broad-except):\n" + "\n".join(violations)
+        )
+
+
+class TestNoFrameworkImportsInServices:
+    """Services must not import FastAPI or Starlette.
+
+    Services should be framework-independent for testability.
+    All web framework types come via dependency injection.
+    """
+
+    _FRAMEWORK_MODULES = {"fastapi", "starlette"}
+
+    def test_no_framework_imports(self):
+        violations = []
+        for path in _python_files(SERVICES):
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name.split(".")[0] in self._FRAMEWORK_MODULES:
+                            violations.append(f"{path.name}:{node.lineno}: import {alias.name}")
+                elif (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and node.module.split(".")[0] in self._FRAMEWORK_MODULES
+                ):
+                    violations.append(f"{path.name}:{node.lineno}: from {node.module}")
+        assert not violations, (
+            "Framework import in service module (services must be framework-independent):\n"
+            + "\n".join(violations)
+        )
+
+
+class TestNoDirectServiceInstantiation:
+    """Route modules get services via DI, not direct construction.
+
+    Service instantiation belongs in dependencies.py. Route modules
+    should receive services as injected parameters.
+    """
+
+    _SERVICE_PATTERN = re.compile(r"\b\w+Service\(")
+    _SKIP_FILES = {"dependencies.py"}
+
+    def test_no_service_constructors_in_routes(self):
+        violations = []
+        for path in _python_files(ROUTES):
+            if path.name in self._SKIP_FILES:
+                continue
+            for i, line in enumerate(path.read_text().splitlines(), 1):
+                if "# noqa: direct-service" in line:
+                    continue
+                for match in self._SERVICE_PATTERN.finditer(line):
+                    violations.append(f"{path.name}:{i}: {match.group()}")
+        assert not violations, (
+            "Direct service instantiation in route module "
+            "(use dependency injection via dependencies.py):\n" + "\n".join(violations)
+        )
+
+
 class TestNoDirectFileWritesInRoutes:
     """Route modules don't call open() for writes."""
 

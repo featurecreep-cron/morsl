@@ -69,7 +69,7 @@ def _generate_startup_icons(settings) -> None:
         if source.exists():
             generate_icons(source, icons_dir)
             logger.info("Generated startup icons from %s", source)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.warning("Startup icon generation failed (non-fatal): %s", e)
 
 
@@ -94,7 +94,7 @@ def _resolve_scheduler_services(settings):
     return settings_svc, get_logger(settings), url, token
 
 
-async def _sched_generation(settings, profile: str) -> None:
+async def _sched_generation(settings, profile: str, *, clear_others: bool = False) -> None:
     try:
         _, app_logger, url, token = _resolve_scheduler_services(settings)
         config = get_config_service(settings).load_profile(profile)
@@ -104,9 +104,10 @@ async def _sched_generation(settings, profile: str) -> None:
             url=url,
             token=token,
             logger=app_logger,
+            clear_others=clear_others,
         )
         await gen_svc.wait_for_completion()
-    except Exception:
+    except Exception:  # noqa: broad-except — scheduled task isolation
         logger.warning(
             "Scheduled generation failed for profile '%s'",
             profile,
@@ -154,7 +155,7 @@ async def _sched_weekly_generation(
             settings_service=settings_svc,
         )
         await get_weekly_generation_service(settings).wait_for_completion()
-    except Exception:
+    except Exception:  # noqa: broad-except — scheduled task isolation
         logger.warning(
             "Scheduled weekly generation failed for '%s'",
             template_name,
@@ -175,14 +176,14 @@ async def _sched_weekly_save(settings, template_name: str) -> None:
             weekly_plan=plan,
             shared=[],
         )
-    except Exception:
+    except (OSError, ValueError, KeyError):
         logger.warning("Scheduled weekly save failed (non-fatal)", exc_info=True)
 
 
 def _build_scheduler_callbacks(settings):
     """Create bound callback functions for the scheduler service."""
     return (
-        lambda profile: _sched_generation(settings, profile),
+        lambda profile, **kw: _sched_generation(settings, profile, **kw),
         lambda action, params: _sched_meal_plan(settings, action, params),
         lambda template_name, week_start=None: _sched_weekly_generation(
             settings,
@@ -216,19 +217,19 @@ async def _shutdown_services(settings) -> None:
     try:
         gen_service = get_generation_service(settings)
         await gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception:
+    except Exception:  # noqa: broad-except — shutdown must not abort
         logger.warning("Error during shutdown cleanup", exc_info=True)
 
     try:
         weekly_gen_service = get_weekly_generation_service(settings)
         await weekly_gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception:
+    except Exception:  # noqa: broad-except — shutdown must not abort
         logger.warning("Weekly generation shutdown error", exc_info=True)
 
     try:
         scheduler_svc = get_scheduler_service(settings)
         scheduler_svc.stop()
-    except Exception:
+    except Exception:  # noqa: broad-except — shutdown must not abort
         logger.warning("Scheduler shutdown error", exc_info=True)
 
 
@@ -245,7 +246,7 @@ async def lifespan(app: FastAPI):
 
     try:
         _setup_scheduler(settings)
-    except Exception:
+    except Exception:  # noqa: broad-except — non-fatal startup
         logger.warning("Scheduler startup failed (non-fatal)", exc_info=True)
 
     yield
@@ -299,7 +300,7 @@ def health_check(
 
     try:
         scheduler_running = scheduler.is_running
-    except Exception:
+    except Exception:  # noqa: broad-except — health check must not fail
         scheduler_running = False
 
     return {
