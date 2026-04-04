@@ -17,10 +17,9 @@ from tzlocal import get_localzone
 
 from morsl.constants import API_CACHE_MAXSIZE, API_CACHE_TTL_MINUTES
 
-# Global API cache: default 512 entries, 240-minute TTL
-_api_cache: cachetools.TTLCache = cachetools.TTLCache(
-    maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60
-)
+# Global API cache: LRU with manual per-entry TTL (respects operator config)
+_api_cache: cachetools.LRUCache = cachetools.LRUCache(maxsize=API_CACHE_MAXSIZE)
+_api_cache_timestamps: dict = {}  # key → (timestamp, ttl_seconds)
 _api_cache_lock = threading.Lock()
 
 
@@ -187,10 +186,16 @@ def format_date(string: str, future: bool = False) -> tuple[datetime, bool]:
 
 
 def cached(func: FuncType) -> FuncType:
-    """Cache method results in the global API TTL cache (thread-safe)."""
+    """Cache method results in the global API cache (thread-safe).
+
+    Respects per-instance TTL via ``self.ttl`` (minutes) — the operator-configured
+    ``api_cache_minutes`` setting flows through here correctly.
+    """
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        import time as _time
+
         ttl: Optional[int] = kwargs.pop("ttl", None)
         if ttl is None:
             try:
@@ -199,6 +204,7 @@ def cached(func: FuncType) -> FuncType:
                 ttl = API_CACHE_TTL_MINUTES
         if not ttl or ttl <= 0:
             return func(self, *args, **kwargs)
+        ttl_seconds = ttl * 60
         # Stringify args to handle unhashable types (dicts, lists)
         key_str = f"{func.__qualname__}|" + "|".join(str(x) for x in args)
         if kwargs:
@@ -206,13 +212,19 @@ def cached(func: FuncType) -> FuncType:
         key = cachetools.keys.hashkey(key_str)
         with _api_cache_lock:
             try:
-                return _api_cache[key]
+                ts, stored_ttl = _api_cache_timestamps.get(key, (0, 0))
+                if _time.monotonic() - ts < stored_ttl:
+                    return _api_cache[key]
+                # Expired — remove stale entry
+                _api_cache.pop(key, None)
+                _api_cache_timestamps.pop(key, None)
             except KeyError:
                 pass
         result = func(self, *args, **kwargs)
         with _api_cache_lock:
-            try:  # noqa: SIM105 — value too large for cache
+            try:
                 _api_cache[key] = result
+                _api_cache_timestamps[key] = (_time.monotonic(), ttl_seconds)
             except ValueError:
                 pass
         return result
