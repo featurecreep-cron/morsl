@@ -226,6 +226,166 @@ class TestProfileEndpoints:
         assert data[0]["name"] == "default"
         assert data[1]["name"] == "weekend"
 
+    async def test_get_profile(self, client, mock_config_service):
+        mock_config_service.get_profile_raw.return_value = {
+            "choices": 5,
+            "constraints": [],
+        }
+        response = await client.get("/api/profiles/default")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "default"
+        assert "config" in data
+
+    async def test_get_profile_not_found(self, client, mock_config_service):
+        mock_config_service.get_profile_raw.side_effect = FileNotFoundError("not found")
+        response = await client.get("/api/profiles/missing")
+        assert response.status_code == 404
+
+    async def test_create_profile_requires_admin(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {
+            "admin_pin_enabled": True,
+            "pin": "1234",
+            "kiosk_enabled": False,
+            "kiosk_pin_enabled": False,
+        }
+        response = await settings_client.post(
+            "/api/profiles",
+            json={"name": "new-profile", "choices": 3},
+        )
+        assert response.status_code == 401
+
+    async def test_create_profile(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.create_profile.return_value = {
+            "choices": 3,
+            "constraints": [],
+        }
+        response = await settings_client.post(
+            "/api/profiles",
+            json={"name": "new-profile", "choices": 3},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "new-profile"
+        mock_config_service.create_profile.assert_called_once()
+
+    async def test_create_profile_duplicate(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.create_profile.side_effect = FileExistsError(
+            "already exists",
+        )
+        response = await settings_client.post(
+            "/api/profiles",
+            json={"name": "existing", "choices": 3},
+        )
+        assert response.status_code == 409
+
+    async def test_update_profile(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.update_profile.return_value = {
+            "choices": 7,
+            "constraints": [],
+        }
+        response = await settings_client.put(
+            "/api/profiles/default",
+            json={"name": "default", "choices": 7},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "default"
+        mock_config_service.update_profile.assert_called_once()
+
+    async def test_update_profile_not_found(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.update_profile.side_effect = FileNotFoundError(
+            "not found",
+        )
+        response = await settings_client.put(
+            "/api/profiles/missing",
+            json={"name": "missing", "choices": 3},
+        )
+        assert response.status_code == 404
+
+    async def test_set_profile_category(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.get_profile_raw.return_value = {
+            "choices": 5,
+            "constraints": [],
+        }
+        response = await settings_client.patch(
+            "/api/profiles/default/category",
+            json={"category": "cocktails"},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+        mock_config_service.update_profile.assert_called_once()
+
+    async def test_set_category_not_found(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.get_profile_raw.side_effect = FileNotFoundError(
+            "not found",
+        )
+        response = await settings_client.patch(
+            "/api/profiles/missing/category",
+            json={"category": "food"},
+        )
+        assert response.status_code == 404
+
+    async def test_delete_profile(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        response = await settings_client.delete("/api/profiles/default")
+        assert response.status_code == 204
+        mock_config_service.delete_profile.assert_called_once_with("default")
+
+    async def test_delete_profile_not_found(
+        self,
+        settings_client,
+        mock_config_service,
+        mock_settings_service,
+    ):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        mock_config_service.delete_profile.side_effect = FileNotFoundError(
+            "not found",
+        )
+        response = await settings_client.delete("/api/profiles/missing")
+        assert response.status_code == 404
+
 
 @pytest.mark.asyncio
 class TestSettingsEnforcement:

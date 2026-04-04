@@ -1205,3 +1205,71 @@ class TestGenerationService:
         svc = GenerationService(data_dir=str(tmp_path))
         result = svc.clear_menu()
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_no_task(self, tmp_path):
+        """wait_for_completion returns current status when no task is running."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        status = await svc.wait_for_completion()
+        assert status.state == GenerationState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_waits_for_task(self, tmp_path, mock_logger):
+        """wait_for_completion blocks until the generation task completes."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        with patch.object(
+            svc,
+            "_sync_generate",
+            return_value={
+                "recipes": [{"id": 1, "name": "Test"}],
+                "generated_at": "2024-01-01T00:00:00",
+                "requested_count": 1,
+                "constraint_count": 0,
+                "status": "optimal",
+                "warnings": [],
+                "relaxed_constraints": [],
+            },
+        ):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            status = await svc.wait_for_completion(timeout=5.0)
+        assert status.state == GenerationState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_shutdown_when_idle(self, tmp_path):
+        """shutdown does nothing when no task is running."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        await svc.shutdown()
+        assert svc.get_status().state == GenerationState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_running_task(self, tmp_path, mock_logger):
+        """shutdown cancels an in-flight generation and resets state to IDLE."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        # Use a slow sync_generate to ensure the task is still running
+        async def slow_generate(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        with patch.object(svc, "_run_generation", side_effect=slow_generate):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            assert svc.get_status().state == GenerationState.GENERATING
+            await svc.shutdown(timeout=2.0)
+        assert svc.get_status().state == GenerationState.IDLE
+
+    def test_cleanup_stale_temp_files(self, tmp_path):
+        """Stale .tmp files are removed on init."""
+        (tmp_path / "menu.tmp").write_text("stale")
+        (tmp_path / "current_menu.json").write_text('{"recipes": []}')
+        GenerationService(data_dir=str(tmp_path))
+        assert not (tmp_path / "menu.tmp").exists()
+        assert (tmp_path / "current_menu.json").exists()
