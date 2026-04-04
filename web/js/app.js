@@ -58,6 +58,13 @@ function menuApp() {
         _carouselCache: null,
         _carouselCacheKey: null,
 
+        // Menu SSE
+        _menuSSE: null,
+        _sseRetryDelay: 1000,
+        _loadMenuInFlight: false,
+        _loadMenuPending: false,
+        _pendingClearOthers: false,
+
         // Category shelves (persistent per-category rows)
         shelves: [],          // [{name, generations: [{recipes, generatedAt}], currentIndex: 0}, ...]
         activeDeckName: null, // which shelf is in the main carousel
@@ -237,6 +244,7 @@ function menuApp() {
             this._iconHandler = () => this._iconGen++;
             window.addEventListener('custom-icons-loaded', this._iconHandler);
             this.setupKioskGesture();
+            this.connectMenuSSE();
             this.startMenuPolling();
             this.scheduleScrollArrowUpdate();
             this._resizeHandler = () => this.updateScrollArrows();
@@ -245,7 +253,7 @@ function menuApp() {
 
         destroy() {
             if (this._svgAbort) { this._svgAbort.abort(); this._svgAbort = null; }
-            if (this._menuPollId) { clearInterval(this._menuPollId); this._menuPollId = null; }
+            if (this._menuSSE) { this._menuSSE.close(); this._menuSSE = null; }
             if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             if (this._statusPollId) { clearInterval(this._statusPollId); this._statusPollId = null; }
             if (this._resizeHandler) { window.removeEventListener('resize', this._resizeHandler); this._resizeHandler = null; }
@@ -360,11 +368,11 @@ function menuApp() {
             }
         },
 
-        async loadMenu() {
+        async loadMenu({ clearOthers = false } = {}) {
             try {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
-                    this.applyMenuData(await res.json());
+                    this.applyMenuData(await res.json(), { clearOthers });
                     this.state = 'ready';
                 } else if (res.status === 404) {
                     // No server menu — check if generation failed
@@ -405,21 +413,29 @@ function menuApp() {
             this.state = 'ready';
         },
 
-        applyMenuData(data) {
+        applyMenuData(data, { clearOthers = false } = {}) {
             const newRecipes = data.recipes || [];
             this.warnings = data.warnings || [];
             this.relaxedConstraints = data.relaxed_constraints || [];
             this.generatedAt = data.generated_at || '';
 
+            const versionChanged = data.version !== this.menuVersion;
+
             if (newRecipes.length > 0) {
                 this.currentRecipes = newRecipes;
 
+                // Scheduled generation with clear_others — fresh start
+                if (clearOthers && versionChanged) {
+                    this.shelves = [];
+                    this.activeDeckName = null;
+                }
+
                 if (this.shelves.length === 0) {
-                    // First load — seed shelf
+                    // First load or cleared — seed shelf
                     const name = data.profile || this.activeProfile || 'Menu';
                     this.addShelf(name, newRecipes);
                     this.activeDeckName = name;
-                } else if (data.version !== this.menuVersion) {
+                } else if (versionChanged) {
                     // Server has a newer menu than what shelves hold — update active shelf
                     const target = data.profile || this.activeDeckName || this.activeProfile || 'Menu';
                     this.addShelf(target, newRecipes);
@@ -451,51 +467,92 @@ function menuApp() {
             // Combined list for carousel
             this.recipes = [...this.currentRecipes, ...this.previousRecipes];
 
-            // Scroll carousel to start on next tick
-            this.$nextTick(() => this.scrollCarouselToStart());
+            // Scroll carousel to start only when content changed
+            if (versionChanged) {
+                this.$nextTick(() => this.scrollCarouselToStart());
+            }
         },
 
-        // ---- Menu Polling (60s version check) ----
+        // ---- Menu SSE (real-time updates) ----
 
+        connectMenuSSE() {
+            if (this._menuSSE) this._menuSSE.close();
+            this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
+            this._menuSSE = new EventSource('/api/menu/stream');
+
+            this._menuSSE.addEventListener('generating', () => {
+                // Only show spinner on kiosk displays — customers don't need to see it
+                if (this.settings.kiosk_enabled && this.state !== 'generating') {
+                    this.state = 'generating';
+                }
+            });
+
+            this._menuSSE.addEventListener('menu_updated', (e) => {
+                let clearOthers = false;
+                try {
+                    const data = JSON.parse(e.data);
+                    clearOthers = !!data.clear_others;
+                } catch (_) { /* ignore parse errors */ }
+                this._pendingClearOthers = clearOthers;
+                this._debouncedLoadMenu();
+            });
+
+            this._menuSSE.addEventListener('menu_cleared', () => {
+                // On kiosk, clear immediately. On phones, keep current view with stale indicator.
+                if (this.settings.kiosk_enabled) {
+                    this.shelves = [];
+                    this.activeDeckName = null;
+                    this.menuVersion = null;
+                    this.recipes = [];
+                    this.currentRecipes = [];
+                    this.generatedAt = '';
+                    this.saveShelves();
+                    this.state = 'ready';
+                }
+            });
+
+            this._menuSSE.addEventListener('connected', () => {
+                this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
+                // Sync state on reconnect — may have missed events while disconnected
+                this._debouncedLoadMenu();
+            });
+
+            this._menuSSE.onerror = () => {
+                this._menuSSE.close();
+                setTimeout(() => this.connectMenuSSE(), this._sseRetryDelay);
+                this._sseRetryDelay = Math.min(this._sseRetryDelay * 2, CONST.SSE_MAX_RETRY_MS);
+            };
+        },
+
+        // Debounced menu load — prevents concurrent fetches from rapid SSE events
+        _debouncedLoadMenu() {
+            if (this._loadMenuInFlight) {
+                this._loadMenuPending = true;
+                return;
+            }
+            this._loadMenuInFlight = true;
+            const clearOthers = this._pendingClearOthers || false;
+            this._pendingClearOthers = false;
+            this.loadMenu({ clearOthers }).finally(() => {
+                this._loadMenuInFlight = false;
+                if (this._loadMenuPending) {
+                    this._loadMenuPending = false;
+                    this._debouncedLoadMenu();
+                }
+            });
+        },
+
+        // Fallback: sync on tab visibility (SSE may have disconnected while backgrounded)
         startMenuPolling() {
-            const pollMs = (this.settings.menu_poll_seconds ?? CONST.DEFAULT_MENU_POLL_SECONDS) * 1000;
-            this._menuPollId = setInterval(() => this.checkMenuVersion(), pollMs);
-            // Poll immediately when tab becomes visible (catches updates while backgrounded)
             this._visibilityHandler = () => {
-                if (document.visibilityState === 'visible') this.checkMenuVersion();
+                if (document.visibilityState === 'visible') {
+                    // Only fetch if SSE is disconnected or version might be stale
+                    if (!this._menuSSE || this._menuSSE.readyState !== EventSource.OPEN) {
+                        this._debouncedLoadMenu();
+                    }
+                }
             };
             document.addEventListener('visibilitychange', this._visibilityHandler);
-        },
-
-        async checkMenuVersion() {
-            if (this.state === 'generating') return;
-            try {
-                const res = await fetch('/api/menu');
-                if (res.status === 404) {
-                    // Menu was cleared from admin — clear customer shelves
-                    if (this.menuVersion) {
-                        this.shelves = [];
-                        this.activeDeckName = null;
-                        this.menuVersion = null;
-                        this.recipes = [];
-                        this.currentRecipes = [];
-                        this.saveShelves();
-                    }
-                    return;
-                }
-                if (!res.ok) return;
-                const data = await res.json();
-                if (data.version !== this.menuVersion) {
-                    const target = data.profile || this.activeProfile || 'Menu';
-                    this.addShelf(target, data.recipes || []);
-                    this.activeDeckName = target;
-                    this.menuVersion = data.version;
-                    this.saveShelves();
-                    this.$nextTick(() => this.scrollCarouselToStart());
-                }
-            } catch (e) {
-                // Silent - will retry next interval
-            }
         },
 
         // ---- Generation ----
@@ -633,6 +690,11 @@ function menuApp() {
             return dayjs(isoString).fromNow();
         },
 
+        formatMenuDate(isoString) {
+            if (!isoString) return '';
+            return dayjs(isoString).format('dddd, MMMM D');
+        },
+
         scrollCarouselToStart() {
             const track = this.$refs.carouselTrack;
             if (track) track.scrollTo({ left: 0, behavior: 'smooth' });
@@ -732,11 +794,14 @@ function menuApp() {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
                     const data = await res.json();
-                    const target = this._targetShelf || this.activeProfile || 'Menu';
+                    const target = this._targetShelf || data.profile || this.activeProfile || 'Menu';
                     this._targetShelf = null;
                     this.addShelf(target, data.recipes || []);
                     this.activeDeckName = target;
+                    this.generatedAt = data.generated_at || '';
                     this.menuVersion = data.version;
+                    this.currentRecipes = data.recipes || [];
+                    this.recipes = [...this.currentRecipes, ...this.previousRecipes];
                     this.saveShelves();
                     this.state = 'ready';
                     this.$nextTick(() => this.scrollCarouselToStart());
