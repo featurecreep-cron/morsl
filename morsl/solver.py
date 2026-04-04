@@ -20,6 +20,8 @@ class RecipePicker:
         self._constraint_specs = []
         # Store random coefficients so they stay consistent across rebuilds
         self._random_coeffs = {r.id: SOLVER_RANDOM_SCALE * random.random() for r in self.recipes}
+        # O(1) recipe lookup by ID — avoids O(n) scans per constraint per rebuild
+        self._recipe_by_id = {r.id: r for r in self.recipes}
 
         self._build_problem()
 
@@ -49,9 +51,9 @@ class RecipePicker:
         weight,
     ):
         """Apply a single constraint to the current solver problem."""
-        # Reconstruct recipe list from IDs
+        # Reconstruct recipe list from IDs via O(1) lookup
         id_set = set(found_recipe_ids)
-        found_recipes = [r for r in self.recipes if r.id in id_set]
+        found_recipes = [self._recipe_by_id[rid] for rid in id_set if rid in self._recipe_by_id]
 
         if intersect_pool:
             found_recipes = list(set(self.recipes) & set(found_recipes))

@@ -204,13 +204,18 @@ function menuApp() {
             } catch (e) { /* ignore corrupt data */ }
             this._loadRecentNames();
             this.loadShelves();
+            // Tier 1: fast UI chrome — settings, profiles, categories
             await Promise.all([
                 this.loadCategories(),
                 this.loadProfiles(),
-                this.loadMenu(),
                 this.loadSettings(),
-                this.loadIconMappings(),
             ]);
+            this.state = 'ready';
+            // Tier 2: heavier data — menu and icon mappings load in background
+            Promise.all([
+                this.loadMenu(),
+                this.loadIconMappings(),
+            ]).catch(e => console.warn('Background load failed:', e));
             // If shelves exist but no active deck, set to first shelf
             if (this.shelves.length > 0 && !this.activeDeckName) {
                 this.activeDeckName = this.shelves[0].name;

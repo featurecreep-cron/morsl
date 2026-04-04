@@ -208,7 +208,7 @@ class WeeklyGenerationService:
             self._status.completed_at = now()
             self._status.error = str(e)
 
-    def _generate_for_profile(
+    def _prepare_profile_data(
         self,
         profile_name: str,
         total_needed: int,
@@ -217,29 +217,45 @@ class WeeklyGenerationService:
         token: str,
         app_logger: logging.Logger,
         cache_minutes: int,
-        deduplicate: bool,
-        exclude_ids: set,
     ) -> Dict[str, Any]:
-        """Generate recipes for a single profile, returning results and warnings."""
-        self._status.profile_progress[profile_name] = "generating"
-        warnings: List[str] = []
+        """Fetch data for a profile (HTTP-heavy). Safe to run in parallel."""
+        self._status.profile_progress[profile_name] = "preparing"
 
         try:
             config = config_service.load_profile(profile_name)
         except FileNotFoundError:
             msg = f"Profile '{profile_name}' not found, skipping"
             self._status.profile_progress[profile_name] = "error"
-            return {
-                "slot_result": {"status": "error", "warnings": [msg]},
-                "warnings": [msg],
-                "recipes": None,
-            }
+            return {"error": msg, "service": None, "profile_name": profile_name}
 
         config["choices"] = total_needed
         config["cache"] = cache_minutes
 
         service = MenuService(url=url, token=token, config=config, logger=app_logger)
         service.prepare_data()
+        return {"error": None, "service": service, "profile_name": profile_name}
+
+    def _solve_profile(
+        self,
+        prepared: Dict[str, Any],
+        total_needed: int,
+        deduplicate: bool,
+        exclude_ids: set,
+        app_logger: logging.Logger,
+    ) -> Dict[str, Any]:
+        """Apply dedup filter and solve for a prepared profile. Must run sequentially."""
+        profile_name = prepared["profile_name"]
+        warnings: List[str] = []
+
+        if prepared["error"]:
+            return {
+                "slot_result": {"status": "error", "warnings": [prepared["error"]]},
+                "warnings": [prepared["error"]],
+                "recipes": None,
+            }
+
+        service = prepared["service"]
+        self._status.profile_progress[profile_name] = "generating"
 
         if deduplicate and exclude_ids:
             original_count = len(service.recipes)
@@ -308,23 +324,34 @@ class WeeklyGenerationService:
             app_settings = settings_service.get_all()
             cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
-        # 3. Run each profile sequentially for dedup
+        # 3a. Parallel data-fetch phase — all profiles prepare concurrently
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _prepare(item):
+            name, needed = item
+            return self._prepare_profile_data(
+                name, needed, config_service, url, token, app_logger, cache_minutes
+            )
+
+        with ThreadPoolExecutor(max_workers=len(sorted_profiles)) as pool:
+            prepared_list = list(pool.map(_prepare, sorted_profiles))
+
+        # Build lookup: profile_name → prepared result (preserving sort order)
+        prepared_map = {p["profile_name"]: p for p in prepared_list}
+
+        # 3b. Sequential solve phase — dedup requires serial exclude_ids propagation
         all_warnings: List[str] = []
         exclude_ids: set = set()
         profile_recipes: Dict[str, list] = {}
         slot_results: Dict[str, Dict[str, Any]] = {}
 
         for profile_name, total_needed in sorted_profiles:
-            result = self._generate_for_profile(
-                profile_name,
+            result = self._solve_profile(
+                prepared_map[profile_name],
                 total_needed,
-                config_service,
-                url,
-                token,
-                app_logger,
-                cache_minutes,
                 deduplicate,
                 exclude_ids,
+                app_logger,
             )
             slot_results[profile_name] = result["slot_result"]
             all_warnings.extend(result["warnings"])
