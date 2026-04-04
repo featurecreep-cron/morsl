@@ -102,7 +102,7 @@ class TandoorAPI:
             content = json.loads(response.content)
             new_results = content.get("results", [])
             self.logger.debug(f"Retrieved {len(new_results)} results.")
-            results = results + new_results
+            results.extend(new_results)
             url = content.get("next", None)
         return results
 

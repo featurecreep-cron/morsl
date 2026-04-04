@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -491,19 +491,16 @@ class TestSettingsEnforcement:
         mock_response.json.return_value = {"rating": 4.5}
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
-        with (
-            patch(
-                "morsl.app.api.routes.proxy.requests.patch", return_value=mock_response
-            ) as mock_patch,
-            patch(
-                "morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response
-            ) as mock_post,
-        ):
+        mock_client = MagicMock()
+        mock_client.patch = AsyncMock(return_value=mock_response)
+        mock_client.post = AsyncMock(return_value=mock_post_response)
+        mock_client.is_closed = False
+        with patch("morsl.app.api.routes.proxy._get_client", return_value=mock_client):
             response = await settings_client.patch("/api/recipe/5/rating", json={"rating": 4.5})
             assert response.status_code == 200
-            mock_patch.assert_called_once()
+            mock_client.patch.assert_called_once()
             # Cook log entry created
-            mock_post.assert_called_once()
+            mock_client.post.assert_called_once()
 
     async def test_rating_cook_log_includes_customer_name(
         self, settings_client, mock_settings_service
@@ -518,18 +515,17 @@ class TestSettingsEnforcement:
         mock_response.json.return_value = {"rating": 3.0}
         mock_post_response = MagicMock()
         mock_post_response.status_code = 201
-        with (
-            patch("morsl.app.api.routes.proxy.requests.patch", return_value=mock_response),
-            patch(
-                "morsl.app.api.routes.proxy.requests.post", return_value=mock_post_response
-            ) as mock_post,
-        ):
+        mock_client = MagicMock()
+        mock_client.patch = AsyncMock(return_value=mock_response)
+        mock_client.post = AsyncMock(return_value=mock_post_response)
+        mock_client.is_closed = False
+        with patch("morsl.app.api.routes.proxy._get_client", return_value=mock_client):
             response = await settings_client.patch(
                 "/api/recipe/5/rating", json={"rating": 3.0, "customer_name": "Bob"}
             )
             assert response.status_code == 200
             # Verify cook log includes the customer name in comment
-            call_kwargs = mock_post.call_args
+            call_kwargs = mock_client.post.call_args
             assert "Rated by Bob" in call_kwargs[1]["json"]["comment"]
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from defusedxml import ElementTree as ET
 from py_svg_hush import filter_svg
@@ -36,6 +36,7 @@ class CustomIconService:
     def __init__(self, data_dir: str = "data") -> None:
         self.icons_dir = os.path.join(data_dir, "custom-icons")
         os.makedirs(self.icons_dir, exist_ok=True)
+        self._svg_cache: Optional[Dict[str, str]] = None
 
     def list_icons(self) -> List[Dict[str, Any]]:
         """Return list of {key, name} for all custom icons."""
@@ -62,6 +63,7 @@ class CustomIconService:
         with open(path, "w") as f:
             f.write(sanitized)
 
+        self._invalidate_cache()
         return {"key": f"custom:{slug}", "name": slug}
 
     def _validate_name(self, name: str) -> None:
@@ -78,8 +80,13 @@ class CustomIconService:
         with open(path) as f:
             return f.read()
 
+    def _invalidate_cache(self) -> None:
+        self._svg_cache = None
+
     def get_all_svgs(self) -> Dict[str, str]:
-        """Return {key: svg_string} for all custom icons."""
+        """Return {key: svg_string} for all custom icons (cached in memory)."""
+        if self._svg_cache is not None:
+            return dict(self._svg_cache)
         result = {}
         for fname in sorted(os.listdir(self.icons_dir)):
             if fname.endswith(".svg"):
@@ -87,7 +94,8 @@ class CustomIconService:
                 path = os.path.join(self.icons_dir, fname)
                 with open(path) as f:
                     result[f"custom:{name}"] = f.read()
-        return result
+        self._svg_cache = result
+        return dict(result)
 
     def rename_icon(self, old_name: str, new_name: str) -> Dict[str, Any]:
         """Rename a custom icon. Returns new {key, name}. Raises FileNotFoundError/ValueError."""
@@ -104,6 +112,7 @@ class CustomIconService:
         if os.path.exists(new_path):
             raise ValueError(f"Icon '{new_slug}' already exists")
         os.rename(old_path, new_path)
+        self._invalidate_cache()
         return {"key": f"custom:{new_slug}", "name": new_slug}
 
     def delete_icon(self, name: str) -> None:
@@ -113,3 +122,4 @@ class CustomIconService:
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Custom icon not found: {name}")
         os.unlink(path)
+        self._invalidate_cache()
