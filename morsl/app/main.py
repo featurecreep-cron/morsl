@@ -94,7 +94,7 @@ def _resolve_scheduler_services(settings):
     return settings_svc, get_logger(settings), url, token
 
 
-async def _sched_generation(settings, profile: str) -> None:
+async def _sched_generation(settings, profile: str, *, clear_others: bool = False) -> None:
     try:
         _, app_logger, url, token = _resolve_scheduler_services(settings)
         config = get_config_service(settings).load_profile(profile)
@@ -104,6 +104,7 @@ async def _sched_generation(settings, profile: str) -> None:
             url=url,
             token=token,
             logger=app_logger,
+            clear_others=clear_others,
         )
         await gen_svc.wait_for_completion()
     except Exception:  # noqa: broad-except — scheduled task isolation
@@ -182,7 +183,7 @@ async def _sched_weekly_save(settings, template_name: str) -> None:
 def _build_scheduler_callbacks(settings):
     """Create bound callback functions for the scheduler service."""
     return (
-        lambda profile: _sched_generation(settings, profile),
+        lambda profile, **kw: _sched_generation(settings, profile, **kw),
         lambda action, params: _sched_meal_plan(settings, action, params),
         lambda template_name, week_start=None: _sched_weekly_generation(
             settings,

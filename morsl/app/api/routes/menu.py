@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.responses import StreamingResponse
 
 from morsl.app.api.dependencies import get_generation_service, require_admin
 from morsl.app.api.models import GenerationStatusResponse, MenuResponse
+from morsl.constants import SSE_QUEUE_TIMEOUT
 from morsl.services.generation_service import GenerationService
 
 router = APIRouter(tags=["menu"])
@@ -42,4 +47,38 @@ def get_status(
         error=status.error,
         recipe_count=status.recipe_count,
         warnings=status.warnings,
+    )
+
+
+@router.get("/menu/stream")
+async def menu_stream(
+    gen_service: GenerationService = Depends(get_generation_service),
+) -> StreamingResponse:
+    """SSE stream for real-time menu change notifications.
+
+    Events:
+    - generating: generation started
+    - menu_updated: new menu available
+    - menu_cleared: menu was deleted
+    """
+    queue = gen_service.subscribe()
+
+    async def event_generator():
+        try:
+            yield "event: connected\ndata: {}\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=SSE_QUEUE_TIMEOUT)
+                    yield f"event: {event['type']}\ndata: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            gen_service.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

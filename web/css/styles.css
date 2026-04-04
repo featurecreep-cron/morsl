@@ -379,10 +379,21 @@ body {
     flex-direction: column;
 }
 
+/* ---- Menu Date ---- */
+.menu-date {
+    flex: 0 0 auto;
+    text-align: center;
+    font-family: var(--heading-font);
+    font-size: 1.1rem;
+    color: var(--accent-color);
+    padding: 0.25rem 1rem 0;
+    letter-spacing: 0.02em;
+}
+
 /* ---- Carousel ---- */
 .carousel-container {
-    flex: 0 0 auto;
-    min-height: 300px;
+    flex: 1 1 auto;
+    min-height: 150px;
 }
 
 .carousel-wrapper {

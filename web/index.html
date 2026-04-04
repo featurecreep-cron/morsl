@@ -152,6 +152,9 @@
     <div class="content-area"
          x-show="state === 'ready' || state === 'generating'">
 
+        <!-- Menu date -->
+        <div class="menu-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></div>
+
         <!-- Deck tab strip -->
         <div class="deck-strip" x-show="shelves.length > 1">
             <template x-for="shelf in shelves" :key="'tab-' + shelf.name">
