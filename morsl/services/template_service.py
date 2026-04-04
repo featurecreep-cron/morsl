@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
 
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class TemplateService:
     def create_template(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new template. Raises FileExistsError if already exists."""
         self._validate_name(name)
-        path = os.path.join(self.templates_dir, f"{name}.json")
+        path = safe_path(self.templates_dir, f"{name}.json")
         if os.path.isfile(path):
             raise FileExistsError(f"Template already exists: {name}")
         config["name"] = name
@@ -75,7 +75,7 @@ class TemplateService:
     def update_template(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing template."""
         self._validate_name(name)
-        path = os.path.join(self.templates_dir, f"{name}.json")
+        path = safe_path(self.templates_dir, f"{name}.json")
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Template not found: {name}")
         config["name"] = name
@@ -85,7 +85,7 @@ class TemplateService:
     def delete_template(self, name: str) -> None:
         """Delete a template."""
         self._validate_name(name)
-        path = os.path.join(self.templates_dir, f"{name}.json")
+        path = safe_path(self.templates_dir, f"{name}.json")
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Template not found: {name}")
         os.unlink(path)
@@ -181,7 +181,7 @@ class TemplateService:
     # ---- Internal ----
 
     def _read(self, name: str) -> Dict[str, Any]:
-        path = os.path.join(self.templates_dir, f"{name}.json")
+        path = safe_path(self.templates_dir, f"{name}.json")
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Template not found: {name}")
         with open(path) as f:

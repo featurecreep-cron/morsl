@@ -47,6 +47,7 @@ function adminApp() {
         customChoices: CONST.DEFAULT_CUSTOM_CHOICES,
         _foodDebounceId: null,
         _keywordDebounceId: null,
+        customFilters: [],       // Available Tandoor custom filters
 
         // Recipe modal
         selectedRecipe: null,
@@ -98,6 +99,7 @@ function adminApp() {
             choices: 5, min_choices: null,
             cache: 240,
             default: false, show_on_menu: true, item_noun: '',
+            filters: [],
             constraints: [],
         },
         // Constraint type metadata for UI — icons from CONSTRAINT_ICONS registry
@@ -137,6 +139,12 @@ function adminApp() {
                 icon: CONSTRAINT_ICONS.createdon,
                 description: 'Filter by when recipes were added to your collection',
                 help: 'Find new additions you haven\'t tried yet, or stick to tried-and-true classics.'
+            },
+            makenow: {
+                label: 'Make Now',
+                icon: CONSTRAINT_ICONS.makenow,
+                description: 'Prefer recipes you can make with ingredients on hand',
+                help: 'Uses Tandoor\'s on-hand tracking. Mark ingredients as "on hand" in Tandoor, then use this to prefer recipes you can make right now.'
             },
         },
         showAddConstraintMenu: false,  // For the add constraint dropdown
@@ -368,6 +376,7 @@ function adminApp() {
                     this.loadHistory(),
                     this.loadAnalytics(),
                     this.loadIconMappings(),
+                    this.loadCustomFilters(),
                 ]);
                 this.adminReady = true;
             } catch (e) {
@@ -539,6 +548,18 @@ function adminApp() {
                 }
             } catch (e) {
                 console.warn('Failed to load keywords:', e);
+            }
+        },
+
+        async loadCustomFilters() {
+            try {
+                const res = await fetch('/api/custom-filters');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.customFilters = data.results || data || [];
+                }
+            } catch (e) {
+                // Not fatal — custom filters are optional
             }
         },
 
@@ -826,6 +847,7 @@ function adminApp() {
                 name: '', originalName: '', description: '', icon: '', category: '',
                 choices: 5, min_choices: null,
                 default: false, show_on_menu: true, item_noun: '',
+                filters: [],
                 constraints: [],
             };
         },
@@ -848,6 +870,7 @@ function adminApp() {
                 default: profileInfo?.default || false,
                 show_on_menu: config.show_on_menu !== false,
                 item_noun: config.item_noun || '',
+                filters: config.filters || [],
                 constraints: config.constraints || [],
             };
             // Sort by type for grouped display, then resolve names
@@ -965,6 +988,7 @@ function adminApp() {
                 default: this.profileEditor.default,
                 show_on_menu: this.profileEditor.show_on_menu,
                 item_noun: this.profileEditor.item_noun,
+                filters: this.profileEditor.filters.length > 0 ? this.profileEditor.filters : undefined,
                 constraints: cleanConstraints,
             };
 
@@ -1241,6 +1265,8 @@ function adminApp() {
                     return `${opLabel} ${c.count} added more than ${days} days ago`;
                 }
                 return `${opLabel} ${c.count} added within last ${days} days`;
+            } else if (c.type === 'makenow') {
+                return `${opLabel} ${c.count} with on-hand ingredients`;
             }
             return `${opLabel} ${c.count}`;
         },

@@ -19,7 +19,7 @@ from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
 from morsl.services.template_service import TemplateService
 from morsl.tandoor_api import TandoorAPI
-from morsl.utils import atomic_write_json, now
+from morsl.utils import atomic_write_json, now, safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class WeeklyGenerationService:
     def get_plan(self, template_name: str) -> Optional[Dict[str, Any]]:
         """Load a generated weekly plan from disk."""
         _validate_template_name(template_name)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         if not os.path.isfile(path):
             return None
         try:
@@ -107,7 +107,7 @@ class WeeklyGenerationService:
     def clear_plan(self, template_name: str) -> bool:
         """Delete a weekly plan file. Returns True if removed."""
         _validate_template_name(template_name)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         if os.path.isfile(path):
             os.unlink(path)
             return True
@@ -196,7 +196,7 @@ class WeeklyGenerationService:
             self._status.completed_at = now()
             self._status.warnings = result.get("warnings", [])
 
-        except Exception as e:
+        except Exception as e:  # noqa: broad-except — state machine must capture any failure
             logger.warning("Weekly generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
@@ -299,11 +299,8 @@ class WeeklyGenerationService:
         # Get global cache setting
         cache_minutes = API_CACHE_TTL_MINUTES
         if settings_service:
-            try:
-                app_settings = settings_service.get_all()
-                cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:  # noqa: S110
-                pass
+            app_settings = settings_service.get_all()
+            cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         # 3. Run each profile sequentially for dedup
         all_warnings: List[str] = []
@@ -399,11 +396,8 @@ class WeeklyGenerationService:
         # Get global cache setting
         cache_minutes = API_CACHE_TTL_MINUTES
         if settings_service:
-            try:
-                app_settings = settings_service.get_all()
-                cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
-            except Exception:  # noqa: S110
-                pass
+            app_settings = settings_service.get_all()
+            cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         loop = asyncio.get_running_loop()
         new_recipes = await loop.run_in_executor(
@@ -476,5 +470,5 @@ class WeeklyGenerationService:
         """Atomic write of weekly plan."""
         _validate_template_name(template_name)
         os.makedirs(self.plans_dir, exist_ok=True)
-        path = os.path.join(self.plans_dir, f"{template_name}.json")
+        path = safe_path(self.plans_dir, f"{template_name}.json")
         atomic_write_json(path, plan_data)

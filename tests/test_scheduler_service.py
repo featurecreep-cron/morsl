@@ -128,11 +128,12 @@ class TestSchedulerService:
         svc.stop()
 
     @pytest.mark.asyncio
-    async def test_clear_before_generate_ignored(self, tmp_path):
-        """clear_before_generate should NOT clear the menu before generation.
+    async def test_clear_before_generate_passes_flag(self, tmp_path):
+        """clear_before_generate passes clear_others=True to the generation callback.
 
-        Clearing before generation risks data loss if generation fails — the user
-        loses their existing menu. Success already overwrites atomically.
+        The menu is not cleared before generation (avoids data loss on failure).
+        Instead, the flag is forwarded so the generated menu includes clear_others,
+        telling the frontend to wipe stale shelves after successful generation.
         """
         svc = SchedulerService(data_dir=str(tmp_path))
         gen_mock = AsyncMock()
@@ -143,6 +144,135 @@ class TestSchedulerService:
         )
         await svc._run_scheduled_generation(schedule["id"])
 
+        gen_mock.assert_called_once_with("gin", clear_others=True)
+
+    @pytest.mark.asyncio
+    async def test_clear_before_generate_false_omits_flag(self, tmp_path):
+        """When clear_before_generate is false, clear_others=False is passed."""
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+
+        schedule = svc.create_schedule(
+            {"profile": "gin", "clear_before_generate": False, "enabled": True}
+        )
+        await svc._run_scheduled_generation(schedule["id"])
+
+        gen_mock.assert_called_once_with("gin", clear_others=False)
+
+    @pytest.mark.asyncio
+    async def test_profile_pipeline_creates_meal_plan(self, tmp_path):
+        """When create_meal_plan is set, meal plan callback fires after generation."""
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        mp_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+        svc.set_meal_plan_callback(mp_mock)
+
+        schedule = svc.create_schedule(
+            {
+                "profile": "gin",
+                "create_meal_plan": True,
+                "meal_plan_type": 3,
+                "enabled": True,
+            }
+        )
+        await svc._run_scheduled_generation(schedule["id"])
+
         gen_mock.assert_called_once()
-        # clear_callback was removed from SchedulerService entirely
-        assert not hasattr(svc, "_clear_callback")
+        mp_mock.assert_called_once_with("create", {"meal_plan_type": 3})
+
+    @pytest.mark.asyncio
+    async def test_profile_pipeline_skips_meal_plan_when_disabled(self, tmp_path):
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        mp_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+        svc.set_meal_plan_callback(mp_mock)
+
+        schedule = svc.create_schedule(
+            {"profile": "gin", "create_meal_plan": False, "enabled": True}
+        )
+        await svc._run_scheduled_generation(schedule["id"])
+
+        gen_mock.assert_called_once()
+        mp_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_pre_generate_cleanup(self, tmp_path):
+        """cleanup_uncooked_days triggers meal plan cleanup before generation."""
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        mp_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+        svc.set_meal_plan_callback(mp_mock)
+
+        schedule = svc.create_schedule(
+            {
+                "profile": "gin",
+                "cleanup_uncooked_days": 7,
+                "meal_plan_type": 3,
+                "enabled": True,
+            }
+        )
+        await svc._run_scheduled_generation(schedule["id"])
+
+        # Cleanup call should happen before generation
+        assert mp_mock.call_count == 1
+        mp_mock.assert_called_once_with("cleanup", {"meal_plan_type": 3, "cleanup_days": 7})
+
+    @pytest.mark.asyncio
+    async def test_weekly_pipeline_calls_weekly_callback(self, tmp_path):
+        svc = SchedulerService(data_dir=str(tmp_path))
+        weekly_mock = AsyncMock()
+        svc.set_weekly_generation_callback(weekly_mock)
+
+        schedule = svc.create_schedule({"template": "weeknight", "enabled": True})
+        await svc._run_scheduled_generation(schedule["id"])
+
+        weekly_mock.assert_called_once()
+        call_args = weekly_mock.call_args
+        assert call_args[0][0] == "weeknight"
+
+    @pytest.mark.asyncio
+    async def test_scheduled_generation_updates_last_run(self, tmp_path):
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+
+        schedule = svc.create_schedule({"profile": "gin", "enabled": True})
+        assert schedule["last_run"] is None
+
+        await svc._run_scheduled_generation(schedule["id"])
+
+        updated = svc._schedules[schedule["id"]]
+        assert updated["last_run"] is not None
+
+    @pytest.mark.asyncio
+    async def test_missing_schedule_id_returns_early(self, tmp_path):
+        svc = SchedulerService(data_dir=str(tmp_path))
+        gen_mock = AsyncMock()
+        svc.set_generation_callback(gen_mock)
+        await svc._run_scheduled_generation("nonexistent-id")
+        gen_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_callback_returns_early(self, tmp_path):
+        svc = SchedulerService(data_dir=str(tmp_path))
+        # No callback set
+        schedule = svc.create_schedule({"profile": "gin", "enabled": True})
+        await svc._run_scheduled_generation(schedule["id"])
+        # Should complete without error
+
+    def test_create_requires_profile_or_template(self, scheduler_service):
+        with pytest.raises(ValueError, match="Either"):
+            scheduler_service.create_schedule({})
+
+    def test_create_rejects_both_profile_and_template(self, scheduler_service):
+        with pytest.raises(ValueError, match="Cannot set both"):
+            scheduler_service.create_schedule({"profile": "gin", "template": "weeknight"})
+
+    def test_update_rejects_both_profile_and_template(self, scheduler_service):
+        s = scheduler_service.create_schedule({"profile": "gin"})
+        with pytest.raises(ValueError, match="Cannot set both"):
+            scheduler_service.update_schedule(s["id"], {"template": "weeknight"})

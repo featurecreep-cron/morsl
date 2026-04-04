@@ -5,9 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
-  packages: write
-  security-events: write
+  contents: read
 
 jobs:
   ci:
@@ -17,6 +15,9 @@ jobs:
   build-and-push:
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
 
@@ -57,6 +58,9 @@ jobs:
   trivy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
 
@@ -73,7 +77,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@b1bff81932f5cdfc8695c7752dcee935dcd061c8  # v4
+        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc  # v4
         with:
           sarif_file: trivy-results.sarif
 

@@ -35,7 +35,7 @@ async def upload_custom_icon(
         )
     try:
         result = svc.save_icon(file.filename, content)
-    except Exception as e:
+    except (ValueError, OSError) as e:
         raise HTTPException(status_code=400, detail=f"Invalid SVG: {e}") from None
     return result
 

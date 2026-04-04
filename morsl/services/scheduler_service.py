@@ -205,10 +205,9 @@ class SchedulerService:
     async def _run_pre_generate(self, schedule: Dict[str, Any], is_weekly: bool) -> None:
         """Cleanup old meal plans before generation.
 
-        Note: clear_before_generate is intentionally ignored. Successful generation
-        atomically overwrites the old menu via _save_menu(). Clearing before generation
-        risks data loss if generation fails — the user loses their existing menu with
-        nothing to replace it.
+        Note: clear_before_generate is handled post-generation via clear_others flag
+        in the saved menu data. The frontend clears all shelves when it sees this flag,
+        giving a fresh start without risking data loss if generation fails.
         """
         cleanup_days = schedule.get("cleanup_uncooked_days", 0)
         mp_type = schedule.get("meal_plan_type")
@@ -221,7 +220,7 @@ class SchedulerService:
                         "cleanup_days": cleanup_days,
                     },
                 )
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled cleanup failed (non-fatal)",
                     exc_info=True,
@@ -242,7 +241,7 @@ class SchedulerService:
         if schedule.get("create_meal_plan") and self._weekly_save_callback:
             try:
                 await self._weekly_save_callback(template_name)
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled weekly save failed (non-fatal)",
                     exc_info=True,
@@ -251,13 +250,16 @@ class SchedulerService:
     async def _run_profile_pipeline(self, schedule: Dict[str, Any]) -> None:
         """Generate from profile and optionally create meal plans."""
 
-        await self._generation_callback(schedule["profile"])
+        await self._generation_callback(
+            schedule["profile"],
+            clear_others=schedule.get("clear_before_generate", False),
+        )
 
         mp_type = schedule.get("meal_plan_type")
         if schedule.get("create_meal_plan") and mp_type and self._meal_plan_callback:
             try:
                 await self._meal_plan_callback("create", {"meal_plan_type": mp_type})
-            except Exception:
+            except Exception:  # noqa: broad-except — non-fatal scheduled task
                 logger.warning(
                     "Scheduled meal plan creation failed (non-fatal)",
                     exc_info=True,
