@@ -1735,6 +1735,26 @@
                 <span x-show="tierVisible('standard')"><strong>Min:</strong> Accept fewer if rules are too strict.</span>
             </small>
 
+            <!-- Custom Filters (Tandoor saved searches) -->
+            <div class="drawer-section" x-show="customFilters.length > 0 && tierVisible('advanced')">
+                <label class="drawer-label">Saved Filters</label>
+                <small class="drawer-help">Limit the recipe pool to results from Tandoor saved searches. Leave empty to use all recipes.</small>
+                <div class="constraint-items-list" style="margin-bottom:0.5rem;">
+                    <template x-for="fid in profileEditor.filters" :key="fid">
+                        <span class="constraint-item-tag">
+                            <span x-text="customFilters.find(f => f.id === fid)?.name || ('#' + fid)"></span>
+                            <button @click="profileEditor.filters = profileEditor.filters.filter(id => id !== fid)" aria-label="Remove">&times;</button>
+                        </span>
+                    </template>
+                </div>
+                <select class="drawer-select" @change="if ($event.target.value) { const id = Number($event.target.value); if (!profileEditor.filters.includes(id)) profileEditor.filters.push(id); $event.target.value = ''; }">
+                    <option value="">Add a saved filter...</option>
+                    <template x-for="cf in customFilters.filter(f => !profileEditor.filters.includes(f.id))" :key="cf.id">
+                        <option :value="cf.id" x-text="cf.name"></option>
+                    </template>
+                </select>
+            </div>
+
             <!-- Constraints List (v2 format) -->
             <div class="drawer-section">
                 <div class="drawer-label-row">
@@ -1776,6 +1796,11 @@
                                     <label>Label (optional)</label>
                                     <input type="text" class="drawer-input" x-model="c.label"
                                            placeholder="e.g., 'Must have gin'">
+                                </div>
+
+                                <!-- Make Now help text -->
+                                <div class="constraint-field" x-show="c.type === 'makenow'">
+                                    <small class="field-help" x-text="constraintTypes['makenow']?.help"></small>
                                 </div>
 
                                 <!-- Items (for keyword/food/book) -->

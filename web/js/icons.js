@@ -731,6 +731,7 @@ const CONSTRAINT_ICONS = {
     rating: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
     cookedon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>',
     createdon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15h6"/></svg>',
+    makenow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z" rx="2"/><path d="M9 12l2 2 4-4"/></svg>',
     discover: '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><title>Discover</title><rect x="15" y="15" width="70" height="70" rx="10" ry="10"/><circle cx="35" cy="35" r="5" fill="currentColor"/><circle cx="65" cy="35" r="5" fill="currentColor"/><circle cx="50" cy="50" r="5" fill="currentColor"/><circle cx="35" cy="65" r="5" fill="currentColor"/><circle cx="65" cy="65" r="5" fill="currentColor"/></svg>',
 };
 Object.freeze(CONSTRAINT_ICONS);

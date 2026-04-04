@@ -184,7 +184,7 @@ async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
         return {"success": False, "error": f"HTTP {resp.status_code}"}
     except httpx.TimeoutException:
         return {"success": False, "error": "Connection timed out"}
-    except Exception as e:
+    except (httpx.HTTPError, OSError) as e:
         logger.warning("test-connection failed for %s: %s", url, e)
         return {"success": False, "error": "Connection failed"}
 
@@ -229,7 +229,7 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
         os.close(fd)
         closed = True
         os.replace(tmp_path, str(dest))
-    except Exception:
+    except OSError:
         if not closed:
             os.close(fd)
         if os.path.exists(tmp_path):
@@ -283,7 +283,7 @@ def upload_favicon(
 
         generate_icons(source_path, ICONS_DIR)
         logger.info("Regenerated icons from %s", source_path)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error("Icon generation failed: %s", e)
         raise HTTPException(500, f"Icon generation failed: {e}") from None
 
@@ -304,7 +304,7 @@ def remove_favicon(
             from morsl.services.icon_service import generate_icons
 
             generate_icons(default_svg, ICONS_DIR)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Default icon regeneration failed: %s", e)
 
     return svc.update({"favicon_url": ""})
@@ -346,7 +346,7 @@ def reset_branding(
             from morsl.services.icon_service import generate_icons
 
             generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Default icon regeneration failed: %s", e)
 
     # Reset branding settings to defaults
@@ -370,7 +370,7 @@ def _reset_step(errors: list, label: str, fn) -> None:
     """Run a factory reset step, collecting errors instead of raising."""
     try:
         fn()
-    except Exception as e:
+    except Exception as e:  # noqa: broad-except — error collection during factory reset
         errors.append(f"{label}: {e}")
 
 

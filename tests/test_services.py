@@ -9,7 +9,12 @@ import pytest
 from morsl.constants import API_CACHE_TTL_MINUTES
 from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationService, GenerationState
-from morsl.services.menu_service import MenuService
+from morsl.services.menu_service import (
+    MenuService,
+    _apply_date_filters,
+    _build_rating_condition,
+    _resolve_date_recipes,
+)
 
 
 class TestMenuService:
@@ -124,6 +129,650 @@ class TestMenuService:
             service.prepare_recipes()
         assert len(service.recipes) == 1
         assert service.recipes[0].id == 1
+
+    def test_parse_makenow_constraint(self, mock_logger):
+        """Test parsing a makenow constraint."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {"type": "makenow", "count": 3, "operator": ">="},
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert len(service.constraints) == 1
+        assert service.constraints[0]["type"] == "makenow"
+        assert service.constraints[0]["count"] == 3
+
+    def test_prepare_makenow_constraint(self, mock_logger):
+        """Test that makenow constraint fetches on-hand recipes from Tandoor."""
+        pool_recipes = [
+            {
+                "id": 1,
+                "name": "R1",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 3.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+            {
+                "id": 2,
+                "name": "R2",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 4.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+        ]
+        # Only recipe 1 is makeable with on-hand ingredients
+        onhand_recipes = [pool_recipes[0]]
+
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {"type": "makenow", "count": 1, "operator": ">="},
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
+            api = MockAPI.return_value
+            api.get_recipes.side_effect = lambda **kwargs: (
+                onhand_recipes if kwargs.get("params", {}).get("makenow") else pool_recipes
+            )
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+            service.prepare_recipes()
+            service.prepare_constraints()
+
+        assert len(service.constraints[0]["matching_recipes"]) == 1
+        assert service.constraints[0]["matching_recipes"][0].id == 1
+
+    def test_prepare_recipes_with_filters(self, mock_logger):
+        """Test that filters config passes CustomFilter IDs to Tandoor."""
+        config = {"choices": 2, "cache": 0, "filters": [42, 99], "constraints": []}
+        mock_recipe_data = [
+            {
+                "id": 1,
+                "name": "R1",
+                "description": "",
+                "new": False,
+                "servings": 4,
+                "keywords": [],
+                "rating": 3.0,
+                "last_cooked": None,
+                "created_at": "2024-01-01T12:00:00+00:00",
+            },
+        ]
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
+            api = MockAPI.return_value
+            api.get_recipes.return_value = mock_recipe_data
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+            service.prepare_recipes()
+            api.get_recipes.assert_called_once_with(params=None, filters=[42, 99])
+        assert len(service.recipes) == 1
+
+    def test_parse_date_constraint_cooked(self, mock_logger):
+        """Test parsing cooked date constraint with older_than_days."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "cookedon",
+                    "count": 2,
+                    "operator": ">=",
+                    "cooked": {"older_than_days": 7},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["cooked_date"] is not None
+        assert service.constraints[0]["cooked_after"] is False
+
+    def test_parse_date_constraint_cooked_within(self, mock_logger):
+        """Test parsing cooked date constraint with within_days (mirror branch)."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "cookedon",
+                    "count": 1,
+                    "operator": ">=",
+                    "cooked": {"within_days": 14},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["cooked_date"] is not None
+        assert service.constraints[0]["cooked_after"] is True
+
+    def test_parse_date_constraint_created_older(self, mock_logger):
+        """Test parsing created date constraint with older_than_days (mirror branch)."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "createdon",
+                    "count": 1,
+                    "operator": ">=",
+                    "created": {"older_than_days": 90},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["created_date"] is not None
+        assert service.constraints[0]["created_after"] is False
+
+    def test_parse_date_constraint_created_within(self, mock_logger):
+        """Test parsing created date constraint with within_days."""
+        config = {
+            "choices": 5,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "createdon",
+                    "count": 1,
+                    "operator": ">=",
+                    "created": {"within_days": 30},
+                },
+            ],
+        }
+        with patch("morsl.services.menu_service.TandoorAPI"):
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+        assert service.constraints[0]["created_date"] is not None
+        assert service.constraints[0]["created_after"] is True
+
+
+class TestBuildRatingCondition:
+    def test_unrated(self):
+        assert _build_rating_condition({"unrated": True}) == 0
+
+    def test_min_and_max(self):
+        assert _build_rating_condition({"min": 3, "max": 5}) == [3, 5]
+
+    def test_min_only(self):
+        assert _build_rating_condition({"min": 4}) == 4
+
+    def test_max_only(self):
+        assert _build_rating_condition({"max": 3}) == -3
+
+    def test_no_rating(self):
+        assert _build_rating_condition({}) is None
+
+
+# Tandoor-shaped API response fixtures for integration tests
+_RECIPE_POOL = [
+    {
+        "id": i,
+        "name": name,
+        "description": "",
+        "new": False,
+        "servings": 4,
+        "keywords": kws,
+        "rating": rating,
+        "last_cooked": cooked,
+        "created_at": "2024-01-01T12:00:00+00:00",
+    }
+    for i, name, kws, rating, cooked in [
+        (
+            1,
+            "Margarita",
+            [{"id": 10, "name": "Tequila"}, {"id": 20, "name": "Citrus"}],
+            4.5,
+            "2024-12-01T12:00:00+00:00",
+        ),
+        (2, "Old Fashioned", [{"id": 30, "name": "Whiskey"}], 5.0, None),
+        (
+            3,
+            "Daiquiri",
+            [{"id": 10, "name": "Tequila"}, {"id": 40, "name": "Rum"}],
+            3.0,
+            "2024-06-01T12:00:00+00:00",
+        ),
+        (4, "Mojito", [{"id": 40, "name": "Rum"}, {"id": 20, "name": "Citrus"}], 2.0, None),
+        (5, "Negroni", [{"id": 50, "name": "Gin"}], 4.0, "2024-11-01T12:00:00+00:00"),
+    ]
+]
+
+
+class TestMenuServiceIntegration:
+    """Tests that exercise prepare_data + select_recipes end-to-end with mocked Tandoor."""
+
+    def _make_service(self, mock_logger, config, api_mock_setup):
+        """Build a MenuService with mocked Tandoor API."""
+        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
+            api = MockAPI.return_value
+            api_mock_setup(api)
+            service = MenuService(
+                url="http://localhost", token="test", config=config, logger=mock_logger
+            )
+            service.prepare_data()
+        return service
+
+    def test_keyword_constraint_end_to_end(self, mock_logger):
+        """Full pipeline: load recipes, prepare keyword constraint, solve."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "keyword",
+                    "items": [{"id": 10, "name": "Tequila"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+            api.get_keyword_tree.return_value = [{"id": 10, "name": "Tequila"}]
+
+        service = self._make_service(mock_logger, config, setup_api)
+
+        # Verify keyword constraint was prepared
+        assert len(service.constraints[0]["keywords"]) == 1
+        assert service.constraints[0]["keywords"][0].id == 10
+
+        # Run solver — should succeed with keyword constraint
+        result = service.select_recipes()
+        assert len(result.recipes) == 2
+        assert result.constraint_count == 1
+        # At least one recipe must have keyword 10
+        has_tequila = any(10 in r.keywords for r in result.recipes)
+        assert has_tequila
+
+    def test_keyword_constraint_no_children(self, mock_logger):
+        """Keyword constraint with include_children=False uses get_keyword instead of tree."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "keyword",
+                    "items": [{"id": 50, "name": "Gin"}],
+                    "count": 1,
+                    "operator": ">=",
+                    "include_children": False,
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+            api.get_keyword.return_value = {"id": 50, "name": "Gin"}
+
+        service = self._make_service(mock_logger, config, setup_api)
+        api = service.tandoor
+        api.get_keyword.assert_called_once_with(50)
+
+    def test_food_constraint_end_to_end(self, mock_logger):
+        """Full pipeline with food constraint — fetches food, queries matching recipes."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "food",
+                    "items": [{"id": 100, "name": "Lime Juice"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.side_effect = lambda **kwargs: (
+                _RECIPE_POOL[:3]  # recipes containing lime juice
+                if kwargs.get("params", {}).get("foods_or")
+                else _RECIPE_POOL
+            )
+            api.get_food.return_value = {"id": 100, "name": "Lime Juice"}
+
+        service = self._make_service(mock_logger, config, setup_api)
+        assert len(service.constraints[0]["foods"]) == 1
+        assert len(service.constraints[0]["matching_recipes"]) == 3
+        result = service.select_recipes()
+        assert result.constraint_count == 1
+
+    def test_food_constraint_with_except(self, mock_logger):
+        """Food constraint with except_ids passes foods_or_not to Tandoor."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "food",
+                    "items": [{"id": 100, "name": "Citrus"}],
+                    "except": [{"id": 101, "name": "Lemon"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.side_effect = lambda **kwargs: (
+                _RECIPE_POOL[:2] if kwargs.get("params", {}).get("foods_or") else _RECIPE_POOL
+            )
+            api.get_food.return_value = {"id": 100, "name": "Citrus"}
+
+        service = self._make_service(mock_logger, config, setup_api)
+        # Check that except_ids were parsed
+        assert service.constraints[0]["except_ids"] == [101]
+
+    def test_book_constraint_end_to_end(self, mock_logger):
+        """Full pipeline with book constraint."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "book",
+                    "items": [{"id": 5, "name": "Classics"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+            api.get_book.return_value = {"id": 5, "name": "Classics", "filter": None}
+            api.get_book_recipes.return_value = [_RECIPE_POOL[0], _RECIPE_POOL[1]]
+
+        service = self._make_service(mock_logger, config, setup_api)
+        assert len(service.constraints[0]["books"]) == 1
+        assert len(service.constraints[0]["matching_recipes"]) == 2
+        result = service.select_recipes()
+        assert result.constraint_count == 1
+
+    def test_rating_constraint_end_to_end(self, mock_logger):
+        """Full pipeline with rating constraint — min 4 stars."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "rating",
+                    "min": 4,
+                    "count": 2,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        # All selected recipes should be 4+ stars
+        for r in result.recipes:
+            assert r.rating >= 4.0
+
+    def test_multiple_constraints(self, mock_logger):
+        """Multiple constraint types in one solve."""
+        config = {
+            "choices": 3,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "keyword",
+                    "items": [{"id": 20, "name": "Citrus"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+                {
+                    "type": "rating",
+                    "min": 3,
+                    "count": 2,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+            api.get_keyword_tree.return_value = [{"id": 20, "name": "Citrus"}]
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        assert result.constraint_count == 2
+        assert len(result.recipes) == 3
+
+    def test_exclude_constraint(self, mock_logger):
+        """Exclude constraint inverts match set — requires picks from non-matching recipes."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "keyword",
+                    "items": [{"id": 40, "name": "Rum"}],
+                    "count": 2,
+                    "operator": ">=",
+                    "exclude": True,
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+            api.get_keyword_tree.return_value = [{"id": 40, "name": "Rum"}]
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        # With exclude=True, the constraint says "at least 2 non-rum recipes"
+        # Since we pick 2 total and require 2 non-rum, none should have rum
+        non_rum = [r for r in result.recipes if 40 not in r.keywords]
+        assert len(non_rum) >= 2
+
+    def test_soft_constraint(self, mock_logger):
+        """Soft constraint can be relaxed when infeasible."""
+        config = {
+            "choices": 3,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "rating",
+                    "min": 5,
+                    "count": 3,
+                    "operator": ">=",
+                    "soft": True,
+                    "label": "All 5 stars",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        # Only 1 recipe has 5 stars, but constraint is soft so solver relaxes
+        assert len(result.recipes) == 3
+        assert result.status in ("optimal", "relaxed")
+
+    def test_select_with_cookedon_constraint(self, mock_logger):
+        """Cookedon date constraint filters by last_cooked."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "cookedon",
+                    "count": 1,
+                    "operator": ">=",
+                    "older_than_days": 180,
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        assert result.constraint_count == 1
+
+    def test_makenow_constraint_in_solver(self, mock_logger):
+        """Makenow constraint flows through solver — applies via book constraint method."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {"type": "makenow", "count": 1, "operator": ">="},
+            ],
+        }
+        onhand = _RECIPE_POOL[:2]
+
+        def setup_api(api):
+            api.get_recipes.side_effect = lambda **kwargs: (
+                onhand if kwargs.get("params", {}).get("makenow") else _RECIPE_POOL
+            )
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        assert result.constraint_count == 1
+        # At least one recipe should be from the on-hand set
+        onhand_ids = {r["id"] for r in onhand}
+        assert any(r.id in onhand_ids for r in result.recipes)
+
+    def test_food_constraint_tolerates_api_error(self, mock_logger):
+        """Food constraint skips foods that fail to fetch but still finds recipes."""
+        from morsl.tandoor_api import TandoorAPIError
+
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "food",
+                    "items": [{"id": 100, "name": "Lime"}, {"id": 101, "name": "Missing"}],
+                    "count": 1,
+                    "operator": ">=",
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.side_effect = lambda **kwargs: (
+                _RECIPE_POOL[:2] if kwargs.get("params", {}).get("foods_or") else _RECIPE_POOL
+            )
+
+            def get_food_side_effect(food_id):
+                if food_id == 101:
+                    raise TandoorAPIError(404, "Not found")
+                return {"id": 100, "name": "Lime"}
+
+            api.get_food.side_effect = get_food_side_effect
+
+        service = self._make_service(mock_logger, config, setup_api)
+        # Should have 1 food (the other was skipped due to error)
+        assert len(service.constraints[0]["foods"]) == 1
+        assert service.constraints[0]["foods"][0].name == "Lime"
+
+    def test_select_with_cookedon_within_days(self, mock_logger):
+        """Cookedon constraint with within_days (the other date branch)."""
+        config = {
+            "choices": 2,
+            "cache": 0,
+            "constraints": [
+                {
+                    "type": "cookedon",
+                    "count": 1,
+                    "operator": ">=",
+                    "within_days": 900,
+                },
+            ],
+        }
+
+        def setup_api(api):
+            api.get_recipes.return_value = _RECIPE_POOL
+
+        service = self._make_service(mock_logger, config, setup_api)
+        result = service.select_recipes()
+        assert result.constraint_count == 1
+
+
+class TestDateFilterFunctions:
+    """Test the date helper functions that are called during constraint application."""
+
+    def test_resolve_date_recipes_no_filter(self):
+        """No within_days or older_than_days returns all recipes."""
+        from morsl.models import make_recipe
+
+        recipes = [make_recipe(r) for r in _RECIPE_POOL]
+        result = _resolve_date_recipes(recipes, {}, "cookedon")
+        assert len(result) == len(recipes)
+
+    def test_apply_date_filters_no_dates(self):
+        """No cooked_date or created_date in constraint returns recipes unchanged."""
+        from morsl.models import make_recipe
+
+        recipes = [make_recipe(r) for r in _RECIPE_POOL]
+        result = _apply_date_filters(recipes, {})
+        assert result == recipes
+
+    def test_apply_date_filters_with_cooked(self):
+        """Apply cooked_date filter narrows results."""
+        from morsl.models import make_recipe
+        from morsl.utils import now
+
+        recipes = [make_recipe(r) for r in _RECIPE_POOL]
+        cutoff = now()
+        result = _apply_date_filters(recipes, {"cooked_date": cutoff, "cooked_after": False})
+        for r in result:
+            assert r.cookedon is not None
+            assert r.cookedon < cutoff
+
+    def test_apply_date_filters_with_created(self):
+        """Apply created_date filter (the other branch)."""
+        from morsl.models import make_recipe
+        from morsl.utils import now
+
+        recipes = [make_recipe(r) for r in _RECIPE_POOL]
+        cutoff = now()
+        result = _apply_date_filters(recipes, {"created_date": cutoff, "created_after": False})
+        for r in result:
+            assert r.createdon is not None
+            assert r.createdon < cutoff
+
+    def test_resolve_date_recipes_within_days(self):
+        """within_days branch of _resolve_date_recipes."""
+        from morsl.models import make_recipe
+
+        recipes = [make_recipe(r) for r in _RECIPE_POOL]
+        result = _resolve_date_recipes(recipes, {"within_days": 365}, "cookedon")
+        # Should return recipes cooked within last 365 days
+        for r in result:
+            assert r.cookedon is not None
 
 
 class TestConfigService:
@@ -556,3 +1205,71 @@ class TestGenerationService:
         svc = GenerationService(data_dir=str(tmp_path))
         result = svc.clear_menu()
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_no_task(self, tmp_path):
+        """wait_for_completion returns current status when no task is running."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        status = await svc.wait_for_completion()
+        assert status.state == GenerationState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_waits_for_task(self, tmp_path, mock_logger):
+        """wait_for_completion blocks until the generation task completes."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        with patch.object(
+            svc,
+            "_sync_generate",
+            return_value={
+                "recipes": [{"id": 1, "name": "Test"}],
+                "generated_at": "2024-01-01T00:00:00",
+                "requested_count": 1,
+                "constraint_count": 0,
+                "status": "optimal",
+                "warnings": [],
+                "relaxed_constraints": [],
+            },
+        ):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            status = await svc.wait_for_completion(timeout=5.0)
+        assert status.state == GenerationState.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_shutdown_when_idle(self, tmp_path):
+        """shutdown does nothing when no task is running."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        await svc.shutdown()
+        assert svc.get_status().state == GenerationState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_shutdown_cancels_running_task(self, tmp_path, mock_logger):
+        """shutdown cancels an in-flight generation and resets state to IDLE."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        # Use a slow sync_generate to ensure the task is still running
+        async def slow_generate(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        with patch.object(svc, "_run_generation", side_effect=slow_generate):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            assert svc.get_status().state == GenerationState.GENERATING
+            await svc.shutdown(timeout=2.0)
+        assert svc.get_status().state == GenerationState.IDLE
+
+    def test_cleanup_stale_temp_files(self, tmp_path):
+        """Stale .tmp files are removed on init."""
+        (tmp_path / "menu.tmp").write_text("stale")
+        (tmp_path / "current_menu.json").write_text('{"recipes": []}')
+        GenerationService(data_dir=str(tmp_path))
+        assert not (tmp_path / "menu.tmp").exists()
+        assert (tmp_path / "current_menu.json").exists()

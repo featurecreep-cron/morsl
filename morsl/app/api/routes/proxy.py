@@ -91,6 +91,16 @@ def search_books(
     return _proxy_get(api_url, token, params=params)
 
 
+@router.get("/custom-filters", dependencies=[Depends(require_admin)])
+def list_custom_filters(
+    credentials: tuple[str, str] = Depends(get_credentials),
+) -> Any:
+    """Proxy custom filter listing from Tandoor."""
+    url, token = credentials
+    api_url = f"{url.rstrip('/')}/api/custom-filter/"
+    return _proxy_get(api_url, token, params={"page_size": 100})
+
+
 @router.get("/meal-types")
 def list_meal_types(
     credentials: tuple[str, str] = Depends(get_credentials),
@@ -178,7 +188,7 @@ def set_rating(
     }
     try:
         requests.post(cook_log_url, headers=headers, json=cook_log_data, timeout=DEFAULT_TIMEOUT)
-    except Exception as e:
+    except requests.RequestException as e:
         logger.warning(f"Failed to create cook log for recipe {recipe_id}: {e}")
 
     if response.content:
