@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from morsl.app.api.dependencies import (
@@ -268,6 +269,18 @@ app = FastAPI(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=GZIP_MIN_SIZE)
+
+# CORS: morsl is a same-origin app (API + static from same server).
+# Restrict cross-origin requests to prevent CSRF via fetch/XHR.
+_CORS_ORIGINS = os.environ.get("MORSL_CORS_ORIGINS", "").split(",")
+_CORS_ORIGINS = [o.strip() for o in _CORS_ORIGINS if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")

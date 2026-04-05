@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import hmac
 import ipaddress
 import logging
 import os
@@ -36,6 +35,8 @@ from morsl.constants import BRANDING_IMAGE_MAX_SIZE, DEFAULT_FAVICON_PATH, ICONS
 from morsl.services.category_service import CategoryService
 from morsl.services.config_service import ConfigService
 from morsl.services.settings_service import DEFAULTS, SettingsService
+from morsl.utils import hash_pin, is_pin_hashed
+from morsl.utils import verify_pin as verify_pin_hash
 
 logger = logging.getLogger(__name__)
 
@@ -132,10 +133,15 @@ def update_settings(
         raise HTTPException(
             400, f"Use POST /settings/credentials for: {', '.join(sorted(cred_in_body))}"
         )
-    # Revoke tokens if PIN value is actually changing
+    # Hash and store PIN if it's being changed
     if "pin" in body:
-        current_pin = svc.get_all().get("pin", "")
-        if body["pin"] != current_pin:
+        new_pin = body["pin"]
+        current = svc.get_all()
+        stored_pin = current.get("pin", "")
+        pin_changed = not new_pin or not verify_pin_hash(new_pin, stored_pin)
+        if new_pin:
+            body["pin"] = hash_pin(new_pin)
+        if pin_changed:
             revoke_admin_tokens()
     result = svc.update(body)
     return _mask_secrets(result)
@@ -190,8 +196,11 @@ def verify_pin(
     client_ip = request.client.host if request.client else "unknown"
     _check_pin_rate_limit(client_ip)
 
-    valid = hmac.compare_digest(body.pin, stored_pin)
+    valid = verify_pin_hash(body.pin, stored_pin)
     if valid:
+        # Transparently migrate plaintext PINs to hashed storage
+        if not is_pin_hashed(stored_pin):
+            svc.update({"pin": hash_pin(body.pin)})
         # Clear failures on success
         _pin_failures.pop(client_ip, None)
         return {"valid": True, "token": create_admin_token()}
