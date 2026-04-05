@@ -56,10 +56,16 @@ def revoke_admin_tokens() -> None:
 
 
 def _cleanup_expired_tokens() -> None:
-    """Prune tokens beyond the max size. Call while holding _admin_tokens_lock."""
+    """Prune expired and excess tokens. Call while holding _admin_tokens_lock."""
+    now = time.time()
+    # Remove tokens older than the maximum possible TTL (5 minutes)
+    max_ttl = max(PIN_IMMEDIATE_GRACE_SECONDS, 300)
+    expired = [tok for tok, created in _admin_tokens.items() if now - created > max_ttl]
+    for tok in expired:
+        del _admin_tokens[tok]
+    # Also enforce size limit
     if len(_admin_tokens) <= ADMIN_TOKEN_CACHE_MAXSIZE:
         return
-    # Remove oldest tokens to get back under the limit
     sorted_tokens = sorted(_admin_tokens.items(), key=lambda x: x[1])
     excess = len(_admin_tokens) - ADMIN_TOKEN_CACHE_MAXSIZE
     for tok, _ in sorted_tokens[:excess]:

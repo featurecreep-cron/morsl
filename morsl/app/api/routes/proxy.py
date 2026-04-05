@@ -44,9 +44,10 @@ async def _proxy_get(url: str, token: str, params: Optional[Dict[str, Any]] = No
     client = _get_client()
     response = await client.get(url, headers=_headers(token), params=params)
     if response.status_code != 200:
+        logger.warning("Tandoor API error %d for %s: %s", response.status_code, url, response.text)
         raise HTTPException(
             status_code=response.status_code,
-            detail=f"Tandoor API error: {response.text}",
+            detail=f"Tandoor API error (HTTP {response.status_code})",
         )
     return response.json()
 
@@ -147,9 +148,12 @@ async def create_meal_type(
         json={"name": body.name, "color": body.color or "#FF5722"},
     )
     if response.status_code not in (200, 201):
+        logger.warning(
+            "Tandoor API error %d creating meal type: %s", response.status_code, response.text
+        )
         raise HTTPException(
             status_code=response.status_code,
-            detail=f"Tandoor API error: {response.text}",
+            detail=f"Tandoor API error (HTTP {response.status_code})",
         )
     return response.json()
 
@@ -186,9 +190,15 @@ async def set_rating(
     api_url = f"{url.rstrip('/')}/api/recipe/{recipe_id}/"
     response = await client.patch(api_url, headers=hdrs, json={"rating": body.rating})
     if response.status_code not in (200, 204):
+        logger.warning(
+            "Tandoor API error %d for rating recipe %d: %s",
+            response.status_code,
+            recipe_id,
+            response.text,
+        )
         raise HTTPException(
             status_code=response.status_code,
-            detail=f"Tandoor API error: {response.text}",
+            detail=f"Tandoor API error (HTTP {response.status_code})",
         )
 
     # Create a cook log entry to record who rated

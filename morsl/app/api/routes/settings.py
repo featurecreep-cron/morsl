@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import contextlib
 import hmac
+import ipaddress
 import logging
 import os
+import socket
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
@@ -37,6 +40,24 @@ from morsl.services.settings_service import DEFAULTS, SettingsService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+def _reject_private_url(url: str) -> Optional[str]:
+    """Return an error message if the URL resolves to a private/internal address, else None."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        return "Invalid URL"
+    try:
+        resolved = socket.getaddrinfo(hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            addr = ipaddress.ip_address(sockaddr[0])
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return "URL must not point to internal/private addresses"
+    except (socket.gaierror, OSError):
+        return "Could not resolve hostname"
+    return None
+
 
 ALLOWED_IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".webp"}
 
@@ -126,9 +147,33 @@ def get_public_settings(svc: SettingsService = Depends(get_settings_service)) ->
     return svc.get_public()
 
 
+_pin_failures: Dict[str, list] = {}  # ip -> [timestamp, ...]
+_PIN_RATE_WINDOW = 60  # seconds
+_PIN_MAX_ATTEMPTS = 5
+
+
+def _check_pin_rate_limit(client_ip: str) -> None:
+    """Raise 429 if too many failed PIN attempts from this IP."""
+    now = time.time()
+    attempts = _pin_failures.get(client_ip, [])
+    # Prune old attempts outside the window
+    attempts = [t for t in attempts if now - t < _PIN_RATE_WINDOW]
+    _pin_failures[client_ip] = attempts
+    if len(attempts) >= _PIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed attempts. Try again in {_PIN_RATE_WINDOW} seconds.",
+        )
+
+
+def _record_pin_failure(client_ip: str) -> None:
+    _pin_failures.setdefault(client_ip, []).append(time.time())
+
+
 @router.post("/verify-pin")
 def verify_pin(
     body: PinRequest,
+    request: Request,
     svc: SettingsService = Depends(get_settings_service),
 ) -> Dict[str, Any]:
     """Verify admin/kiosk PIN. Returns valid=true and a session token on success."""
@@ -141,9 +186,16 @@ def verify_pin(
     stored_pin = settings.get("pin", "")
     if not stored_pin:
         return {"valid": True}
+
+    client_ip = request.client.host if request.client else "unknown"
+    _check_pin_rate_limit(client_ip)
+
     valid = hmac.compare_digest(body.pin, stored_pin)
     if valid:
+        # Clear failures on success
+        _pin_failures.pop(client_ip, None)
         return {"valid": True, "token": create_admin_token()}
+    _record_pin_failure(client_ip)
     return {"valid": False}
 
 
@@ -172,8 +224,13 @@ def get_setup_status(
 async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
     """Test a Tandoor API connection with the given credentials."""
     url = str(body.url).rstrip("/")
+    # SSRF protection: resolve hostname and reject internal/loopback addresses
+    _err = _reject_private_url(url)
+    if _err:
+        return {"success": False, "error": _err}
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=False) as client:
             resp = await client.get(
                 f"{url}/api/food/?limit=1",
                 headers={"Authorization": f"Bearer {body.token}"},
@@ -220,6 +277,18 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{prefix}-{int(time.time())}{ext}"
     dest = UPLOADS_DIR / filename
+
+    # Sanitize SVG uploads to prevent stored XSS
+    if ext == ".svg":
+        try:
+            from defusedxml.ElementTree import fromstring
+
+            fromstring(content)  # reject malformed/malicious XML
+            from svg_hush import filter_svg
+
+            content = filter_svg(content)
+        except (ValueError, SyntaxError, OSError):
+            raise HTTPException(400, "Invalid or unsafe SVG content") from None
 
     # Atomic write
     fd, tmp_path = tempfile.mkstemp(dir=str(UPLOADS_DIR), suffix=".tmp")
@@ -285,7 +354,7 @@ def upload_favicon(
         logger.info("Regenerated icons from %s", source_path)
     except (OSError, ValueError) as e:
         logger.error("Icon generation failed: %s", e)
-        raise HTTPException(500, f"Icon generation failed: {e}") from None
+        raise HTTPException(500, "Icon generation failed") from None
 
     return svc.update({"favicon_url": url})
 

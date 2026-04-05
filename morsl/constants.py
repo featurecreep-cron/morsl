@@ -11,7 +11,7 @@ ADMIN_TOKEN_CACHE_MAXSIZE = 128
 PIN_TIMEOUT_OPTIONS = [0, 30, 60, 300]
 # Grace period for "immediate" timeout — allows admin page to complete its
 # parallel API calls during a single page load before the token expires.
-PIN_IMMEDIATE_GRACE_SECONDS = 120
+PIN_IMMEDIATE_GRACE_SECONDS = 15
 
 # HTTP client
 HTTP_CONNECT_TIMEOUT = 5

@@ -53,6 +53,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[dev]"
 
+      - name: Audit dependencies
+        run: pip install pip-audit && pip-audit
+
       - name: Test with coverage
         run: pytest --tb=short -q --cov --cov-report=xml
 

@@ -372,10 +372,14 @@ class TandoorAPI:
         self.delete_object(url, obj_id)
         self.logger.debug(f"Succesfully deleted meal plan {obj_id}.")
 
+    _VALID_SUBSTITUTE_TYPES = {"food", "ingredient"}
+
     @cached
     def get_food_substitutes(
         self, food_id: Union[str, int], substitute: str
     ) -> List[Dict[str, Any]]:
+        if substitute not in self._VALID_SUBSTITUTE_TYPES:
+            raise ValueError(f"Invalid substitute type: {substitute}")
         url = f"{self.url}{substitute}/{food_id}/substitutes/"
         self.logger.debug(f"Connecting to tandoor api at url: {url}")
         response = self.session.get(url, params={"onhand": 1}, timeout=DEFAULT_TIMEOUT)
