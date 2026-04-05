@@ -153,4 +153,4 @@ def preview_profile(
         }
     except (OSError, ValueError, KeyError) as e:
         logger.warning(f"Preview failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from None
+        raise HTTPException(status_code=500, detail="Profile preview failed") from None

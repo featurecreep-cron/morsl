@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, Field, computed_field
 
 from morsl.constants import API_CACHE_TTL_MINUTES
 
@@ -157,9 +157,9 @@ class RatingRequest(BaseModel):
 
 class OrderRequest(BaseModel):
     recipe_id: int
-    recipe_name: str
+    recipe_name: str = Field(max_length=200)
     servings: int = 1
-    customer_name: Optional[str] = None
+    customer_name: Optional[str] = Field(default=None, max_length=100)
 
 
 class MealTypeCreateRequest(BaseModel):
