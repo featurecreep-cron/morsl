@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import re
+import secrets
 import sys
 import tempfile
 import threading
@@ -34,6 +36,45 @@ def safe_path(base_dir: str, *parts: str) -> str:
     if not (resolved == base_resolved or resolved.startswith(base_resolved + os.sep)):
         raise ValueError(f"Path escapes base directory: {joined}")
     return resolved
+
+
+_PIN_HASH_PREFIX = "scrypt$"
+
+
+def hash_pin(pin: str) -> str:
+    """Hash a PIN using scrypt. Returns 'scrypt$salt_hex$hash_hex'."""
+    if not pin:
+        return ""
+    salt = secrets.token_bytes(16)
+    derived = hashlib.scrypt(pin.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+    return f"{_PIN_HASH_PREFIX}{salt.hex()}${derived.hex()}"
+
+
+def verify_pin(pin: str, stored: str) -> bool:
+    """Verify a PIN against a stored hash or plaintext (migration).
+
+    Returns (valid, needs_rehash) — needs_rehash is True when the stored
+    value was plaintext and should be replaced with a hash.
+    """
+    if not stored:
+        return False
+    if stored.startswith(_PIN_HASH_PREFIX):
+        parts = stored.split("$")
+        if len(parts) != 3:
+            return False
+        salt = bytes.fromhex(parts[1])
+        expected = bytes.fromhex(parts[2])
+        derived = hashlib.scrypt(pin.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+        return secrets.compare_digest(derived, expected)
+    # Legacy plaintext — constant-time compare
+    import hmac
+
+    return hmac.compare_digest(pin, stored)
+
+
+def is_pin_hashed(stored: str) -> bool:
+    """Check if a stored PIN value is already hashed."""
+    return stored.startswith(_PIN_HASH_PREFIX) if stored else True
 
 
 def atomic_write_json(path: str, data: Any) -> None:
