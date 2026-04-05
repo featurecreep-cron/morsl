@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -175,8 +176,20 @@ class TandoorAPI:
         if filters is not None:
             if not isinstance(filters, list):
                 filters = [filters]
-            for f in filters:
-                recipes += self.get_paged_results(url, {"page_size": self.page_size, "filter": f})
+            if len(filters) == 1:
+                recipes += self.get_paged_results(
+                    url, {"page_size": self.page_size, "filter": filters[0]}
+                )
+            elif filters:
+                with ThreadPoolExecutor(max_workers=len(filters)) as pool:
+                    results = pool.map(
+                        lambda f: self.get_paged_results(
+                            url, {"page_size": self.page_size, "filter": f}
+                        ),
+                        filters,
+                    )
+                    for result in results:
+                        recipes += result
 
         self.logger.debug(f"Returning {len(recipes)} total recipes.")
         return recipes
@@ -266,8 +279,10 @@ class TandoorAPI:
             list: List of book contents.
         """
 
-        url = f"{self.url}recipe-book-entry/?book={book.id}"
-        book_entries = self.get_unpaged_results(url, "", **kwargs)
+        url = f"{self.url}recipe-book-entry/"
+        book_entries = self.get_paged_results(
+            url, {"book": book.id, "page_size": self.page_size}, **kwargs
+        )
         recipes = [be["recipe_content"] for be in book_entries]
         if book.filter:
             recipes += self.get_recipes(filters=book.filter)

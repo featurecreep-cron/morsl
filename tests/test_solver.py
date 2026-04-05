@@ -172,35 +172,41 @@ class TestSoftConstraints:
 
 
 @pytest.mark.slow
-class TestProgressiveRelaxation:
-    def test_reduces_n_on_infeasible(self, sample_recipes, mock_logger):
-        """Request 5 with impossible hard constraints but feasible at 3, min_choices=1."""
-        # Only 3 Italian recipes; require all selected to be Italian (<=0 non-Italian)
-        # At N=5 this is infeasible (only 3 Italian), but at N=3 it works
+class TestConstraintInfeasibility:
+    def test_hard_constraint_infeasible_raises(self, sample_recipes, mock_logger):
+        """Hard constraints that can't be satisfied raise RuntimeError."""
+        # Only 3 Italian recipes; require all 5 selected to be Italian — impossible
         italian = [r for r in sample_recipes if 10 in r.keywords]
-        picker = RecipePicker(sample_recipes, 5, logger=mock_logger, min_choices=1)
-        # Require all selected are Italian: non-Italian == 0
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
         picker.add_keyword_constraint(italian, 0, "<=", exclude=True)
-        result = picker.solve()
-        assert len(result.recipes) == 3
-        assert len(result.warnings) > 0
-        assert "Reduced" in result.warnings[0]
+        with pytest.raises(RuntimeError, match="No solution found"):
+            picker.solve()
 
-    def test_fails_at_min_choices(self, sample_recipes, mock_logger):
-        """Constraints infeasible even at min_choices raises RuntimeError."""
-        # Require 8 Italian hard — impossible at any N since only 3 Italian
+    def test_soft_constraint_relaxes_on_infeasible(self, sample_recipes, mock_logger):
+        """Soft constraints relax when infeasible — still returns full recipe count."""
+        # Only 3 Italian recipes; request 5 Italian as soft constraint
         italian = [r for r in sample_recipes if 10 in r.keywords]
-        picker = RecipePicker(sample_recipes, 5, logger=mock_logger, min_choices=3)
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_keyword_constraint(italian, 5, ">=", weight=50)
+        result = picker.solve()
+        assert len(result.recipes) == 5
+        assert len(result.relaxed_constraints) > 0
+
+    def test_hard_constraint_impossible_count(self, sample_recipes, mock_logger):
+        """Require 8 Italian hard — impossible since only 3 Italian."""
+        italian = [r for r in sample_recipes if 10 in r.keywords]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
         picker.add_keyword_constraint(italian, 8, ">=")
         with pytest.raises(RuntimeError, match="No solution found"):
             picker.solve()
 
-    def test_no_reduction_when_feasible(self, sample_recipes, mock_logger):
-        """Feasible at original N, no warnings, full count returned."""
-        picker = RecipePicker(sample_recipes, 5, logger=mock_logger, min_choices=1)
+    def test_feasible_no_relaxation(self, sample_recipes, mock_logger):
+        """Feasible constraints produce no relaxation and full count."""
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
         result = picker.solve()
         assert len(result.recipes) == 5
         assert result.warnings == ()
+        assert result.relaxed_constraints == ()
 
 
 class TestBackwardCompatibility:
@@ -295,3 +301,91 @@ class TestDateConstraints:
         result = picker.solve()
         assert len(result.recipes) == 5
         assert len(result.relaxed_constraints) > 0
+
+    def test_cookedon_eq_constraint(self, sample_recipes, mock_logger):
+        """cookedon constraint with == selects exact count of cooked recipes."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_cookedon_constraints(cooked, 3, "==")
+        result = picker.solve()
+        sel_cooked = [r for r in result.recipes if r.cookedon is not None]
+        assert len(sel_cooked) == 3
+
+    def test_cookedon_between_constraint(self, sample_recipes, mock_logger):
+        """cookedon constraint with 'between' bounds cooked recipe count."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_cookedon_constraints(cooked, 2, "between", upper_bound=4)
+        result = picker.solve()
+        sel_cooked = [r for r in result.recipes if r.cookedon is not None]
+        assert 2 <= len(sel_cooked) <= 4
+
+    def test_createdon_lte_constraint(self, sample_recipes, mock_logger):
+        """createdon constraint with <= caps recipes created in range."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # At most 3 of the selection should be from after May 2023
+        picker.add_createdon_constraints(recent, 3, "<=")
+        result = picker.solve()
+        sel_recent = [r for r in result.recipes if r.createdon and r.createdon >= cutoff]
+        assert len(sel_recent) <= 3
+
+    def test_createdon_eq_constraint(self, sample_recipes, mock_logger):
+        """createdon constraint with == selects exact count from date range."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_createdon_constraints(recent, 3, "==")
+        result = picker.solve()
+        sel_recent = [r for r in result.recipes if r.createdon and r.createdon >= cutoff]
+        assert len(sel_recent) == 3
+
+    def test_createdon_between_constraint(self, sample_recipes, mock_logger):
+        """createdon constraint with 'between' bounds count in range."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        picker.add_createdon_constraints(recent, 1, "between", upper_bound=3)
+        result = picker.solve()
+        sel_recent = [r for r in result.recipes if r.createdon and r.createdon >= cutoff]
+        assert 1 <= len(sel_recent) <= 3
+
+    def test_createdon_exclude(self, sample_recipes, mock_logger):
+        """createdon with exclude=True constrains recipes NOT in the date range."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # exclude=True: constraint applies to recipes created BEFORE cutoff
+        picker.add_createdon_constraints(recent, 2, ">=", exclude=True)
+        result = picker.solve()
+        sel_old = [r for r in result.recipes if r.createdon and r.createdon < cutoff]
+        assert len(sel_old) >= 2
+
+    def test_createdon_soft_constraint(self, sample_recipes, mock_logger):
+        """createdon with weight > 0 relaxes when impossible."""
+        from datetime import datetime, timezone
+
+        cutoff = datetime(2023, 5, 1, tzinfo=timezone.utc)
+        recent = [r for r in sample_recipes if r.createdon and r.createdon >= cutoff]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        # Impossible: require 10 recent recipes in selection of 5
+        picker.add_createdon_constraints(recent, 10, ">=", weight=50)
+        result = picker.solve()
+        assert len(result.recipes) == 5
+        assert len(result.relaxed_constraints) > 0
+
+    def test_between_requires_upper_bound(self, sample_recipes, mock_logger):
+        """'between' operator without upper_bound raises ValueError."""
+        cooked = [r for r in sample_recipes if r.cookedon is not None]
+        picker = RecipePicker(sample_recipes, 5, logger=mock_logger)
+        with pytest.raises(ValueError, match="upper_bound"):
+            picker.add_cookedon_constraints(cooked, 2, "between")

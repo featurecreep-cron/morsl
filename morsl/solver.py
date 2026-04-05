@@ -22,6 +22,8 @@ class RecipePicker:
         self._random_coeffs = {r.id: SOLVER_RANDOM_SCALE * random.random() for r in self.recipes}
         # O(1) recipe lookup by ID — avoids O(n) scans per constraint per rebuild
         self._recipe_by_id = {r.id: r for r in self.recipes}
+        # Pre-computed set for O(1) membership in constraint application
+        self._recipe_set = set(self.recipes)
 
         self._build_problem()
 
@@ -56,9 +58,9 @@ class RecipePicker:
         found_recipes = [self._recipe_by_id[rid] for rid in id_set if rid in self._recipe_by_id]
 
         if intersect_pool:
-            found_recipes = list(set(self.recipes) & set(found_recipes))
+            found_recipes = list(self._recipe_set & set(found_recipes))
         if exclude:
-            found_recipes = list(set(self.recipes) - set(found_recipes))
+            found_recipes = list(self._recipe_set - set(found_recipes))
 
         expr = lpSum(self.recipe_vars[i] for i in [r.id for r in found_recipes])
 
@@ -220,36 +222,16 @@ class RecipePicker:
         )
         debug = self.logger.loglevel == 10
 
-        warnings = []
-        original_n = self.numrecipes
+        self._build_problem()
+        self._build_objective()
+        self.solver.solve(PULP_CBC_CMD(msg=debug))
 
-        while True:
-            # Rebuild to get a clean problem with current numrecipes
-            self._build_problem()
-            self._build_objective()
-
-            self.solver.solve(PULP_CBC_CMD(msg=debug))
-
-            if self.solver.status == 1:
-                break
-
-            if self.numrecipes > self.min_choices:
-                self.numrecipes -= 1
-                self.logger.info(
-                    f"Infeasible at {self.numrecipes + 1} recipes, trying {self.numrecipes}..."
-                )
-            else:
-                self.logger.warning(
-                    "No solution found at %d recipes — adjustment of criteria required.",
-                    self.numrecipes,
-                )
-                raise RuntimeError("No solution found.")
-
-        if self.numrecipes < original_n:
-            warnings.append(
-                f"Reduced from {original_n} to {self.numrecipes} "
-                "recipes to find a feasible solution."
+        if self.solver.status != 1:
+            self.logger.warning(
+                "No solution found at %d recipes — adjustment of criteria required.",
+                self.numrecipes,
             )
+            raise RuntimeError("No solution found.")
 
         # Collect relaxed constraints
         relaxed = []
@@ -262,9 +244,9 @@ class RecipePicker:
         self.logger.info(f"Solver selected {len(selected)} recipes: {[r.name for r in selected]}")
         return SolverResult(
             recipes=tuple(selected),
-            requested_count=original_n,
+            requested_count=self.numrecipes,
             constraint_count=self.numcriteria,
             relaxed_constraints=tuple(relaxed),
-            warnings=tuple(warnings),
+            warnings=(),
             status="optimal",
         )
