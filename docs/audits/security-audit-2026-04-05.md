@@ -251,21 +251,21 @@ Expired tokens stay in memory until the 128-slot cache fills. Cleanup should pru
 | HIGH-1 SSRF on favicon URL | High | **Fixed** | `11bc2ad` |
 | HIGH-2 PIN rate limiting | High | **Fixed** | `11bc2ad` |
 | HIGH-3 PIN hashing | High | **Fixed** | `e1d78ea` |
-| HIGH-4 Token encryption | High | **Pending decision** — env var path exists; in-memory dict tradeoff needs owner sign-off |
+| HIGH-4 Token encryption | Informational | **Closed** — in-memory dict; attacker with process memory access already owns the host |
 | HIGH-5 Branch protection + CI gates | High | **Fixed** | `11bc2ad` |
 | HIGH-6 Branding SVG sanitization | High | **Fixed** | `11bc2ad` |
 | MED-1 WiFi PSK in public settings | Medium | **Fixed** | `11bc2ad` |
 | MED-2 Error response scrubbing | Medium | **Fixed** | `11bc2ad` |
-| MED-3 Recipe proxy auth | Medium | **Pending decision** — kiosk may need unauthenticated recipe access |
+| MED-3 Recipe proxy auth | Medium | **Accepted** — intentional for kiosk; tracked as multi-user dependency in `docs/designs/multi-user-brd.md` |
 | MED-4 Input validation | Medium | **Fixed** | `11bc2ad` |
-| MED-5 QR innerHTML | Medium | **Pending decision** — QR lib encodes data as cell pattern; exploitation path unclear |
+| MED-5 QR innerHTML | Low | **Accepted** — QR lib encodes data as cell pattern, not injectable text |
 | MED-6 CORS origin restriction | Medium | **Fixed** | `e1d78ea` |
 | MED-7 Exception message scrubbing | Medium | **Fixed** | `11bc2ad` |
 | LOW-1 Grace period reduction | Low | **Fixed** | `11bc2ad` |
 | LOW-2 Token pruning | Low | **Fixed** | `11bc2ad` |
 | LOW-4 Path segment validation | Low | **Fixed** | `11bc2ad` |
 
-**14 of 17 findings fixed. 3 pending owner decision.**
+**14 of 17 findings fixed. 2 accepted risk (owner approved). 1 downgraded and closed.**
 
 ## Not Vulnerable (Verified)
 
