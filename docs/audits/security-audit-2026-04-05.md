@@ -243,6 +243,30 @@ Expired tokens stay in memory until the 128-slot cache fills. Cleanup should pru
 6. **MED-1**: Stop persisting WiFi password server-side
 7. **HIGH-3/4**: Hash PIN, document token exposure, prefer env var
 
+## Remediation Status
+
+| Finding | Severity | Status | Commit |
+|---------|----------|--------|--------|
+| CRIT-1 SVG sanitizer bypass | Critical | **Fixed** | `11bc2ad` |
+| HIGH-1 SSRF on favicon URL | High | **Fixed** | `11bc2ad` |
+| HIGH-2 PIN rate limiting | High | **Fixed** | `11bc2ad` |
+| HIGH-3 PIN hashing | High | **Fixed** | `e1d78ea` |
+| HIGH-4 Token encryption | High | **Won't fix** — env var path preferred; in-memory dict on single-user kiosk |
+| HIGH-5 Branch protection + CI gates | High | **Fixed** | `11bc2ad` |
+| HIGH-6 Branding SVG sanitization | High | **Fixed** | `11bc2ad` |
+| MED-1 WiFi PSK in public settings | Medium | **Fixed** | `11bc2ad` |
+| MED-2 Error response scrubbing | Medium | **Fixed** | `11bc2ad` |
+| MED-3 Recipe proxy auth | Medium | **Won't fix** — kiosk display requires unauthenticated recipe access |
+| MED-4 Input validation | Medium | **Fixed** | `11bc2ad` |
+| MED-5 QR innerHTML | Medium | **Won't fix** — QR lib encodes data as cell pattern, not injectable text |
+| MED-6 CORS origin restriction | Medium | **Fixed** | `e1d78ea` |
+| MED-7 Exception message scrubbing | Medium | **Fixed** | `11bc2ad` |
+| LOW-1 Grace period reduction | Low | **Fixed** | `11bc2ad` |
+| LOW-2 Token pruning | Low | **Fixed** | `11bc2ad` |
+| LOW-4 Path segment validation | Low | **Fixed** | `11bc2ad` |
+
+**14 of 17 findings fixed. 3 accepted risks documented.**
+
 ## Not Vulnerable (Verified)
 
 - **Path traversal**: `safe_path()` with symlink resolution + regex name validation on all file-backed services. Sound implementation.
