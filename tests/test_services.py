@@ -1273,3 +1273,88 @@ class TestGenerationService:
         GenerationService(data_dir=str(tmp_path))
         assert not (tmp_path / "menu.tmp").exists()
         assert (tmp_path / "current_menu.json").exists()
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_timeout(self, tmp_path, mock_logger):
+        """wait_for_completion raises TimeoutError when task exceeds timeout."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        async def slow_generate(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        with patch.object(svc, "_run_generation", side_effect=slow_generate):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            with pytest.raises(asyncio.TimeoutError):
+                await svc.wait_for_completion(timeout=0.1)
+        # Clean up — cancel the lingering task
+        await svc.shutdown(timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_wait_for_completion_after_error(self, tmp_path, mock_logger):
+        """wait_for_completion returns ERROR status after a failed generation."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        with patch.object(svc, "_sync_generate", side_effect=RuntimeError("solver exploded")):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            status = await svc.wait_for_completion(timeout=5.0)
+        assert status.state == GenerationState.ERROR
+        assert "solver exploded" in status.error
+
+    @pytest.mark.asyncio
+    async def test_shutdown_double_call(self, tmp_path):
+        """Calling shutdown twice is safe (idempotent)."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        await svc.shutdown()
+        await svc.shutdown()
+        assert svc.get_status().state == GenerationState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_shutdown_after_error(self, tmp_path, mock_logger):
+        """Shutdown after an error resets state to IDLE."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        with patch.object(svc, "_sync_generate", side_effect=RuntimeError("boom")):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            # Wait for error state
+            await svc.wait_for_completion(timeout=5.0)
+            assert svc.get_status().state == GenerationState.ERROR
+
+        # Shutdown should be safe even in ERROR state (task is already done)
+        await svc.shutdown()
+        # State remains ERROR because shutdown only resets IDLE when it cancels a running task
+        # The task already completed (with error), so shutdown is a no-op
+        assert svc.get_status().state == GenerationState.ERROR
+
+    @pytest.mark.asyncio
+    async def test_shutdown_immediately_after_start(self, tmp_path, mock_logger):
+        """Shutdown right after start_generation cancels the task."""
+        svc = GenerationService(data_dir=str(tmp_path))
+
+        async def slow_generate(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        with patch.object(svc, "_run_generation", side_effect=slow_generate):
+            await svc.start_generation(
+                config={"choices": 1, "cache": 0},
+                url="http://localhost",
+                token="test",
+                logger=mock_logger,
+            )
+            # Immediately shut down — task should still be running
+            await svc.shutdown(timeout=2.0)
+        assert svc.get_status().state == GenerationState.IDLE

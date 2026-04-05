@@ -206,7 +206,8 @@ def cached(func: FuncType) -> FuncType:
             return func(self, *args, **kwargs)
         ttl_seconds = ttl * 60
         # Stringify args to handle unhashable types (dicts, lists)
-        key_str = f"{func.__qualname__}|" + "|".join(str(x) for x in args)
+        # Include instance id to prevent cache cross-contamination between instances
+        key_str = f"{func.__qualname__}|{id(self)}|" + "|".join(str(x) for x in args)
         if kwargs:
             key_str += "|" + str(sorted(kwargs.items()))
         key = cachetools.keys.hashkey(key_str)

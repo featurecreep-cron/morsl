@@ -9,8 +9,11 @@ from typing import Any, Dict, List
 
 from morsl.tandoor_api import TandoorAPI, TandoorError
 
-# Module-level shared pool — avoids recreating threads on every generation
+# Module-level shared pools — avoids recreating threads on every generation
+# Separate pools prevent contention: detail fetches submit food-substitute
+# lookups back to _food_pool, so they never compete for threads.
 _detail_pool = ThreadPoolExecutor(max_workers=10)
+_food_pool = ThreadPoolExecutor(max_workers=20)
 
 
 def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
@@ -50,7 +53,7 @@ def _batch_resolve_foods(api: TandoorAPI, food_objs: list[dict], logger: Logger)
         _, food = item
         return item[0], _resolve_food(api, food, logger)
 
-    futures = _detail_pool.map(_resolve, indexed)
+    futures = _food_pool.map(_resolve, indexed)
     for idx, resolved in futures:
         results[idx] = resolved
 

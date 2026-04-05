@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
 from typing import Any, Dict, List, Optional
 
@@ -67,7 +68,14 @@ class MenuService:
     Uses v2 profile format with unified constraints array.
     """
 
-    def __init__(self, url: str, token: str, config: Dict[str, Any], logger: Logger) -> None:
+    def __init__(
+        self,
+        url: str,
+        token: str,
+        config: Dict[str, Any],
+        logger: Logger,
+        api: Optional[TandoorAPI] = None,
+    ) -> None:
         self.logger = logger
         self.config = config
         self.include_children: bool = config.get("include_children", True)
@@ -77,7 +85,7 @@ class MenuService:
         )
         self.cache: int = int(config.get("cache", API_CACHE_TTL_MINUTES))
 
-        self.tandoor = TandoorAPI(url, token, self.logger, cache=self.cache)
+        self.tandoor = api or TandoorAPI(url, token, self.logger, cache=self.cache)
         self.recipes: List[Recipe] = []
         self.recipe_picker: Optional[RecipePicker] = None
 
@@ -140,7 +148,8 @@ class MenuService:
                 mealtype_id=plan_type, date=mp_date, params=recipes_param
             ):
                 self.recipes.append(make_recipe(r))
-        self.recipes = list(set(self.recipes))
+        self.recipes = list(dict.fromkeys(self.recipes))
+        self._recipe_set = frozenset(self.recipes)
 
     def prepare_constraints(self) -> None:
         """Prepare all constraints by fetching related data from API."""
@@ -163,11 +172,21 @@ class MenuService:
         include_children = constraint.get("include_children", self.include_children)
 
         kw_tree: List[Dict[str, Any]] = []
-        for kw_id in item_ids:
-            if include_children:
-                kw_tree += self.tandoor.get_keyword_tree(kw_id)
-            else:
-                kw_tree.append(self.tandoor.get_keyword(kw_id))
+        if len(item_ids) <= 1:
+            for kw_id in item_ids:
+                if include_children:
+                    kw_tree += self.tandoor.get_keyword_tree(kw_id)
+                else:
+                    kw_tree.append(self.tandoor.get_keyword(kw_id))
+        else:
+            fetch = self.tandoor.get_keyword_tree if include_children else self.tandoor.get_keyword
+            with ThreadPoolExecutor(max_workers=len(item_ids)) as pool:
+                results = pool.map(fetch, item_ids)
+                for result in results:
+                    if isinstance(result, list):
+                        kw_tree += result
+                    else:
+                        kw_tree.append(result)
 
         constraint["keywords"] = list({make_keyword(k) for k in kw_tree})
 
@@ -178,11 +197,25 @@ class MenuService:
 
         # Fetch Food objects for logging — skip items that fail
         food_list: List[Food] = []
-        for fd_id in item_ids:
-            try:
-                food_list.append(make_food(self.tandoor.get_food(fd_id)))
-            except TandoorError:
-                self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+        if len(item_ids) <= 1:
+            for fd_id in item_ids:
+                try:
+                    food_list.append(make_food(self.tandoor.get_food(fd_id)))
+                except TandoorError:
+                    self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+        else:
+
+            def _fetch_food(fd_id):
+                try:
+                    return make_food(self.tandoor.get_food(fd_id))
+                except TandoorError:
+                    self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+                    return None
+
+            with ThreadPoolExecutor(max_workers=len(item_ids)) as pool:
+                for food in pool.map(_fetch_food, item_ids):
+                    if food is not None:
+                        food_list.append(food)
         constraint["foods"] = food_list
 
         # Find recipes with these foods
@@ -254,7 +287,7 @@ class MenuService:
         """Fetch recipes that can be made with on-hand ingredients."""
         recipes = self.tandoor.get_recipes(params={"makenow": True})
         found = [make_recipe(r) for r in recipes]
-        found = [r for r in found if r in self.recipes]
+        found = [r for r in found if r in self._recipe_set]
         found = _apply_date_filters(found, constraint)
         constraint["matching_recipes"] = found
 

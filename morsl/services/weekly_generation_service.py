@@ -217,6 +217,7 @@ class WeeklyGenerationService:
         token: str,
         app_logger: logging.Logger,
         cache_minutes: int,
+        shared_api: Optional[TandoorAPI] = None,
     ) -> Dict[str, Any]:
         """Fetch data for a profile (HTTP-heavy). Safe to run in parallel."""
         self._status.profile_progress[profile_name] = "preparing"
@@ -231,7 +232,9 @@ class WeeklyGenerationService:
         config["choices"] = total_needed
         config["cache"] = cache_minutes
 
-        service = MenuService(url=url, token=token, config=config, logger=app_logger)
+        service = MenuService(
+            url=url, token=token, config=config, logger=app_logger, api=shared_api
+        )
         service.prepare_data()
         return {"error": None, "service": service, "profile_name": profile_name}
 
@@ -325,12 +328,23 @@ class WeeklyGenerationService:
             cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         # 3a. Parallel data-fetch phase — all profiles prepare concurrently
+        # Share a single TandoorAPI instance across all profiles to leverage
+        # the global cache for overlapping recipe pools.
         from concurrent.futures import ThreadPoolExecutor
+
+        shared_api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
 
         def _prepare(item):
             name, needed = item
             return self._prepare_profile_data(
-                name, needed, config_service, url, token, app_logger, cache_minutes
+                name,
+                needed,
+                config_service,
+                url,
+                token,
+                app_logger,
+                cache_minutes,
+                shared_api=shared_api,
             )
 
         with ThreadPoolExecutor(max_workers=len(sorted_profiles)) as pool:
@@ -365,8 +379,7 @@ class WeeklyGenerationService:
         for recipes in profile_recipes.values():
             all_recipe_objs.extend(recipes)
 
-        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
-        details_list = fetch_recipe_details(api, all_recipe_objs, app_logger)
+        details_list = fetch_recipe_details(shared_api, all_recipe_objs, app_logger)
 
         detail_map: Dict[int, Dict[str, Any]] = {}
         for detail in details_list:
@@ -482,8 +495,7 @@ class WeeklyGenerationService:
 
         solver_result = service.select_recipes()
 
-        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
-        return fetch_recipe_details(api, solver_result.recipes, app_logger)
+        return fetch_recipe_details(service.tandoor, solver_result.recipes, app_logger)
 
     async def wait_for_completion(self, timeout: float = 300.0) -> WeeklyGenerationStatus:
         """Wait for an in-flight generation to finish."""
