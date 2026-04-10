@@ -521,8 +521,16 @@ function menuApp() {
                 }
             });
 
-            this._menuSSE.addEventListener('connected', () => {
+            this._menuSSE.addEventListener('connected', (e) => {
                 this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
+                // Reload page if server version changed (new deployment)
+                try {
+                    const data = JSON.parse(e.data);
+                    if (this.appVersion && data.version && data.version !== this.appVersion) {
+                        location.reload();
+                        return;
+                    }
+                } catch (_) { /* ignore */ }
                 // Sync state on reconnect — may have missed events while disconnected
                 this._debouncedLoadMenu();
             });
@@ -564,20 +572,6 @@ function menuApp() {
                 }
             };
             document.addEventListener('visibilitychange', this._visibilityHandler);
-            // Periodic version check for always-on kiosk displays
-            this._versionCheckInterval = setInterval(() => this._checkAppVersion(), CONST.VERSION_CHECK_MS);
-        },
-
-        async _checkAppVersion() {
-            if (!this.appVersion) return;
-            try {
-                const res = await fetch('/health');
-                if (!res.ok) return;
-                const serverVersion = (await res.json()).version || '';
-                if (serverVersion && serverVersion !== this.appVersion) {
-                    location.reload();
-                }
-            } catch (_) { /* offline — ignore */ }
         },
 
         // ---- Generation ----
