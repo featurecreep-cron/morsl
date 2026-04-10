@@ -65,6 +65,7 @@ class MenuResponse(BaseModel):
     profile: str = ""
     warnings: List[str] = []
     relaxed_constraints: List[RelaxedConstraintResponse] = []
+    clear_others: bool = False
 
     @computed_field
     @property

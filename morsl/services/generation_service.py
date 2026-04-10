@@ -269,6 +269,7 @@ class GenerationService:
 
     def _save_menu(self, menu_data: Dict[str, Any], *, clear_others: bool = False) -> None:
         """Atomic write and update in-memory cache."""
+        menu_data["clear_others"] = clear_others
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         atomic_write_json(menu_path, menu_data)
         self._cached_menu = menu_data
