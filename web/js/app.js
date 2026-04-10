@@ -556,6 +556,7 @@ function menuApp() {
         startMenuPolling() {
             this._visibilityHandler = () => {
                 if (document.visibilityState === 'visible') {
+                    this._checkAppVersion();
                     // Only fetch if SSE is disconnected or version might be stale
                     if (!this._menuSSE || this._menuSSE.readyState !== EventSource.OPEN) {
                         this._debouncedLoadMenu();
@@ -563,6 +564,20 @@ function menuApp() {
                 }
             };
             document.addEventListener('visibilitychange', this._visibilityHandler);
+            // Periodic version check for always-on kiosk displays
+            this._versionCheckInterval = setInterval(() => this._checkAppVersion(), CONST.VERSION_CHECK_MS);
+        },
+
+        async _checkAppVersion() {
+            if (!this.appVersion) return;
+            try {
+                const res = await fetch('/health');
+                if (!res.ok) return;
+                const serverVersion = (await res.json()).version || '';
+                if (serverVersion && serverVersion !== this.appVersion) {
+                    location.reload();
+                }
+            } catch (_) { /* offline — ignore */ }
         },
 
         // ---- Generation ----
