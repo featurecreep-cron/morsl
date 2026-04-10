@@ -377,7 +377,10 @@ function menuApp() {
             try {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
-                    this.applyMenuData(await res.json(), { clearOthers });
+                    const data = await res.json();
+                    // clear_others may be persisted in the menu JSON (schedule flag)
+                    const effectiveClear = clearOthers || !!data.clear_others;
+                    this.applyMenuData(data, { clearOthers: effectiveClear });
                     this.state = 'ready';
                 } else if (res.status === 404) {
                     // No server menu — check if generation failed
@@ -433,6 +436,8 @@ function menuApp() {
                 if (clearOthers && versionChanged) {
                     this.shelves = [];
                     this.activeDeckName = null;
+                    this._carouselCache = null;
+                    this._carouselCacheKey = null;
                 }
 
                 if (this.shelves.length === 0) {
@@ -823,6 +828,8 @@ function menuApp() {
         },
 
         addShelf(name, recipes) {
+            this._carouselCache = null;
+            this._carouselCacheKey = null;
             const existing = this.shelves.find(s => s.name === name);
             const generation = { recipes, generatedAt: new Date().toISOString() };
             if (existing) {
