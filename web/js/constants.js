@@ -18,9 +18,6 @@ const CONST = {
     SSE_INITIAL_RETRY_MS: 1000,
     SSE_MAX_RETRY_MS: 30000,
 
-    // App version check
-    VERSION_CHECK_MS: 5 * 60 * 1000,  // 5 minutes
-
     // Data limits (non-configurable)
     MAX_SHELF_GENERATIONS: 5,
     MAX_RECENT_NAMES: 10,
