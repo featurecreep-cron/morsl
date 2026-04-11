@@ -1,4 +1,4 @@
-FROM python:3.14-slim@sha256:fb83750094b46fd6b8adaa80f66e2302ecbe45d513f6cece637a841e1025b4ca AS builder
+FROM python:3.14-slim@sha256:bc389f7dfcb21413e72a28f491985326994795e34d2b86c8ae2f417b4e7818aa AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN mkdir -p morsl/app morsl/services && \
 
 # ---
 
-FROM python:3.14-slim@sha256:fb83750094b46fd6b8adaa80f66e2302ecbe45d513f6cece637a841e1025b4ca
+FROM python:3.14-slim@sha256:bc389f7dfcb21413e72a28f491985326994795e34d2b86c8ae2f417b4e7818aa
 
 LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
       org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
