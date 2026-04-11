@@ -53,6 +53,7 @@ PUBLIC_KEYS = frozenset(
         "item_noun",
         "timezone",
         "qr_menu_url",
+        "qr_wifi_string",
         "pin_timeout",
         "qr_show_on_menu",
     }
