@@ -204,9 +204,6 @@ body {
     font-weight: 600;
 }
 
-.explore-btn-subtitle {
-    display: none;
-}
 
 
 .category-panel {
@@ -357,7 +354,7 @@ body {
     flex-direction: column;
 }
 
-/* (menu-date moved into header as .header-date) */
+/* (menu-date moved into top-right corner as .corner-date) */
 
 /* ---- Carousel ---- */
 .carousel-container {
@@ -567,6 +564,10 @@ body {
     padding-top: 0.75rem;
     border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
     width: 100%;
+    max-height: 40vh;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
 .ingredient-inline {

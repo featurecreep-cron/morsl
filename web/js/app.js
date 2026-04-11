@@ -317,8 +317,8 @@ function menuApp() {
                         container.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 1 });
                     } catch (e) { /* skip */ }
                 };
-                render(this.$refs.headerQrWifi, this.settings.qr_wifi_string);
-                render(this.$refs.headerQrMenu, this.settings.qr_menu_url);
+                render(this.$refs.cornerQrWifi, this.settings.qr_wifi_string);
+                render(this.$refs.cornerQrMenu, this.settings.qr_menu_url);
             });
         },
 

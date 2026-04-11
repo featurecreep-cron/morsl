@@ -85,7 +85,6 @@
                             :title="category.description || category.subtitle || ''">
                         <span class="explore-btn-icon" x-html="getCategoryIcon(category)"></span>
                         <span class="explore-btn-label" x-text="category.display_name || category.id"></span>
-                        <span class="explore-btn-subtitle" x-text="category.subtitle || '\u00a0'"></span>
                     </button>
                 </template>
             </div>
@@ -279,11 +278,11 @@
     <div class="top-right-corner">
         <span class="corner-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></span>
         <div class="qr-corner" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
-            <div class="qr-corner-item" x-show="settings.qr_wifi_string" x-ref="headerQrWifi">
+            <div class="qr-corner-item" x-show="settings.qr_wifi_string" x-ref="cornerQrWifi">
                 <div class="qr-corner-code"></div>
                 <span class="qr-corner-label">WiFi</span>
             </div>
-            <div class="qr-corner-item" x-show="settings.qr_menu_url" x-ref="headerQrMenu">
+            <div class="qr-corner-item" x-show="settings.qr_menu_url" x-ref="cornerQrMenu">
                 <div class="qr-corner-code"></div>
                 <span class="qr-corner-label">Menu</span>
             </div>
@@ -291,7 +290,7 @@
     </div>
 
     <!-- Footer: slogan -->
-    <footer class="menu-footer" x-show="state === 'ready'">
+    <footer class="menu-footer" x-show="state === 'ready' && (sloganFooter || sloganHeader)">
         <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
     </footer>
 
