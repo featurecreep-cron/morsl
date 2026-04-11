@@ -308,7 +308,7 @@ function menuApp() {
             this.$nextTick(() => {
                 const render = (ref, data) => {
                     if (!ref || !data) return;
-                    const container = ref.querySelector('.footer-qr-code');
+                    const container = ref.querySelector('.qr-corner-code');
                     if (!container) return;
                     try {
                         const qr = qrcode(0, 'M');
@@ -317,8 +317,8 @@ function menuApp() {
                         container.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 1 });
                     } catch (e) { /* skip */ }
                 };
-                render(this.$refs.footerQrWifi, this.settings.qr_wifi_string);
-                render(this.$refs.footerQrMenu, this.settings.qr_menu_url);
+                render(this.$refs.headerQrWifi, this.settings.qr_wifi_string);
+                render(this.$refs.headerQrMenu, this.settings.qr_menu_url);
             });
         },
 

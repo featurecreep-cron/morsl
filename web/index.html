@@ -41,7 +41,7 @@
         </div>
     </div>
 
-    <!-- Header: branding -->
+    <!-- Header: branding centered -->
     <header class="menu-header" x-ref="menuHeader">
         <div class="menu-brand">
             <div x-show="logoUrl" x-ref="menuLogo" class="menu-logo" aria-hidden="true"></div>
@@ -151,9 +151,6 @@
     <!-- Scrollable content area: deck strip + main carousel -->
     <div class="content-area"
          x-show="state === 'ready' || state === 'generating'">
-
-        <!-- Menu date -->
-        <div class="menu-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></div>
 
         <!-- Deck tab strip -->
         <div class="deck-strip" x-show="shelves.length > 1">
@@ -276,21 +273,27 @@
             </div><!-- .carousel-wrapper -->
         </main>
 
-        <!-- Footer (inside content-area so it scrolls with content) -->
-        <footer class="menu-footer text-center" x-show="state === 'ready'">
-            <div class="footer-qr-row" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
-                <div class="footer-qr" x-show="settings.qr_wifi_string" x-ref="footerQrWifi">
-                    <div class="footer-qr-code"></div>
-                    <span class="footer-qr-label">Join WiFi</span>
-                </div>
-                <div class="footer-qr" x-show="settings.qr_menu_url" x-ref="footerQrMenu">
-                    <div class="footer-qr-code"></div>
-                    <span class="footer-qr-label">Open Menu</span>
-                </div>
-            </div>
-            <p class="menu-slogan" x-show="sloganFooter" x-text="sloganFooter"></p>
-        </footer>
     </div><!-- .content-area -->
+
+    <!-- Top-right corner: date + QR codes -->
+    <div class="top-right-corner">
+        <span class="corner-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></span>
+        <div class="qr-corner" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
+            <div class="qr-corner-item" x-show="settings.qr_wifi_string" x-ref="headerQrWifi">
+                <div class="qr-corner-code"></div>
+                <span class="qr-corner-label">WiFi</span>
+            </div>
+            <div class="qr-corner-item" x-show="settings.qr_menu_url" x-ref="headerQrMenu">
+                <div class="qr-corner-code"></div>
+                <span class="qr-corner-label">Menu</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer: slogan -->
+    <footer class="menu-footer" x-show="state === 'ready'">
+        <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
+    </footer>
 
     <!-- Name prompt (bottom sheet) -->
     <div class="name-prompt-backdrop"
@@ -412,17 +415,6 @@
         <span class="order-toast-icon">&#10003;</span>
         <span class="order-toast-text">Saved to meal plan!</span>
     </div>
-
-    <!-- Floating save-to-meal-plan button -->
-    <button class="meal-plan-fab"
-            x-show="settings.meal_plan_enabled !== false && mainCarouselRecipes.length > 0 && !mealPlanSave.show"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 transform scale-90"
-            x-transition:enter-end="opacity-100 transform scale-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0 transform scale-90"
-            @click="openMealPlanSave()">Save to Meal Plan</button>
 
     <!-- Meal plan save bottom sheet -->
     <div class="name-prompt-backdrop"
