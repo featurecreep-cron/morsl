@@ -392,12 +392,14 @@ body {
 
 /* ---- Carousel ---- */
 .carousel-container {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
     min-height: 150px;
+    overflow: hidden;
 }
 
 .carousel-wrapper {
     position: relative;
+    height: 100%;
 }
 
 .carousel-track {
@@ -409,6 +411,7 @@ body {
     scrollbar-width: none;
     gap: 1rem;
     padding: 0.5rem 1rem;
+    height: 100%;
 }
 
 .carousel-track::-webkit-scrollbar {
@@ -594,6 +597,12 @@ body {
     padding-top: 0.75rem;
     border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
     width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent);
+    mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent);
 }
 
 .ingredient-inline {
