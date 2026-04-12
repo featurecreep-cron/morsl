@@ -806,6 +806,12 @@ function menuApp() {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
                     const data = await res.json();
+                    // SSE may have already delivered this menu — skip duplicate shelf add
+                    if (data.version && data.version === this.menuVersion) {
+                        this._targetShelf = null;
+                        this.state = 'ready';
+                        return;
+                    }
                     const target = this._targetShelf || data.profile || this.activeProfile || 'Menu';
                     this._targetShelf = null;
                     this.addShelf(target, data.recipes || []);
