@@ -211,8 +211,14 @@
                         <span class="toggle-track"></span>
                     </label>
                 </div>
-                <!-- clear_before_generate removed: generation always overwrites atomically.
-                     Clearing before generation risks data loss if generation fails. -->
+                <div class="settings-row">
+                    <div class="settings-label">Clear existing menus</div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" x-model="scheduleForm.clear_before_generate">
+                        <span class="toggle-track"></span>
+                    </label>
+                    <div class="settings-hint">Remove other shelves when this schedule generates</div>
+                </div>
                 </div>
                 <!-- Advanced: meal plan integration -->
                 <div x-show="tierVisible('standard')">
