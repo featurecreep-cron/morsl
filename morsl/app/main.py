@@ -109,7 +109,7 @@ async def _sched_generation(settings, profile: str, *, clear_others: bool = Fals
             clear_others=clear_others,
         )
         await gen_svc.wait_for_completion()
-    except Exception:  # noqa: broad-except — scheduled task isolation
+    except Exception:  # broad-except — scheduled task isolation
         logger.warning(
             "Scheduled generation failed for profile '%s'",
             profile,
@@ -157,7 +157,7 @@ async def _sched_weekly_generation(
             settings_service=settings_svc,
         )
         await get_weekly_generation_service(settings).wait_for_completion()
-    except Exception:  # noqa: broad-except — scheduled task isolation
+    except Exception:  # broad-except — scheduled task isolation
         logger.warning(
             "Scheduled weekly generation failed for '%s'",
             template_name,
@@ -219,19 +219,19 @@ async def _shutdown_services(settings) -> None:
     try:
         gen_service = get_generation_service(settings)
         await gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception:  # noqa: broad-except — shutdown must not abort
+    except Exception:  # broad-except — shutdown must not abort
         logger.warning("Error during shutdown cleanup", exc_info=True)
 
     try:
         weekly_gen_service = get_weekly_generation_service(settings)
         await weekly_gen_service.shutdown(timeout=GENERATION_SHUTDOWN_TIMEOUT)
-    except Exception:  # noqa: broad-except — shutdown must not abort
+    except Exception:  # broad-except — shutdown must not abort
         logger.warning("Weekly generation shutdown error", exc_info=True)
 
     try:
         scheduler_svc = get_scheduler_service(settings)
         scheduler_svc.stop()
-    except Exception:  # noqa: broad-except — shutdown must not abort
+    except Exception:  # broad-except — shutdown must not abort
         logger.warning("Scheduler shutdown error", exc_info=True)
 
 
@@ -248,7 +248,7 @@ async def lifespan(app: FastAPI):
 
     try:
         _setup_scheduler(settings)
-    except Exception:  # noqa: broad-except — non-fatal startup
+    except Exception:  # broad-except — non-fatal startup
         logger.warning("Scheduler startup failed (non-fatal)", exc_info=True)
 
     yield
@@ -314,7 +314,7 @@ def health_check(
 
     try:
         scheduler_running = scheduler.is_running
-    except Exception:  # noqa: broad-except — health check must not fail
+    except Exception:  # broad-except — health check must not fail
         scheduler_running = False
 
     return {

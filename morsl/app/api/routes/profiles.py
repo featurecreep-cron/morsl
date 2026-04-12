@@ -145,7 +145,9 @@ def preview_profile(
     config["cache"] = settings_svc.get_all().get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
     try:
-        service = MenuService(url=url, token=token, config=config, logger=logger)  # noqa: direct-service — preview creates one-off service with request-scoped config
+        service = MenuService(  # direct-service — preview needs request-scoped config
+            url=url, token=token, config=config, logger=logger
+        )
         service.prepare_data()
         return {
             "matching_count": len(service.recipes),

@@ -334,7 +334,7 @@ class TestNoBroadExcept:
                     violations.append(f"{path.name}:{i}: {stripped}")
         assert not violations, (
             "Broad except clause in non-grandfathered module "
-            "(use a specific exception or add # noqa: broad-except):\n" + "\n".join(violations)
+            "(use a specific exception or add # broad-except comment):\n" + "\n".join(violations)
         )
 
 
@@ -384,7 +384,7 @@ class TestNoDirectServiceInstantiation:
             if path.name in self._SKIP_FILES:
                 continue
             for i, line in enumerate(path.read_text().splitlines(), 1):
-                if "# noqa: direct-service" in line:
+                if "direct-service" in line:
                     continue
                 for match in self._SERVICE_PATTERN.finditer(line):
                     violations.append(f"{path.name}:{i}: {match.group()}")

@@ -439,7 +439,7 @@ def _reset_step(errors: list, label: str, fn) -> None:
     """Run a factory reset step, collecting errors instead of raising."""
     try:
         fn()
-    except Exception as e:  # noqa: broad-except — error collection during factory reset
+    except Exception as e:  # broad-except — error collection during factory reset
         errors.append(f"{label}: {e}")
 
 
