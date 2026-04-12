@@ -789,8 +789,8 @@ body {
 }
 
 .deck-card-placeholder svg {
-    width: 60%;
-    height: 60%;
+    width: 85%;
+    height: 85%;
 }
 
 /* Gradient overlay with category name + count */
