@@ -293,7 +293,7 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
             from defusedxml.ElementTree import fromstring
 
             fromstring(content)  # reject malformed/malicious XML
-            from svg_hush import filter_svg
+            from py_svg_hush import filter_svg
 
             content = filter_svg(content)
         except (ValueError, SyntaxError, OSError):
@@ -443,7 +443,6 @@ def reset_branding(
     return svc.update(updates)
 
 
-@router.post("/factory-reset", dependencies=[Depends(require_admin)])
 def _reset_step(errors: list, label: str, fn) -> None:
     """Run a factory reset step, collecting errors instead of raising."""
     try:
@@ -471,6 +470,7 @@ def _regenerate_default_icons() -> None:
         generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
 
 
+@router.post("/factory-reset", dependencies=[Depends(require_admin)])
 def factory_reset(
     settings: Settings = Depends(get_settings),
     svc: SettingsService = Depends(get_settings_service),
