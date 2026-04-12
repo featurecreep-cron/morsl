@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Dict, List
 
 from slugify import slugify
 
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, read_json
 
 
 class CategoryService:
@@ -94,9 +93,9 @@ class CategoryService:
 
     def _load(self) -> None:
         path = os.path.join(self.data_dir, "categories.json")
-        if os.path.isfile(path):
-            with open(path) as f:
-                self._categories = json.load(f)
+        loaded = read_json(path)
+        if loaded is not None:
+            self._categories = loaded
             self._migrate_categories()
         else:
             self._categories = {}

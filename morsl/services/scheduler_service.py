@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
 import os
 from datetime import tzinfo
@@ -13,7 +12,7 @@ from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from morsl.utils import atomic_write_json, now
+from morsl.utils import atomic_write_json, now, read_json
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +270,4 @@ class SchedulerService:
 
     def _load(self) -> None:
         path = os.path.join(self.data_dir, "schedules.json")
-        if os.path.isfile(path):
-            with open(path) as f:
-                self._schedules = json.load(f)
+        self._schedules = read_json(path, {})

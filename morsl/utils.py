@@ -78,6 +78,20 @@ def is_pin_hashed(stored: str) -> bool:
     return stored.startswith(_PIN_HASH_PREFIX) if stored else True
 
 
+def read_json(path: str, default: Any = None) -> Any:
+    """Read JSON from file with consistent error handling.
+
+    Returns default if the file doesn't exist or contains invalid JSON.
+    """
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return default
+
+
 def atomic_write_json(path: str, data: Any) -> None:
     """Write JSON to file atomically via temp file + os.replace()."""
     dir_path = os.path.dirname(path) or "."
