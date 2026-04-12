@@ -71,12 +71,22 @@ class CategoryService:
         self._save()
         return self.list_categories()
 
-    def delete_category(self, cat_id: str) -> None:
-        """Delete a category. Raises KeyError if not found."""
+    def delete_category(self, cat_id: str, config_service=None) -> None:
+        """Delete a category and clear it from affected profiles.
+
+        If config_service is provided, clears the category field on any
+        profiles that reference this category.
+        """
         if cat_id not in self._categories:
             raise KeyError(f"Category not found: {cat_id}")
         del self._categories[cat_id]
         self._save()
+        if config_service is not None:
+            for p in config_service.list_profiles():
+                if p.category == cat_id:
+                    raw = config_service.get_profile_raw(p.name)
+                    raw["category"] = ""
+                    config_service.update_profile(p.name, raw)
 
     def _save(self) -> None:
         path = os.path.join(self.data_dir, "categories.json")

@@ -4,9 +4,7 @@ import base64
 import contextlib
 import ipaddress
 import logging
-import os
 import socket
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -35,7 +33,7 @@ from morsl.constants import BRANDING_IMAGE_MAX_SIZE, DEFAULT_FAVICON_PATH, ICONS
 from morsl.services.category_service import CategoryService
 from morsl.services.config_service import ConfigService
 from morsl.services.settings_service import DEFAULTS, SettingsService
-from morsl.utils import hash_pin, is_pin_hashed
+from morsl.utils import atomic_write_bytes, hash_pin, is_pin_hashed
 from morsl.utils import verify_pin as verify_pin_hash
 
 logger = logging.getLogger(__name__)
@@ -156,11 +154,19 @@ def get_public_settings(svc: SettingsService = Depends(get_settings_service)) ->
 _pin_failures: Dict[str, list] = {}  # ip -> [timestamp, ...]
 _PIN_RATE_WINDOW = 60  # seconds
 _PIN_MAX_ATTEMPTS = 5
+_PIN_MAX_TRACKED_IPS = 1024
 
 
 def _check_pin_rate_limit(client_ip: str) -> None:
     """Raise 429 if too many failed PIN attempts from this IP."""
     now = time.time()
+    # GC: prune stale IPs to prevent unbounded dict growth
+    if len(_pin_failures) > _PIN_MAX_TRACKED_IPS:
+        stale = [
+            ip for ip, ts in _pin_failures.items() if not ts or now - ts[-1] >= _PIN_RATE_WINDOW
+        ]
+        for ip in stale:
+            del _pin_failures[ip]
     attempts = _pin_failures.get(client_ip, [])
     # Prune old attempts outside the window
     attempts = [t for t in attempts if now - t < _PIN_RATE_WINDOW]
@@ -299,21 +305,7 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
         except (ValueError, SyntaxError, OSError):
             raise HTTPException(400, "Invalid or unsafe SVG content") from None
 
-    # Atomic write
-    fd, tmp_path = tempfile.mkstemp(dir=str(UPLOADS_DIR), suffix=".tmp")
-    closed = False
-    try:
-        os.write(fd, content)
-        os.close(fd)
-        closed = True
-        os.replace(tmp_path, str(dest))
-    except OSError:
-        if not closed:
-            os.close(fd)
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
-
+    atomic_write_bytes(str(dest), content)
     return f"/uploads/branding/{filename}"
 
 

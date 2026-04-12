@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -87,6 +88,23 @@ def atomic_write_json(path: str, data: Any) -> None:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, path)
     except (OSError, TypeError, ValueError):
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+
+def atomic_write_bytes(path: str, data: bytes) -> None:
+    """Write bytes to file atomically via temp file + os.replace()."""
+    dir_path = os.path.dirname(path) or "."
+    os.makedirs(dir_path, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+    try:
+        os.write(fd, data)
+        os.close(fd)
+        os.replace(tmp_path, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.close(fd)
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise
