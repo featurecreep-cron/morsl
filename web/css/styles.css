@@ -784,13 +784,13 @@ body {
     align-items: center;
     justify-content: center;
     background: var(--card-bg);
-    color: var(--text-muted, #666);
-    opacity: 0.5;
+    color: var(--accent-color);
+    opacity: 0.8;
 }
 
 .deck-card-placeholder svg {
-    width: 40%;
-    height: 40%;
+    width: 60%;
+    height: 60%;
 }
 
 /* Gradient overlay with category name + count */

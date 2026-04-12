@@ -291,7 +291,7 @@
     </div>
 
     <!-- Footer: slogan -->
-    <footer class="menu-footer" x-show="state === 'ready' && (sloganFooter || sloganHeader)">
+    <footer class="menu-footer" x-show="(state === 'ready' || state === 'generating') && (sloganFooter || sloganHeader)">
         <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
     </footer>
 
