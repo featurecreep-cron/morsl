@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import logging
 import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from morsl.services.sse_publisher import SSEPublisher
 from morsl.tandoor_api import TandoorAPI, TandoorError
 from morsl.utils import now
 
+_MAX_SERVER_ORDERS = 1000
 
-class OrderService:
+
+class OrderService(SSEPublisher):
     """Order tracking via Tandoor meal plans with SSE notification.
 
     Orders are stored as Tandoor meal plan entries using a configured meal type.
@@ -27,7 +28,7 @@ class OrderService:
         self._cached_meal_type: Optional[Dict[str, Any]] = None
         self._cached_meal_type_id: Optional[int] = None
         self._lock = threading.Lock()
-        self._subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
+        self._init_sse()
         self._server_orders: List[Dict[str, Any]] = []
 
     def _get_api(self) -> TandoorAPI:
@@ -119,19 +120,23 @@ class OrderService:
             "customer_name": customer_name,
         }
 
-        self._notify(order)
+        self._notify_subscribers(order)
         return order
 
     def store_and_notify(self, order: Dict[str, Any]) -> None:
         """Store an order in the server-side in-memory list and notify SSE subscribers."""
         with self._lock:
             self._server_orders.append(order)
-        self._notify(order)
+            if len(self._server_orders) > _MAX_SERVER_ORDERS:
+                self._server_orders = self._server_orders[-_MAX_SERVER_ORDERS:]
+        self._notify_subscribers(order)
 
     def store_order(self, order: Dict[str, Any]) -> None:
         """Store an order in the server-side in-memory list."""
         with self._lock:
             self._server_orders.append(order)
+            if len(self._server_orders) > _MAX_SERVER_ORDERS:
+                self._server_orders = self._server_orders[-_MAX_SERVER_ORDERS:]
 
     def get_server_orders(
         self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
@@ -294,18 +299,6 @@ class OrderService:
 
         return len(tandoor_orders) + server_count
 
-    def subscribe(self) -> asyncio.Queue[Dict[str, Any]]:
-        """Create a new SSE subscriber queue."""
-        q: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        with self._lock:
-            self._subscribers.append(q)
-        return q
-
-    def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
-        """Remove subscriber queue."""
-        with self._lock, contextlib.suppress(ValueError):
-            self._subscribers.remove(q)
-
     @staticmethod
     def _build_timestamp(from_date: str, note: str) -> str:
         """Combine Tandoor's from_date (date only) with the time from the order note.
@@ -339,19 +332,3 @@ class OrderService:
         if at_pos <= len("Ordered by "):
             return None
         return note[len("Ordered by ") : at_pos]
-
-    def _notify(self, order: Dict[str, Any]) -> None:
-        """Push order to all subscribers (non-blocking)."""
-        with self._lock:
-            subscribers = list(self._subscribers)
-        dead: List[asyncio.Queue[Dict[str, Any]]] = []
-        for q in subscribers:
-            try:
-                q.put_nowait(order)
-            except asyncio.QueueFull:
-                dead.append(q)
-        if dead:
-            with self._lock:
-                for q in dead:
-                    with contextlib.suppress(ValueError):
-                        self._subscribers.remove(q)

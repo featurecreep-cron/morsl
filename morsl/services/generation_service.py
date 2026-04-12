@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import json
 import os
-import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,6 +15,7 @@ from morsl.constants import GENERATION_SHUTDOWN_TIMEOUT
 from morsl.services.history_service import HistoryService
 from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
+from morsl.services.sse_publisher import SSEPublisher
 from morsl.utils import atomic_write_json, now
 
 
@@ -37,7 +37,7 @@ class GenerationStatus:
     warnings: List[str] = field(default_factory=list)
 
 
-class GenerationService:
+class GenerationService(SSEPublisher):
     """Manages asynchronous menu generation with state tracking."""
 
     def __init__(
@@ -49,8 +49,7 @@ class GenerationService:
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
         self._cached_menu: Optional[Dict[str, Any]] = None
-        self._subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
-        self._sub_lock = threading.Lock()
+        self._init_sse()
         self._cleanup_stale_temp_files()
         # Load menu into cache on startup
         self._cached_menu = self._load_menu_from_disk()
@@ -67,8 +66,11 @@ class GenerationService:
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         if not os.path.isfile(menu_path):
             return None
-        with open(menu_path) as f:
-            return json.load(f)
+        try:
+            with open(menu_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def clear_menu(self) -> bool:
         """Delete current_menu.json and clear cache. Returns True if a file was removed."""
@@ -247,25 +249,6 @@ class GenerationService:
             if fname.endswith(".tmp"):
                 with contextlib.suppress(OSError):
                     os.unlink(os.path.join(self.data_dir, fname))
-
-    def subscribe(self) -> asyncio.Queue[Dict[str, Any]]:
-        """Create a new SSE subscriber queue for menu change events."""
-        q: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=64)
-        with self._sub_lock:
-            self._subscribers.append(q)
-        return q
-
-    def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
-        """Remove subscriber queue."""
-        with self._sub_lock, contextlib.suppress(ValueError):
-            self._subscribers.remove(q)
-
-    def _notify_subscribers(self, event: Dict[str, Any]) -> None:
-        """Push event to all SSE subscribers (non-blocking)."""
-        with self._sub_lock:
-            for q in self._subscribers:
-                with contextlib.suppress(asyncio.QueueFull):
-                    q.put_nowait(event)
 
     def _save_menu(self, menu_data: Dict[str, Any], *, clear_others: bool = False) -> None:
         """Atomic write and update in-memory cache."""
