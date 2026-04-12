@@ -156,7 +156,11 @@
             <template x-for="shelf in shelves" :key="'tab-' + shelf.name">
                 <div class="deck-card"
                      :class="{ 'deck-card--active': shelf.name === activeDeckName }"
-                     @click="activateDeck(shelf.name)">
+                     @click="activateDeck(shelf.name)"
+                     @contextmenu.prevent="removeShelf(shelf.name)"
+                     @touchstart="deckLongPress.start($event, shelf.name)"
+                     @touchend="deckLongPress.cancel()"
+                     @touchmove="deckLongPress.cancel()">
                     <div class="deck-card-stack">
                         <div class="deck-card-face">
                             <img class="deck-card-img" x-show="deckPreview(shelf)?.image" :src="deckPreview(shelf)?.image" :alt="deckPreview(shelf)?.name || ''">
@@ -167,7 +171,6 @@
                             </div>
                         </div>
                     </div>
-                    <button class="deck-card-close" @click.stop="removeShelf(shelf.name)" aria-label="Remove shelf">&times;</button>
                 </div>
             </template>
         </div>

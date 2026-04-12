@@ -68,6 +68,28 @@ function menuApp() {
         // Category shelves (persistent per-category rows)
         shelves: [],          // [{name, generations: [{recipes, generatedAt}], currentIndex: 0}, ...]
         activeDeckName: null, // which shelf is in the main carousel
+
+        // Long press handler for deck card removal (touch devices)
+        deckLongPress: {
+            _timer: null,
+            _fired: false,
+            start(e, name) {
+                this._fired = false;
+                this._timer = setTimeout(() => {
+                    this._fired = true;
+                    // Prevent the click from firing after long press
+                    e.target.closest('.deck-card')?.addEventListener('click', this._blockClick, { capture: true, once: true });
+                    // Access Alpine component from the event target
+                    const app = Alpine.$data(e.target);
+                    if (app?.removeShelf) app.removeShelf(name);
+                }, 500);
+            },
+            cancel() {
+                clearTimeout(this._timer);
+                this._timer = null;
+            },
+            _blockClick(e) { e.stopPropagation(); e.preventDefault(); },
+        },
         _targetShelf: null,      // shelf name for current generation
 
         // Meal plan save
