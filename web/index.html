@@ -274,6 +274,11 @@
                 </template>
             </div>
             </div><!-- .carousel-wrapper -->
+
+            <!-- Footer: slogan (inside carousel-container to hug below cards) -->
+            <footer class="menu-footer" x-show="(state === 'ready' || state === 'generating') && (sloganFooter || sloganHeader)">
+                <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
+            </footer>
         </main>
 
     </div><!-- .content-area -->
@@ -292,11 +297,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Footer: slogan -->
-    <footer class="menu-footer" x-show="(state === 'ready' || state === 'generating') && (sloganFooter || sloganHeader)">
-        <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
-    </footer>
 
     <!-- Name prompt (bottom sheet) -->
     <div class="name-prompt-backdrop"
