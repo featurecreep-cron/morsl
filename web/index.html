@@ -160,6 +160,7 @@
                     <div class="deck-card-stack">
                         <div class="deck-card-face">
                             <img class="deck-card-img" x-show="deckPreview(shelf)?.image" :src="deckPreview(shelf)?.image" :alt="deckPreview(shelf)?.name || ''">
+                            <div class="deck-card-placeholder" x-show="!deckPreview(shelf)?.image" x-html="placeholderSvg(deckPreview(shelf))"></div>
                             <div class="deck-card-overlay">
                                 <span class="deck-card-title" x-text="formatDisplayName(shelf.name)"></span>
                                 <span class="deck-card-count" x-text="itemNounText(shelf.generations.reduce((sum, g) => sum + (g.recipes ? g.recipes.length : 0), 0), resolveNoun(shelf.name))"></span>
