@@ -220,13 +220,6 @@ function menuApp() {
             if (this.shelves.length > 0 && !this.activeDeckName) {
                 this.activeDeckName = this.shelves[0].name;
             }
-            // If no menu loaded and a default profile is configured, highlight its category
-            if (this.recipes.length === 0) {
-                const profile = this.profiles.find(p => p.default);
-                if (profile && profile.category) {
-                    this.categoryPanelOpen = profile.category;
-                }
-            }
             // Prefetch brand logo and loading icon SVGs for theme-aware inline rendering
             if (this.settings.logo_url) {
                 prefetchBrandSvg(this.settings.logo_url).then(ok => { if (ok) this._iconGen++; });

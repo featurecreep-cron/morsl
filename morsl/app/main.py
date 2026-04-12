@@ -105,6 +105,7 @@ async def _sched_generation(settings, profile: str, *, clear_others: bool = Fals
             url=url,
             token=token,
             logger=app_logger,
+            profile_name=profile,
             clear_others=clear_others,
         )
         await gen_svc.wait_for_completion()
