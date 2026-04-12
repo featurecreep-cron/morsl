@@ -254,13 +254,13 @@
                                     </ul>
                                 </div>
                                 <span class="tap-hint">Tap for recipe</span>
-                                <!-- Order button (floating bottom-right) -->
+                                <!-- Request button (floating bottom-right) -->
                                 <button class="card-fab card-fab--order"
                                         x-show="settings.orders_enabled !== false"
                                         :class="{ ordered: orderConfirm === item.id }"
                                         @click.stop="orderDrink(item)"
-                                        :title="orderConfirm === item.id ? 'Ordered!' : 'Order this recipe'"
-                                        :aria-label="orderConfirm === item.id ? 'Ordered!' : 'Order this recipe'">
+                                        :title="orderConfirm === item.id ? 'Requested!' : 'Request this recipe'"
+                                        :aria-label="orderConfirm === item.id ? 'Requested!' : 'Request this recipe'">
                                     <span x-show="orderConfirm === item.id">&#10003;</span>
                                     <span x-show="orderConfirm !== item.id" x-html="getHeadingIcon()" style="width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:inherit;"></span>
                                 </button>
@@ -323,7 +323,7 @@
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0">
                 <div class="name-prompt-header">
-                    <span id="name-prompt-title" class="name-prompt-title" x-text="namePrompt.action === 'rate' ? (namePrompt.recipe?.name || 'Rate') : 'Who\u2019s ordering?'"></span>
+                    <span id="name-prompt-title" class="name-prompt-title" x-text="namePrompt.action === 'rate' ? (namePrompt.recipe?.name || 'Rate') : 'Who\u2019s requesting?'"></span>
                     <button class="name-prompt-skip" @click="skipNamePrompt()" aria-label="Close">&times;</button>
                 </div>
                 <div class="name-prompt-stars" x-show="namePrompt.action === 'rate'" role="group" aria-label="Choose rating">
@@ -387,7 +387,7 @@
         </div>
     </div>
 
-    <!-- Order confirmation toast -->
+    <!-- Request confirmation toast -->
     <div class="order-toast"
          role="alert" aria-live="assertive" aria-atomic="true"
          x-show="orderConfirm"
@@ -398,7 +398,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0 transform translate-y-4">
         <span class="order-toast-icon">&#10003;</span>
-        <span class="order-toast-text">Order placed!</span>
+        <span class="order-toast-text">Request placed!</span>
     </div>
 
     <!-- Meal plan save toast -->
@@ -616,7 +616,7 @@
                     x-show="selectedRecipe && settings.orders_enabled !== false"
                     :disabled="orderConfirm === selectedRecipe?.id">
                 <span class="btn-order-icon"><span x-show="orderConfirm === selectedRecipe?.id">&#10003;</span><span x-show="orderConfirm !== selectedRecipe?.id" x-html="getHeadingIcon()" style="width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:inherit;"></span></span>
-                <span x-text="orderConfirm === selectedRecipe?.id ? 'Ordered!' : 'Order'"></span>
+                <span x-text="orderConfirm === selectedRecipe?.id ? 'Requested!' : 'Request'"></span>
             </button>
         </div>
     </div>

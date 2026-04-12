@@ -1682,8 +1682,8 @@ function adminApp() {
         clearOrders() {
             this.confirmModal = {
                 show: true,
-                title: 'Clear All Orders?',
-                message: 'This will remove all orders from the queue. This cannot be undone.',
+                title: 'Clear All Requests?',
+                message: 'This will remove all requests from the queue. This cannot be undone.',
                 confirmText: 'Clear All',
                 onConfirm: async () => {
                     try {
