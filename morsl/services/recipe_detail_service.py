@@ -129,7 +129,8 @@ def fetch_recipe_details(
         }
         try:
             details = api.get_recipe_details(r.id)
-            recipe_data["image"] = details.get("image")
+            img = details.get("image")
+            recipe_data["image"] = img.get("file_url") if isinstance(img, dict) else img
             recipe_data["working_time"] = details.get("working_time")
             recipe_data["cooking_time"] = details.get("cooking_time")
             detail_kws = details.get("keywords", [])
