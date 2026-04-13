@@ -229,6 +229,15 @@ class TandoorAPI:
         self.logger.debug(f"Returning {len(keywords)} total keywords.")
         return keywords
 
+    def get_keyword(
+        self, kw_id: str | int, params: dict[str, Any] | None = None, **kwargs
+    ) -> dict[str, Any]:
+        """Fetch a single keyword by ID."""
+        url = f"{self.url}keyword/"
+        keyword = self.get_unpaged_results(url, kw_id, **kwargs)
+        self.logger.debug(f"Returning keyword {keyword['id']}: {keyword['name']}.")
+        return keyword
+
     def get_food_tree(
         self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> List[Dict[str, Any]]:

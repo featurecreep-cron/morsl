@@ -1742,23 +1742,30 @@
             </small>
 
             <!-- Custom Filters (Tandoor saved searches) -->
-            <div class="drawer-section" x-show="customFilters.length > 0 && tierVisible('advanced')">
+            <div class="drawer-section" x-show="tierVisible('advanced')">
                 <label class="drawer-label">Saved Filters</label>
                 <small class="drawer-help">Limit the recipe pool to results from Tandoor saved searches. Leave empty to use all recipes.</small>
-                <div class="constraint-items-list" style="margin-bottom:0.5rem;">
-                    <template x-for="fid in profileEditor.filters" :key="fid">
-                        <span class="constraint-item-tag">
-                            <span x-text="customFilters.find(f => f.id === fid)?.name || ('#' + fid)"></span>
-                            <button @click="profileEditor.filters = profileEditor.filters.filter(id => id !== fid)" aria-label="Remove">&times;</button>
-                        </span>
-                    </template>
-                </div>
-                <select class="drawer-select" @change="if ($event.target.value) { const id = Number($event.target.value); if (!profileEditor.filters.includes(id)) profileEditor.filters.push(id); $event.target.value = ''; }">
-                    <option value="">Add a saved filter...</option>
-                    <template x-for="cf in customFilters.filter(f => !profileEditor.filters.includes(f.id))" :key="cf.id">
-                        <option :value="cf.id" x-text="cf.name"></option>
-                    </template>
-                </select>
+                <template x-if="customFilters.length > 0">
+                    <div>
+                        <div class="constraint-items-list" style="margin-bottom:0.5rem;">
+                            <template x-for="fid in profileEditor.filters" :key="fid">
+                                <span class="constraint-item-tag">
+                                    <span x-text="customFilters.find(f => f.id === fid)?.name || ('#' + fid)"></span>
+                                    <button @click="profileEditor.filters = profileEditor.filters.filter(id => id !== fid)" aria-label="Remove">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <select class="drawer-select" @change="if ($event.target.value) { const id = Number($event.target.value); if (!profileEditor.filters.includes(id)) profileEditor.filters.push(id); $event.target.value = ''; }">
+                            <option value="">Add a saved filter...</option>
+                            <template x-for="cf in customFilters.filter(f => !profileEditor.filters.includes(f.id))" :key="cf.id">
+                                <option :value="cf.id" x-text="cf.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                </template>
+                <template x-if="customFilters.length === 0">
+                    <small class="drawer-help" style="font-style:italic;">No saved filters in Tandoor</small>
+                </template>
             </div>
 
             <!-- Constraints List (v2 format) -->
