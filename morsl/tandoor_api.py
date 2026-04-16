@@ -122,6 +122,10 @@ class TandoorAPI:
         while next_url:
             resp = self.session.get(next_url, timeout=DEFAULT_TIMEOUT)
             if resp.status_code != 200:
+                self.logger.warning(
+                    f"Failed to fetch next page ({next_url}): {resp.status_code} — "
+                    f"returning {len(items)} partial results"
+                )
                 break
             page = json.loads(resp.content)
             items.extend(page.get("results", []))
@@ -326,6 +330,7 @@ class TandoorAPI:
         url = f"{self.url}custom-filter/"
         return self.get_paged_results(url, {"page_size": self.page_size}, **kwargs)
 
+    @cached
     def get_mealplan_recipes(
         self,
         mealtype_id: Optional[Union[List[int], int]] = None,
@@ -396,6 +401,7 @@ class TandoorAPI:
 
         return plan
 
+    @cached
     def get_meal_plans(self, date: datetime, **kwargs) -> List[Dict[str, Any]]:
         url = f"{self.url}meal-plan/?from_date={date.strftime('%Y-%m-%d')}"
         response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
