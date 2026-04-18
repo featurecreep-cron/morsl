@@ -68,28 +68,25 @@ def debug_history_state(
     gen_service: GenerationService = Depends(get_generation_service),
 ) -> dict:
     """Temporary debug endpoint — remove after diagnosing history issue."""
-    from morsl.app.api.dependencies import _services
-    from morsl.app.api.models import HistoryEntryResponse
+    from morsl.app.api.dependencies import _services, get_history_service, get_settings
 
-    hs = gen_service._history_service
-    entries = hs._entries if hs else []
-    first_entry_keys = sorted(entries[0].keys()) if entries else []
+    hs_from_gen = gen_service._history_service
+    hs_from_di = _services.get("history")
+    settings = get_settings()
+    hs_from_factory = get_history_service(settings)
 
-    # Check if entries validate against the response model
-    validation_errors = []
-    for i, entry in enumerate(entries[:5]):
-        try:
-            HistoryEntryResponse(**entry)
-        except Exception as e:  # broad-except — debug diagnostic
-            validation_errors.append(
-                {"index": i, "error": str(e), "entry_keys": sorted(entry.keys())}
-            )
+    # Simulate what the /api/history route does
+    entries_from_di, total_from_di = hs_from_factory.list_entries(limit=5, offset=0)
 
     return {
-        "has_history_service": hs is not None,
-        "history_entries_in_memory": len(entries),
-        "first_entry_keys": first_entry_keys,
-        "validation_errors": validation_errors,
+        "gen_history_entries": len(hs_from_gen._entries) if hs_from_gen else -1,
+        "di_history_entries": len(hs_from_di._entries) if hs_from_di else -1,
+        "factory_history_entries": len(hs_from_factory._entries),
+        "same_instance_gen_di": hs_from_gen is hs_from_di,
+        "same_instance_gen_factory": hs_from_gen is hs_from_factory,
+        "list_entries_total": total_from_di,
+        "list_entries_count": len(entries_from_di),
+        "first_entry_profile": entries_from_di[0].get("profile") if entries_from_di else None,
         "singleton_keys": list(_services.keys()),
     }
 
