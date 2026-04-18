@@ -69,16 +69,28 @@ def debug_history_state(
 ) -> dict:
     """Temporary debug endpoint — remove after diagnosing history issue."""
     from morsl.app.api.dependencies import _services
+    from morsl.app.api.models import HistoryEntryResponse
 
     hs = gen_service._history_service
+    entries = hs._entries if hs else []
+    first_entry_keys = sorted(entries[0].keys()) if entries else []
+
+    # Check if entries validate against the response model
+    validation_errors = []
+    for i, entry in enumerate(entries[:5]):
+        try:
+            HistoryEntryResponse(**entry)
+        except Exception as e:
+            validation_errors.append(
+                {"index": i, "error": str(e), "entry_keys": sorted(entry.keys())}
+            )
+
     return {
         "has_history_service": hs is not None,
-        "history_entries_in_memory": len(hs._entries) if hs else -1,
-        "history_data_dir": hs.data_dir if hs else None,
-        "generation_service_id": id(gen_service),
-        "history_service_id": id(hs) if hs else None,
+        "history_entries_in_memory": len(entries),
+        "first_entry_keys": first_entry_keys,
+        "validation_errors": validation_errors,
         "singleton_keys": list(_services.keys()),
-        "generation_singleton_match": _services.get("generation") is gen_service,
     }
 
 
