@@ -63,6 +63,25 @@ def get_status(
     )
 
 
+@router.get("/debug/history-state")
+def debug_history_state(
+    gen_service: GenerationService = Depends(get_generation_service),
+) -> dict:
+    """Temporary debug endpoint — remove after diagnosing history issue."""
+    from morsl.app.api.dependencies import _services
+
+    hs = gen_service._history_service
+    return {
+        "has_history_service": hs is not None,
+        "history_entries_in_memory": len(hs._entries) if hs else -1,
+        "history_data_dir": hs.data_dir if hs else None,
+        "generation_service_id": id(gen_service),
+        "history_service_id": id(hs) if hs else None,
+        "singleton_keys": list(_services.keys()),
+        "generation_singleton_match": _services.get("generation") is gen_service,
+    }
+
+
 @router.patch("/menu/swap", response_model=RecipeResponse)
 def swap_recipe(
     request: SwapRequest,
