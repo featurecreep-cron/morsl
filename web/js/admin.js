@@ -1734,14 +1734,12 @@ function adminApp() {
             if (this._orderSSE) this._orderSSE.close();
             this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
 
-            // Pre-flight auth check — don't open EventSource if we can't auth
-            try {
-                const check = await this.adminFetch('/api/orders/stream', { method: 'HEAD' });
-                if (check.status === 401 || check.status === 403) {
-                    console.warn('Order SSE auth failed, not connecting');
-                    return;
-                }
-            } catch { /* network error — try SSE anyway */ }
+            // EventSource can't send X-Admin-Token headers, so SSE only
+            // works when PIN auth is disabled (no auth required on admin endpoints).
+            // Skip connection entirely when PIN is active to avoid 401 reconnect loops.
+            const pub = this.settings;
+            const pinActive = pub.admin_pin_enabled || (pub.kiosk_enabled && pub.kiosk_pin_enabled);
+            if (pinActive && pub.has_pin) return;
 
             this._orderSSE = new EventSource('/api/orders/stream');
             this._orderSSE.addEventListener('order', (e) => {

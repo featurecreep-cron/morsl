@@ -534,7 +534,10 @@ class TandoorAPI:
                 f"Failed to fetch meal plans. Status code: {response.status_code}: {response.text}"
             )
             raise TandoorAPIError(response.status_code, response.text)
-        return json.loads(response.content)
+        data = json.loads(response.content)
+        if isinstance(data, dict):
+            data = data.get("results", [])
+        return data
 
     def cleanup_uncooked_meal_plans(self, meal_plan_type: int, days: int) -> int:
         """Delete meal plans older than `days` without a cook log.
