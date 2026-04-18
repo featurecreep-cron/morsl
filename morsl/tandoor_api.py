@@ -100,7 +100,20 @@ class TandoorAPI:
                     f"{response.status_code}: {response.text}"
                 )
                 raise TandoorAPIError(response.status_code, response.text)
-            content = json.loads(response.content)
+            try:
+                content = json.loads(response.content)
+            except json.JSONDecodeError as e:
+                body_preview = response.text[:200] if response.text else "(empty)"
+                self.logger.error(
+                    f"Tandoor returned non-JSON from {url} "
+                    f"(status={response.status_code}, "
+                    f"content-type={response.headers.get('content-type', 'unknown')}): "
+                    f"{body_preview}"
+                )
+                raise TandoorAPIError(
+                    response.status_code,
+                    f"Non-JSON response from {url}: {body_preview}",
+                ) from e
             new_results = content.get("results", [])
             self.logger.debug(f"Retrieved {len(new_results)} results.")
             results.extend(new_results)
@@ -134,7 +147,7 @@ class TandoorAPI:
 
     @cached
     def get_unpaged_results(self, url: str, obj_id: Union[str, int], **kwargs) -> Dict[str, Any]:
-        url = f"{url}{obj_id}"
+        url = f"{url}{obj_id}/"
         self.logger.debug(f"Connecting to tandoor api at url: {url}")
         response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
 
@@ -143,7 +156,19 @@ class TandoorAPI:
                 f"Failed to fetch recipes. Status code: {response.status_code}: {response.text}"
             )
             raise TandoorAPIError(response.status_code, response.text)
-        return json.loads(response.content)
+        try:
+            return json.loads(response.content)
+        except json.JSONDecodeError as e:
+            body_preview = response.text[:200] if response.text else "(empty)"
+            self.logger.error(
+                f"Tandoor returned non-JSON from {url} "
+                f"(content-type={response.headers.get('content-type', 'unknown')}): "
+                f"{body_preview}"
+            )
+            raise TandoorAPIError(
+                response.status_code,
+                f"Non-JSON response from {url}: {body_preview}",
+            ) from e
 
     def create_object(self, url: str, data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         self.logger.debug(f"Create object with tandoor api at url: {url}")
@@ -228,7 +253,7 @@ class TandoorAPI:
         Returns:
             dict: Details of the recipe in JSON-LD format.
         """
-        url = f"{self.url}recipe/{recipe_id}"
+        url = f"{self.url}recipe/{recipe_id}/"
         response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
 
         if response.status_code == 200:

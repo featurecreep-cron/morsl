@@ -1730,9 +1730,19 @@ function adminApp() {
             } catch (e) { /* silent */ }
         },
 
-        connectOrderSSE() {
+        async connectOrderSSE() {
             if (this._orderSSE) this._orderSSE.close();
             this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
+
+            // Pre-flight auth check — don't open EventSource if we can't auth
+            try {
+                const check = await this.adminFetch('/api/orders/stream', { method: 'HEAD' });
+                if (check.status === 401 || check.status === 403) {
+                    console.warn('Order SSE auth failed, not connecting');
+                    return;
+                }
+            } catch { /* network error — try SSE anyway */ }
+
             this._orderSSE = new EventSource('/api/orders/stream');
             this._orderSSE.addEventListener('order', (e) => {
                 try {
