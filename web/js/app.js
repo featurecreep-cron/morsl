@@ -468,12 +468,12 @@ function menuApp() {
                 if (this.shelves.length === 0) {
                     // First load or cleared — seed shelf
                     const name = data.profile || this.activeProfile || 'Menu';
-                    this.addShelf(name, newRecipes);
+                    this.addShelf(name, newRecipes, data.generated_at);
                     this.activeDeckName = name;
                 } else if (versionChanged) {
                     // Server has a newer menu than what shelves hold — update active shelf
                     const target = data.profile || this.activeDeckName || this.activeProfile || 'Menu';
-                    this.addShelf(target, newRecipes);
+                    this.addShelf(target, newRecipes, data.generated_at);
                     this.activeDeckName = target;
                     this.saveShelves();
                 }
@@ -855,7 +855,7 @@ function menuApp() {
                     }
                     const target = this._targetShelf || data.profile || this.activeProfile || 'Menu';
                     this._targetShelf = null;
-                    this.addShelf(target, data.recipes || []);
+                    this.addShelf(target, data.recipes || [], data.generated_at);
                     this.activeDeckName = target;
                     this.generatedAt = data.generated_at || '';
                     this.menuVersion = data.version;
@@ -876,11 +876,11 @@ function menuApp() {
             }
         },
 
-        addShelf(name, recipes) {
+        addShelf(name, recipes, generatedAt) {
             this._carouselCache = null;
             this._carouselCacheKey = null;
             const existing = this.shelves.find(s => s.name === name);
-            const generation = { recipes, generatedAt: new Date().toISOString() };
+            const generation = { recipes, generatedAt: generatedAt || new Date().toISOString() };
             if (existing) {
                 // Prepend new generation, cap at max
                 existing.generations.unshift(generation);
