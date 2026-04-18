@@ -224,6 +224,21 @@ def get_logger(settings: Settings = Depends(get_settings)) -> Logger:
     return setup_logging(log=settings.log_level, log_to_stdout=settings.log_to_stdout)
 
 
+def get_provider(
+    settings: Settings = Depends(get_settings),
+    settings_svc: SettingsService = Depends(get_settings_service),
+    logger: Logger = Depends(get_logger),
+):
+    """Build a TandoorProvider from current credentials."""
+    from morsl.constants import API_CACHE_TTL_MINUTES
+    from morsl.providers.tandoor import TandoorProvider
+    from morsl.tandoor_api import TandoorAPI
+
+    url, token = resolve_credentials(settings, settings_svc)
+    api = TandoorAPI(url, token, logger, cache=API_CACHE_TTL_MINUTES)
+    return TandoorProvider(api)
+
+
 def get_credentials(
     settings: Settings = Depends(get_settings),
     settings_svc: SettingsService = Depends(get_settings_service),

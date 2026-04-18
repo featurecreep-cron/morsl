@@ -17,6 +17,11 @@ from morsl.services.menu_service import (
 )
 
 
+def _make_mock_provider():
+    """Create a MagicMock suitable for use as a RecipeProvider."""
+    return MagicMock()
+
+
 class TestMenuService:
     def test_init_with_defaults(self, mock_logger):
         config = {
@@ -24,10 +29,7 @@ class TestMenuService:
             "cache": API_CACHE_TTL_MINUTES,
             "constraints": [],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.choices == 5
         assert service.min_choices is None
 
@@ -37,10 +39,7 @@ class TestMenuService:
             "min_choices": 3,
             "cache": 0,
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.min_choices == 3
 
     def test_parse_constraints_v2_format(self, mock_logger):
@@ -63,10 +62,7 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
 
         assert len(service.constraints) == 2
         assert service.constraints[0]["type"] == "keyword"
@@ -90,19 +86,13 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
 
         assert service.constraints[0]["except_ids"] == [2]
 
     def test_parse_constraints_empty(self, mock_logger):
         config = {"choices": 5, "cache": 0, "constraints": []}
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.constraints == []
 
     def test_prepare_recipes_all(self, mock_logger):
@@ -120,13 +110,10 @@ class TestMenuService:
                 "created_at": "2024-01-01T12:00:00+00:00",
             },
         ]
-        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
-            api = MockAPI.return_value
-            api.get_recipes.return_value = mock_recipe_data
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
-            service.prepare_recipes()
+        provider = _make_mock_provider()
+        provider.get_recipes.return_value = mock_recipe_data
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_recipes()
         assert len(service.recipes) == 1
         assert service.recipes[0].id == 1
 
@@ -139,16 +126,13 @@ class TestMenuService:
                 {"type": "makenow", "count": 3, "operator": ">="},
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert len(service.constraints) == 1
         assert service.constraints[0]["type"] == "makenow"
         assert service.constraints[0]["count"] == 3
 
     def test_prepare_makenow_constraint(self, mock_logger):
-        """Test that makenow constraint fetches on-hand recipes from Tandoor."""
+        """Test that makenow constraint fetches on-hand recipes from provider."""
         pool_recipes = [
             {
                 "id": 1,
@@ -183,22 +167,19 @@ class TestMenuService:
                 {"type": "makenow", "count": 1, "operator": ">="},
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
-            api = MockAPI.return_value
-            api.get_recipes.side_effect = lambda **kwargs: (
-                onhand_recipes if kwargs.get("params", {}).get("makenow") else pool_recipes
-            )
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
-            service.prepare_recipes()
-            service.prepare_constraints()
+        provider = _make_mock_provider()
+        provider.get_recipes.side_effect = lambda **kwargs: (
+            onhand_recipes if kwargs.get("params", {}).get("makenow") else pool_recipes
+        )
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_recipes()
+        service.prepare_constraints()
 
         assert len(service.constraints[0]["matching_recipes"]) == 1
         assert service.constraints[0]["matching_recipes"][0].id == 1
 
     def test_prepare_recipes_with_filters(self, mock_logger):
-        """Test that filters config passes CustomFilter IDs to Tandoor."""
+        """Test that filters config passes CustomFilter IDs to provider."""
         config = {"choices": 2, "cache": 0, "filters": [42, 99], "constraints": []}
         mock_recipe_data = [
             {
@@ -213,14 +194,11 @@ class TestMenuService:
                 "created_at": "2024-01-01T12:00:00+00:00",
             },
         ]
-        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
-            api = MockAPI.return_value
-            api.get_recipes.return_value = mock_recipe_data
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
-            service.prepare_recipes()
-            api.get_recipes.assert_called_once_with(params=None, filters=[42, 99])
+        provider = _make_mock_provider()
+        provider.get_recipes.return_value = mock_recipe_data
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_recipes()
+        provider.get_recipes.assert_called_once_with(params=None, filters=[42, 99])
         assert len(service.recipes) == 1
 
     def test_parse_date_constraint_cooked(self, mock_logger):
@@ -237,10 +215,7 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.constraints[0]["cooked_date"] is not None
         assert service.constraints[0]["cooked_after"] is False
 
@@ -258,10 +233,7 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.constraints[0]["cooked_date"] is not None
         assert service.constraints[0]["cooked_after"] is True
 
@@ -279,10 +251,7 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.constraints[0]["created_date"] is not None
         assert service.constraints[0]["created_after"] is False
 
@@ -300,10 +269,7 @@ class TestMenuService:
                 },
             ],
         }
-        with patch("morsl.services.menu_service.TandoorAPI"):
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
+        service = MenuService(config=config, logger=mock_logger, provider=_make_mock_provider())
         assert service.constraints[0]["created_date"] is not None
         assert service.constraints[0]["created_after"] is True
 
@@ -323,6 +289,80 @@ class TestBuildRatingCondition:
 
     def test_no_rating(self):
         assert _build_rating_condition({}) is None
+
+
+class TestPantryConstraint:
+    """Tests for the pantry flag auto-injecting a soft makenow constraint."""
+
+    def test_pantry_flag_injects_makenow(self, mock_logger):
+        provider = _make_mock_provider()
+        from morsl.providers.base import Capability
+
+        provider.capabilities.return_value = Capability.ONHAND
+        provider.get_recipes.return_value = []
+
+        config = {"choices": 3, "pantry": True, "constraints": []}
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_constraints()
+
+        makenow = [c for c in service.constraints if c.get("type") == "makenow"]
+        assert len(makenow) == 1
+        assert makenow[0]["soft"] is True
+        assert makenow[0]["weight"] == 5  # DEFAULT_PANTRY_WEIGHT
+
+    def test_pantry_flag_skips_when_makenow_exists(self, mock_logger):
+        provider = _make_mock_provider()
+        from morsl.providers.base import Capability
+
+        provider.capabilities.return_value = Capability.ONHAND
+        provider.get_recipes.return_value = []
+
+        config = {
+            "choices": 3,
+            "pantry": True,
+            "constraints": [{"type": "makenow", "count": 2, "operator": ">="}],
+        }
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_constraints()
+
+        makenow = [c for c in service.constraints if c.get("type") == "makenow"]
+        assert len(makenow) == 1  # only the original, no duplicate
+
+    def test_pantry_flag_skips_without_capability(self, mock_logger):
+        provider = _make_mock_provider()
+        from morsl.providers.base import Capability
+
+        provider.capabilities.return_value = Capability.MEAL_PLAN  # no ONHAND
+
+        config = {"choices": 3, "pantry": True, "constraints": []}
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_constraints()
+
+        makenow = [c for c in service.constraints if c.get("type") == "makenow"]
+        assert len(makenow) == 0
+
+    def test_no_pantry_flag_no_injection(self, mock_logger):
+        provider = _make_mock_provider()
+        config = {"choices": 3, "constraints": []}
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_constraints()
+
+        makenow = [c for c in service.constraints if c.get("type") == "makenow"]
+        assert len(makenow) == 0
+
+    def test_custom_pantry_weight(self, mock_logger):
+        provider = _make_mock_provider()
+        from morsl.providers.base import Capability
+
+        provider.capabilities.return_value = Capability.ONHAND
+        provider.get_recipes.return_value = []
+
+        config = {"choices": 3, "pantry": True, "pantry_weight": 20, "constraints": []}
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_constraints()
+
+        makenow = [c for c in service.constraints if c.get("type") == "makenow"]
+        assert makenow[0]["weight"] == 20
 
 
 # Tandoor-shaped API response fixtures for integration tests
@@ -361,17 +401,14 @@ _RECIPE_POOL = [
 
 
 class TestMenuServiceIntegration:
-    """Tests that exercise prepare_data + select_recipes end-to-end with mocked Tandoor."""
+    """Tests that exercise prepare_data + select_recipes end-to-end with mocked provider."""
 
-    def _make_service(self, mock_logger, config, api_mock_setup):
-        """Build a MenuService with mocked Tandoor API."""
-        with patch("morsl.services.menu_service.TandoorAPI") as MockAPI:
-            api = MockAPI.return_value
-            api_mock_setup(api)
-            service = MenuService(
-                url="http://localhost", token="test", config=config, logger=mock_logger
-            )
-            service.prepare_data()
+    def _make_service(self, mock_logger, config, provider_setup):
+        """Build a MenuService with mocked provider."""
+        provider = _make_mock_provider()
+        provider_setup(provider)
+        service = MenuService(config=config, logger=mock_logger, provider=provider)
+        service.prepare_data()
         return service
 
     def test_keyword_constraint_end_to_end(self, mock_logger):
@@ -389,11 +426,11 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
-            api.get_keyword_tree.return_value = [{"id": 10, "name": "Tequila"}]
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
+            provider.get_tag_tree.return_value = [{"id": 10, "name": "Tequila"}]
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
 
         # Verify keyword constraint was prepared
         assert len(service.constraints[0]["keywords"]) == 1
@@ -408,7 +445,7 @@ class TestMenuServiceIntegration:
         assert has_tequila
 
     def test_keyword_constraint_no_children(self, mock_logger):
-        """Keyword constraint with include_children=False uses get_keyword instead of tree."""
+        """Keyword constraint with include_children=False uses get_tag instead of tree."""
         config = {
             "choices": 2,
             "cache": 0,
@@ -423,16 +460,15 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
-            api.get_keyword.return_value = {"id": 50, "name": "Gin"}
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
+            provider.get_tag.return_value = {"id": 50, "name": "Gin"}
 
-        service = self._make_service(mock_logger, config, setup_api)
-        api = service.tandoor
-        api.get_keyword.assert_called_once_with(50)
+        service = self._make_service(mock_logger, config, setup)
+        service.provider.get_tag.assert_called_once_with(50)
 
     def test_food_constraint_end_to_end(self, mock_logger):
-        """Full pipeline with food constraint — fetches food, queries matching recipes."""
+        """Full pipeline with food constraint — fetches ingredient, queries matching recipes."""
         config = {
             "choices": 2,
             "cache": 0,
@@ -446,22 +482,22 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.side_effect = lambda **kwargs: (
+        def setup(provider):
+            provider.get_recipes.side_effect = lambda **kwargs: (
                 _RECIPE_POOL[:3]  # recipes containing lime juice
                 if kwargs.get("params", {}).get("foods_or")
                 else _RECIPE_POOL
             )
-            api.get_food.return_value = {"id": 100, "name": "Lime Juice"}
+            provider.get_ingredient.return_value = {"id": 100, "name": "Lime Juice"}
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         assert len(service.constraints[0]["foods"]) == 1
         assert len(service.constraints[0]["matching_recipes"]) == 3
         result = service.select_recipes()
         assert result.constraint_count == 1
 
     def test_food_constraint_with_except(self, mock_logger):
-        """Food constraint with except_ids passes foods_or_not to Tandoor."""
+        """Food constraint with except_ids passes foods_or_not to provider."""
         config = {
             "choices": 2,
             "cache": 0,
@@ -476,18 +512,18 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.side_effect = lambda **kwargs: (
+        def setup(provider):
+            provider.get_recipes.side_effect = lambda **kwargs: (
                 _RECIPE_POOL[:2] if kwargs.get("params", {}).get("foods_or") else _RECIPE_POOL
             )
-            api.get_food.return_value = {"id": 100, "name": "Citrus"}
+            provider.get_ingredient.return_value = {"id": 100, "name": "Citrus"}
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         # Check that except_ids were parsed
         assert service.constraints[0]["except_ids"] == [101]
 
     def test_book_constraint_end_to_end(self, mock_logger):
-        """Full pipeline with book constraint."""
+        """Full pipeline with collection constraint."""
         config = {
             "choices": 2,
             "cache": 0,
@@ -501,12 +537,12 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
-            api.get_book.return_value = {"id": 5, "name": "Classics", "filter": None}
-            api.get_book_recipes.return_value = [_RECIPE_POOL[0], _RECIPE_POOL[1]]
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
+            provider.get_collection.return_value = {"id": 5, "name": "Classics", "filter": None}
+            provider.get_collection_recipes.return_value = [_RECIPE_POOL[0], _RECIPE_POOL[1]]
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         assert len(service.constraints[0]["books"]) == 1
         assert len(service.constraints[0]["matching_recipes"]) == 2
         result = service.select_recipes()
@@ -527,10 +563,10 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         # All selected recipes should be 4+ stars
         for r in result.recipes:
@@ -557,11 +593,11 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
-            api.get_keyword_tree.return_value = [{"id": 20, "name": "Citrus"}]
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
+            provider.get_tag_tree.return_value = [{"id": 20, "name": "Citrus"}]
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         assert result.constraint_count == 2
         assert len(result.recipes) == 3
@@ -582,11 +618,11 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
-            api.get_keyword_tree.return_value = [{"id": 40, "name": "Rum"}]
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
+            provider.get_tag_tree.return_value = [{"id": 40, "name": "Rum"}]
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         # With exclude=True, the constraint says "at least 2 non-rum recipes"
         # Since we pick 2 total and require 2 non-rum, none should have rum
@@ -610,10 +646,10 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         # Only 1 recipe has 5 stars, but constraint is soft so solver relaxes
         assert len(result.recipes) == 3
@@ -634,10 +670,10 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         assert result.constraint_count == 1
 
@@ -652,12 +688,12 @@ class TestMenuServiceIntegration:
         }
         onhand = _RECIPE_POOL[:2]
 
-        def setup_api(api):
-            api.get_recipes.side_effect = lambda **kwargs: (
+        def setup(provider):
+            provider.get_recipes.side_effect = lambda **kwargs: (
                 onhand if kwargs.get("params", {}).get("makenow") else _RECIPE_POOL
             )
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         assert result.constraint_count == 1
         # At least one recipe should be from the on-hand set
@@ -665,7 +701,7 @@ class TestMenuServiceIntegration:
         assert any(r.id in onhand_ids for r in result.recipes)
 
     def test_food_constraint_tolerates_api_error(self, mock_logger):
-        """Food constraint skips foods that fail to fetch but still finds recipes."""
+        """Food constraint skips ingredients that fail to fetch but still finds recipes."""
         from morsl.tandoor_api import TandoorAPIError
 
         config = {
@@ -681,19 +717,19 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.side_effect = lambda **kwargs: (
+        def setup(provider):
+            provider.get_recipes.side_effect = lambda **kwargs: (
                 _RECIPE_POOL[:2] if kwargs.get("params", {}).get("foods_or") else _RECIPE_POOL
             )
 
-            def get_food_side_effect(food_id):
+            def get_ingredient_side_effect(food_id, **kwargs):
                 if food_id == 101:
                     raise TandoorAPIError(404, "Not found")
                 return {"id": 100, "name": "Lime"}
 
-            api.get_food.side_effect = get_food_side_effect
+            provider.get_ingredient.side_effect = get_ingredient_side_effect
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         # Should have 1 food (the other was skipped due to error)
         assert len(service.constraints[0]["foods"]) == 1
         assert service.constraints[0]["foods"][0].name == "Lime"
@@ -713,10 +749,10 @@ class TestMenuServiceIntegration:
             ],
         }
 
-        def setup_api(api):
-            api.get_recipes.return_value = _RECIPE_POOL
+        def setup(provider):
+            provider.get_recipes.return_value = _RECIPE_POOL
 
-        service = self._make_service(mock_logger, config, setup_api)
+        service = self._make_service(mock_logger, config, setup)
         result = service.select_recipes()
         assert result.constraint_count == 1
 
@@ -1038,10 +1074,10 @@ class TestOnHandSubstitution:
             ms.recipes = [MagicMock()]
             ms.choices = 1
             ms.select_recipes.return_value = self._make_solver_result()
-            ms.tandoor = MagicMock()
-            ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=False)
-            ms.tandoor.get_food_substitutes.return_value = [{"id": 200}]
-            ms.tandoor.get_food.return_value = {
+            ms.provider = MagicMock()
+            ms.provider.get_recipe_details.return_value = self._make_details(food_onhand=False)
+            ms.provider.get_ingredient_substitutes.return_value = [{"id": 200}]
+            ms.provider.get_ingredient.return_value = {
                 "id": 200,
                 "name": "Lemon Juice",
                 "food_onhand": True,
@@ -1053,7 +1089,7 @@ class TestOnHandSubstitution:
 
         assert len(result["recipes"]) == 1
         assert result["recipes"][0]["ingredients"][0]["food"] == "Lemon Juice"
-        ms.tandoor.get_food_substitutes.assert_called_once_with(100, substitute="food")
+        ms.provider.get_ingredient_substitutes.assert_called_once_with(100, substitute_type="food")
 
     def test_no_substitution_when_onhand(self, mock_logger):
         """When food is already on hand, no substitution occurs."""
@@ -1063,15 +1099,15 @@ class TestOnHandSubstitution:
             ms.recipes = [MagicMock()]
             ms.choices = 1
             ms.select_recipes.return_value = self._make_solver_result()
-            ms.tandoor = MagicMock()
-            ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=True)
+            ms.provider = MagicMock()
+            ms.provider.get_recipe_details.return_value = self._make_details(food_onhand=True)
 
             result = GenerationService._sync_generate(
                 {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
             )
 
         assert result["recipes"][0]["ingredients"][0]["food"] == "Lime Juice"
-        ms.tandoor.get_food_substitutes.assert_not_called()
+        ms.provider.get_ingredient_substitutes.assert_not_called()
 
     def test_steps_and_timing_extracted(self, mock_logger):
         """Steps and timing are extracted from recipe details."""
@@ -1081,8 +1117,8 @@ class TestOnHandSubstitution:
             ms.recipes = [MagicMock()]
             ms.choices = 1
             ms.select_recipes.return_value = self._make_solver_result()
-            ms.tandoor = MagicMock()
-            ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=True)
+            ms.provider = MagicMock()
+            ms.provider.get_recipe_details.return_value = self._make_details(food_onhand=True)
 
             result = GenerationService._sync_generate(
                 {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger
@@ -1105,9 +1141,9 @@ class TestOnHandSubstitution:
             ms.recipes = [MagicMock()]
             ms.choices = 1
             ms.select_recipes.return_value = self._make_solver_result()
-            ms.tandoor = MagicMock()
-            ms.tandoor.get_recipe_details.return_value = self._make_details(food_onhand=False)
-            ms.tandoor.get_food_substitutes.return_value = []
+            ms.provider = MagicMock()
+            ms.provider.get_recipe_details.return_value = self._make_details(food_onhand=False)
+            ms.provider.get_ingredient_substitutes.return_value = []
 
             result = GenerationService._sync_generate(
                 {"choices": 1, "cache": 0}, "http://localhost", "test", mock_logger

@@ -99,6 +99,8 @@ class RelaxedConstraint:
     label: str
     slack_value: float
     weight: float
+    operator: str = ""
+    original_count: int = 0
 
 
 @dataclass(frozen=True)

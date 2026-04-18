@@ -292,6 +292,12 @@ class TandoorAPI:
         self.logger.debug(f"Returning food {food['id']}: {food['name']}.")
         return food
 
+    @cached
+    def get_onhand_foods(self) -> List[Dict[str, Any]]:
+        """Fetch all foods marked as on-hand."""
+        url = f"{self.url}food/"
+        return self.get_paged_results(url, {"onhand": 1, "page_size": self.page_size})
+
     def get_book(
         self, book_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> Dict[str, Any]:

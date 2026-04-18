@@ -14,6 +14,7 @@ from morsl.app.api.dependencies import (
     get_logger,
     get_meal_plan_service,
     get_order_service,
+    get_provider,
     get_settings,
     get_settings_service,
     revoke_admin_tokens,
@@ -93,12 +94,18 @@ def mock_order_service():
 
 
 @pytest.fixture
-def client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger):
+def mock_provider():
+    return MagicMock()
+
+
+@pytest.fixture
+def client(mock_settings, mock_gen_service, mock_config_service, mock_app_logger, mock_provider):
     app.dependency_overrides[get_settings] = lambda: mock_settings
     app.dependency_overrides[get_generation_service] = lambda: mock_gen_service
     app.dependency_overrides[get_config_service] = lambda: mock_config_service
     app.dependency_overrides[get_logger] = lambda: mock_app_logger
     app.dependency_overrides[get_credentials] = lambda: ("http://test.local", "test_token")
+    app.dependency_overrides[get_provider] = lambda: mock_provider
     yield AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
     app.dependency_overrides.clear()
 
@@ -1013,3 +1020,109 @@ class TestMealPlanSave:
         response = await meal_plan_client.post("/api/meal-plan", json=body)
         assert response.status_code == 200
         assert mock_meal_plan_service.save_menu.call_args.kwargs["shared"] == [5, 8]
+
+
+_MENU_WITH_RECIPES = {
+    "recipes": [
+        {
+            "id": 1,
+            "name": "Pasta",
+            "ingredients": [
+                {"food": "flour", "amount": 2.0, "unit": "cup"},
+                {"food": "eggs", "amount": 3.0, "unit": None},
+            ],
+        },
+        {
+            "id": 2,
+            "name": "Bread",
+            "ingredients": [
+                {"food": "flour", "amount": 4.0, "unit": "cup"},
+                {"food": "yeast", "amount": 1.0, "unit": "tbsp"},
+            ],
+        },
+    ],
+    "generated_at": "2026-04-17T10:00:00",
+    "requested_count": 2,
+    "constraint_count": 0,
+    "status": "optimal",
+    "profile": "default",
+}
+
+
+@pytest.mark.asyncio
+class TestShoppingListEndpoints:
+    async def test_shopping_list_no_menu(self, client, mock_gen_service):
+        mock_gen_service.get_current_menu.return_value = None
+        response = await client.post("/api/shopping-list")
+        assert response.status_code == 404
+
+    async def test_shopping_list_generates(self, client, mock_gen_service):
+        mock_gen_service.get_current_menu.return_value = _MENU_WITH_RECIPES
+        response = await client.post("/api/shopping-list")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 3  # flour (merged), eggs, yeast
+        foods = {i["food"].lower(): i for i in data["items"]}
+        assert foods["flour"]["amount"] == 6
+        assert foods["eggs"]["amount"] == 3
+        assert foods["yeast"]["amount"] == 1
+
+    async def test_shopping_list_text(self, client, mock_gen_service):
+        mock_gen_service.get_current_menu.return_value = _MENU_WITH_RECIPES
+        response = await client.post("/api/shopping-list/text")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        text = response.text
+        assert "flour" in text.lower()
+        assert "eggs" in text.lower()
+
+    async def test_shopping_list_text_no_menu(self, client, mock_gen_service):
+        mock_gen_service.get_current_menu.return_value = None
+        response = await client.post("/api/shopping-list/text")
+        assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+class TestSwapEndpoint:
+    async def test_swap_no_menu(self, client, mock_gen_service):
+        mock_gen_service.swap_recipe.side_effect = RuntimeError("No menu to swap from")
+        response = await client.patch(
+            "/api/menu/swap", json={"old_recipe_id": 1, "profile": "default"}
+        )
+        assert response.status_code == 400
+
+    async def test_swap_recipe_not_found(self, client, mock_gen_service):
+        mock_gen_service.swap_recipe.side_effect = RuntimeError("Recipe 99 not in current menu")
+        response = await client.patch(
+            "/api/menu/swap", json={"old_recipe_id": 99, "profile": "default"}
+        )
+        assert response.status_code == 400
+
+    async def test_swap_success(self, client, mock_gen_service):
+        new_recipe = {
+            "id": 42,
+            "name": "New Recipe",
+            "description": "A replacement",
+            "rating": 4.0,
+            "image": "http://img.jpg",
+            "ingredients": [],
+            "keywords": [],
+            "steps": [],
+            "working_time": 10,
+            "cooking_time": 20,
+        }
+        mock_gen_service.swap_recipe.return_value = new_recipe
+        response = await client.patch(
+            "/api/menu/swap", json={"old_recipe_id": 1, "profile": "default"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 42
+        assert data["name"] == "New Recipe"
+
+    async def test_swap_missing_profile(self, client, mock_config_service):
+        mock_config_service.load_profile.side_effect = FileNotFoundError("not found")
+        response = await client.patch(
+            "/api/menu/swap", json={"old_recipe_id": 1, "profile": "missing"}
+        )
+        assert response.status_code == 404

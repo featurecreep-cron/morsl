@@ -2,13 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import json
+from logging import Logger
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
 
-from morsl.app.api.dependencies import get_generation_service, require_admin
-from morsl.app.api.models import GenerationStatusResponse, MenuResponse
+from morsl.app.api.dependencies import (
+    get_config_service,
+    get_credentials,
+    get_generation_service,
+    get_logger,
+    require_admin,
+)
+from morsl.app.api.models import (
+    GenerationStatusResponse,
+    MenuResponse,
+    RecipeResponse,
+    SwapRequest,
+)
 from morsl.constants import SSE_QUEUE_TIMEOUT
+from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationService
 
 router = APIRouter(tags=["menu"])
@@ -48,6 +61,37 @@ def get_status(
         recipe_count=status.recipe_count,
         warnings=status.warnings,
     )
+
+
+@router.patch("/menu/swap", response_model=RecipeResponse)
+def swap_recipe(
+    request: SwapRequest,
+    gen_service: GenerationService = Depends(get_generation_service),
+    config_service: ConfigService = Depends(get_config_service),
+    credentials: tuple[str, str] = Depends(get_credentials),
+    logger: Logger = Depends(get_logger),
+) -> RecipeResponse:
+    """Replace one recipe in the current menu without regenerating."""
+    try:
+        config = config_service.load_profile(request.profile)
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=404, detail=f"Profile '{request.profile}' not found"
+        ) from e
+
+    url, token = credentials
+    try:
+        new_recipe = gen_service.swap_recipe(
+            old_recipe_id=request.old_recipe_id,
+            config=config,
+            url=url,
+            token=token,
+            logger=logger,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return RecipeResponse(**new_recipe)
 
 
 @router.get("/menu/stream")

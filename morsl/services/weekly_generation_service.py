@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from morsl.constants import API_CACHE_TTL_MINUTES, GENERATION_SHUTDOWN_TIMEOUT
+from morsl.providers.tandoor import TandoorProvider
 from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationState
 from morsl.services.menu_service import MenuService
@@ -213,11 +214,8 @@ class WeeklyGenerationService:
         profile_name: str,
         total_needed: int,
         config_service: ConfigService,
-        url: str,
-        token: str,
         app_logger: logging.Logger,
-        cache_minutes: int,
-        shared_api: Optional[TandoorAPI] = None,
+        shared_provider: TandoorProvider,
     ) -> Dict[str, Any]:
         """Fetch data for a profile (HTTP-heavy). Safe to run in parallel."""
         self._status.profile_progress[profile_name] = "preparing"
@@ -230,11 +228,8 @@ class WeeklyGenerationService:
             return {"error": msg, "service": None, "profile_name": profile_name}
 
         config["choices"] = total_needed
-        config["cache"] = cache_minutes
 
-        service = MenuService(
-            url=url, token=token, config=config, logger=app_logger, api=shared_api
-        )
+        service = MenuService(config=config, logger=app_logger, provider=shared_provider)
         service.prepare_data()
         return {"error": None, "service": service, "profile_name": profile_name}
 
@@ -328,11 +323,12 @@ class WeeklyGenerationService:
             cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
         # 3a. Parallel data-fetch phase — all profiles prepare concurrently
-        # Share a single TandoorAPI instance across all profiles to leverage
+        # Share a single provider instance across all profiles to leverage
         # the global cache for overlapping recipe pools.
         from concurrent.futures import ThreadPoolExecutor
 
         shared_api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
+        shared_provider = TandoorProvider(shared_api)
 
         def _prepare(item):
             name, needed = item
@@ -340,11 +336,8 @@ class WeeklyGenerationService:
                 name,
                 needed,
                 config_service,
-                url,
-                token,
                 app_logger,
-                cache_minutes,
-                shared_api=shared_api,
+                shared_provider,
             )
 
         with ThreadPoolExecutor(max_workers=len(sorted_profiles)) as pool:
@@ -379,7 +372,7 @@ class WeeklyGenerationService:
         for recipes in profile_recipes.values():
             all_recipe_objs.extend(recipes)
 
-        details_list = fetch_recipe_details(shared_api, all_recipe_objs, app_logger)
+        details_list = fetch_recipe_details(shared_provider, all_recipe_objs, app_logger)
 
         detail_map: Dict[int, Dict[str, Any]] = {}
         for detail in details_list:
@@ -478,9 +471,10 @@ class WeeklyGenerationService:
         """Single-slot regeneration — runs in thread pool."""
         config = config_service.load_profile(profile_name)
         config["choices"] = recipes_per_day
-        config["cache"] = cache_minutes
 
-        service = MenuService(url=url, token=token, config=config, logger=app_logger)
+        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
+        provider = TandoorProvider(api)
+        service = MenuService(config=config, logger=app_logger, provider=provider)
         service.prepare_data()
 
         if exclude_ids:
@@ -495,7 +489,7 @@ class WeeklyGenerationService:
 
         solver_result = service.select_recipes()
 
-        return fetch_recipe_details(service.tandoor, solver_result.recipes, app_logger)
+        return fetch_recipe_details(service.provider, solver_result.recipes, app_logger)
 
     async def wait_for_completion(self, timeout: float = 300.0) -> WeeklyGenerationStatus:
         """Wait for an in-flight generation to finish."""

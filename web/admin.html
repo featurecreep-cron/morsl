@@ -716,6 +716,7 @@
                                   x-text="' \u2014 ' + (order.customer_name || '')"></span>
                             <small x-text="new Date(order.timestamp).toLocaleTimeString()"></small>
                         </span>
+                        <button class="btn-chip-remove" @click.stop="markOrderReady(order)" title="Mark as ready" style="color:var(--accent-color); font-size:0.9rem;">&#10003;</button>
                         <button class="btn-icon-danger" @click.stop="deleteOrder(order)" title="Delete request">&times;</button>
                     </div>
                 </template>
@@ -1797,8 +1798,8 @@
                             <div class="constraint-summary" @click="toggleConstraintExpand(idx)">
                                 <span class="constraint-type-icon" x-html="constraintTypes[c.type]?.icon || '?'"></span>
                                 <span class="constraint-type-label" x-text="constraintTypes[c.type]?.label || c.type"></span>
-                                <span class="constraint-summary-text" x-text="getConstraintSummary(c)"></span>
-                                <span class="constraint-soft-badge" x-show="isConstraintSoft(c)">soft</span>
+                                <span class="constraint-summary-text" x-text="describeConstraint(c)"></span>
+                                <span class="constraint-soft-badge" x-show="isConstraintSoft(c)" x-text="'soft' + (c.weight && c.weight !== 10 ? ' (' + c.weight + ')' : '')"></span>
                                 <span class="constraint-expand-icon" x-text="expandedConstraint === idx ? '▲' : '▼'"></span>
                             </div>
 
@@ -1945,6 +1946,14 @@
                                         <span>Flexible rule</span>
                                     </label>
                                     <small>Flexible rules can be relaxed if not all requirements can be satisfied</small>
+                                    <div x-show="isConstraintSoft(c)" x-transition style="margin-top:0.5rem;">
+                                        <label style="font-size:0.8rem; display:flex; align-items:center; gap:0.5rem;">
+                                            Priority: <span x-text="c.weight || 10" style="min-width:1.5em; text-align:center;"></span>
+                                            <input type="range" min="1" max="20" :value="c.weight || 10" @input="c.weight = parseInt($event.target.value)"
+                                                   style="flex:1; accent-color:var(--accent-color);">
+                                        </label>
+                                        <small style="opacity:0.6;">Higher = harder to relax. Low priority rules yield first.</small>
+                                    </div>
                                 </div>
 
                                 <!-- Include children (per-constraint) -->
@@ -1974,22 +1983,64 @@
                     </div>
                 </div>
 
-                <!-- Add constraint dropdown -->
-                <div class="add-constraint-dropdown" x-data="{ open: false }">
-                    <button class="btn-add-constraint" @click="open = !open" type="button">
-                        <span>+ Add Rule</span>
-                        <span x-text="open ? '▲' : '▼'" style="font-size: 0.7em; margin-left: 0.5rem;"></span>
-                    </button>
-                    <div class="add-constraint-menu" x-show="open" @click.outside="open = false" x-transition>
-                        <template x-for="(typeInfo, typeKey) in constraintTypes" :key="typeKey">
-                            <button class="add-constraint-option" @click="addConstraint(typeKey); open = false">
-                                <span class="add-constraint-option-icon" x-html="typeInfo.icon"></span>
-                                <span class="add-constraint-option-content">
-                                    <span class="add-constraint-option-label" x-text="typeInfo.label"></span>
-                                    <span class="add-constraint-option-desc" x-text="typeInfo.description"></span>
-                                </span>
+                <!-- Quick Add presets + Add constraint dropdown -->
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-start;">
+                    <div class="add-constraint-dropdown" x-data="{ open: false }">
+                        <button class="btn-add-constraint btn-secondary" @click="open = !open" type="button" style="font-size:0.8rem; height:30px;">
+                            <span>Quick Add</span>
+                            <span x-text="open ? '▲' : '▼'" style="font-size: 0.7em; margin-left: 0.5rem;"></span>
+                        </button>
+                        <div class="add-constraint-menu" x-show="open" @click.outside="open = false" x-transition>
+                            <button class="add-constraint-option" @click="quickAddConstraint('theme-keywords'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.keyword?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Theme Keywords</span><span class="add-constraint-option-desc">Require recipes with specific tags</span></span>
                             </button>
-                        </template>
+                            <button class="add-constraint-option" @click="quickAddConstraint('avoid-keywords'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.keyword?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Avoid Keywords</span><span class="add-constraint-option-desc">Exclude recipes with certain tags</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('include-foods'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.food?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Include Foods</span><span class="add-constraint-option-desc">Require recipes with specific ingredients</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('avoid-foods'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.food?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Avoid Foods</span><span class="add-constraint-option-desc">Exclude recipes with certain ingredients</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('from-books'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.book?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">From Books</span><span class="add-constraint-option-desc">Pick from specific recipe books</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('min-rating'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.rating?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Min Rating</span><span class="add-constraint-option-desc">Only highly rated recipes</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('avoid-recent'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.cookedon?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Avoid Recent</span><span class="add-constraint-option-desc">Skip recipes cooked in last 14 days</span></span>
+                            </button>
+                            <button class="add-constraint-option" @click="quickAddConstraint('include-new'); open = false">
+                                <span class="add-constraint-option-icon" x-html="constraintTypes.createdon?.icon"></span>
+                                <span class="add-constraint-option-content"><span class="add-constraint-option-label">Include New</span><span class="add-constraint-option-desc">Include recipes added in last 30 days</span></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="add-constraint-dropdown" x-data="{ open: false }">
+                        <button class="btn-add-constraint" @click="open = !open" type="button">
+                            <span>+ Add Rule</span>
+                            <span x-text="open ? '▲' : '▼'" style="font-size: 0.7em; margin-left: 0.5rem;"></span>
+                        </button>
+                        <div class="add-constraint-menu" x-show="open" @click.outside="open = false" x-transition>
+                            <template x-for="(typeInfo, typeKey) in constraintTypes" :key="typeKey">
+                                <button class="add-constraint-option" @click="addConstraint(typeKey); open = false">
+                                    <span class="add-constraint-option-icon" x-html="typeInfo.icon"></span>
+                                    <span class="add-constraint-option-content">
+                                        <span class="add-constraint-option-label" x-text="typeInfo.label"></span>
+                                        <span class="add-constraint-option-desc" x-text="typeInfo.description"></span>
+                                    </span>
+                                </button>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </div>

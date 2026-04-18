@@ -10,11 +10,12 @@ from morsl.models import RelaxedConstraint, SolverResult
 
 
 class RecipePicker:
-    def __init__(self, recipes, numrecipes, logger=None, min_choices=None):
+    def __init__(self, recipes, numrecipes, logger=None, min_choices=None, locked=None):
         self.logger = logger
         self.recipes = recipes
         self.numrecipes = numrecipes
         self.min_choices = min_choices if min_choices is not None else numrecipes
+        self._locked_ids = {r.id for r in (locked or [])}
 
         # Store constraint specs for replay during progressive relaxation
         self._constraint_specs = []
@@ -31,7 +32,13 @@ class RecipePicker:
         """Build (or rebuild) the LP problem with all stored constraints."""
         self.solver = LpProblem("RecipePicker", LpMaximize)
         self.recipe_vars = LpVariable.dicts("Recipe", [r.id for r in self.recipes], cat="Binary")
-        self.solver += lpSum(self.recipe_vars.values()) == self.numrecipes
+        self.solver += lpSum(self.recipe_vars.values()) >= self.min_choices
+        self.solver += lpSum(self.recipe_vars.values()) <= self.numrecipes
+
+        # Lock pre-selected recipes
+        for rid in self._locked_ids:
+            if rid in self.recipe_vars:
+                self.solver += self.recipe_vars[rid] == 1
 
         # Soft constraint tracking
         self.soft_constraints = []
@@ -97,17 +104,17 @@ class RecipePicker:
         if operator == ">=":
             slack = LpVariable(f"slack_{label}_{len(self.soft_constraints)}", lowBound=0)
             self.solver += expr + slack >= count
-            self.soft_constraints.append((slack, weight, label))
+            self.soft_constraints.append((slack, weight, label, operator, count))
         elif operator == "<=":
             slack = LpVariable(f"slack_{label}_{len(self.soft_constraints)}", lowBound=0)
             self.solver += expr - slack <= count
-            self.soft_constraints.append((slack, weight, label))
+            self.soft_constraints.append((slack, weight, label, operator, count))
         elif operator == "==":
             slack_pos = LpVariable(f"slack_{label}_{len(self.soft_constraints)}_pos", lowBound=0)
             slack_neg = LpVariable(f"slack_{label}_{len(self.soft_constraints)}_neg", lowBound=0)
             self.solver += expr + slack_pos - slack_neg == count
-            self.soft_constraints.append((slack_pos, weight, label))
-            self.soft_constraints.append((slack_neg, weight, label))
+            self.soft_constraints.append((slack_pos, weight, label, operator, count))
+            self.soft_constraints.append((slack_neg, weight, label, operator, count))
         elif operator == "between":
             if upper_bound is None:
                 raise ValueError("'between' operator requires 'upper_bound'")
@@ -115,8 +122,8 @@ class RecipePicker:
             slack_hi = LpVariable(f"slack_{label}_{len(self.soft_constraints)}_hi", lowBound=0)
             self.solver += expr + slack_lo >= count
             self.solver += expr - slack_hi <= upper_bound
-            self.soft_constraints.append((slack_lo, weight, label))
-            self.soft_constraints.append((slack_hi, weight, label))
+            self.soft_constraints.append((slack_lo, weight, label, ">=", count))
+            self.soft_constraints.append((slack_hi, weight, label, "<=", upper_bound))
         else:
             raise ValueError(f"Invalid constraint operator: {operator}")
 
@@ -164,55 +171,51 @@ class RecipePicker:
         )
 
     def add_food_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
+        kwargs.setdefault("label", "food")
         self.add_constraint(
             found_recipes,
             numrecipes,
             operator,
             exclude=exclude,
             intersect_pool=True,
-            label="food",
             **kwargs,
         )
 
     def add_book_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
+        kwargs.setdefault("label", "book")
         self.add_constraint(
             found_recipes,
             numrecipes,
             operator,
             exclude=exclude,
             intersect_pool=True,
-            label="book",
             **kwargs,
         )
 
     def add_keyword_constraint(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(
-            found_recipes, numrecipes, operator, exclude=exclude, label="keyword", **kwargs
-        )
+        kwargs.setdefault("label", "keyword")
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, **kwargs)
 
     def add_rating_constraints(self, found_recipes, numrecipes, operator, exclude=False, **kwargs):
-        self.add_constraint(
-            found_recipes, numrecipes, operator, exclude=exclude, label="rating", **kwargs
-        )
+        kwargs.setdefault("label", "rating")
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, **kwargs)
 
     def add_createdon_constraints(
         self, found_recipes, numrecipes, operator, exclude=False, **kwargs
     ):
-        self.add_constraint(
-            found_recipes, numrecipes, operator, exclude=exclude, label="createdon", **kwargs
-        )
+        kwargs.setdefault("label", "createdon")
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, **kwargs)
 
     def add_cookedon_constraints(
         self, found_recipes, numrecipes, operator, exclude=False, **kwargs
     ):
-        self.add_constraint(
-            found_recipes, numrecipes, operator, exclude=exclude, label="cookedon", **kwargs
-        )
+        kwargs.setdefault("label", "cookedon")
+        self.add_constraint(found_recipes, numrecipes, operator, exclude=exclude, **kwargs)
 
     def _build_objective(self):
         """Build objective: maximize variety + penalize soft constraint violations."""
         obj = lpSum(self._random_coeffs[r.id] * self.recipe_vars[r.id] for r in self.recipes)
-        for slack_var, w, _label in self.soft_constraints:
+        for slack_var, w, _label, _op, _count in self.soft_constraints:
             obj -= w * slack_var
         self.solver += obj
 
@@ -235,18 +238,29 @@ class RecipePicker:
 
         # Collect relaxed constraints
         relaxed = []
-        for slack_var, w, label in self.soft_constraints:
+        for slack_var, w, label, op, count in self.soft_constraints:
             sv = value(slack_var) or 0.0
             if sv > SOLVER_SLACK_EPSILON:
-                relaxed.append(RelaxedConstraint(label=label, slack_value=sv, weight=w))
+                relaxed.append(
+                    RelaxedConstraint(
+                        label=label,
+                        slack_value=sv,
+                        weight=w,
+                        operator=op,
+                        original_count=count,
+                    )
+                )
 
         selected = [r for r in self.recipes if (value(self.recipe_vars[r.id]) or 0) >= 0.5]
         self.logger.info(f"Solver selected {len(selected)} recipes: {[r.name for r in selected]}")
+        warnings = []
+        if len(selected) < self.numrecipes:
+            warnings.append(f"Found {len(selected)} of {self.numrecipes} requested recipes")
         return SolverResult(
             recipes=tuple(selected),
             requested_count=self.numrecipes,
             constraint_count=self.numcriteria,
             relaxed_constraints=tuple(relaxed),
-            warnings=(),
+            warnings=tuple(warnings),
             status="optimal",
         )

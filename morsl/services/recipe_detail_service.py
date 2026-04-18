@@ -5,9 +5,12 @@ from __future__ import annotations
 import random
 from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
-from morsl.tandoor_api import TandoorAPI, TandoorError
+from morsl.tandoor_api import TandoorError
+
+if TYPE_CHECKING:
+    from morsl.providers.base import RecipeProvider
 
 # Module-level shared pools — avoids recreating threads on every generation
 # Separate pools prevent contention: detail fetches submit food-substitute
@@ -16,14 +19,14 @@ _detail_pool = ThreadPoolExecutor(max_workers=10)
 _food_pool = ThreadPoolExecutor(max_workers=20)
 
 
-def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
+def _resolve_food(provider: RecipeProvider, food_obj: dict, logger: Logger) -> dict:
     """Resolve on-hand food substitution for a single ingredient."""
     if food_obj.get("food_onhand"):
         return food_obj
     try:
-        subs = api.get_food_substitutes(food_obj["id"], substitute="food")
+        subs = provider.get_ingredient_substitutes(food_obj["id"], substitute_type="food")
         if subs:
-            return api.get_food(random.choice(subs)["id"])
+            return provider.get_ingredient(random.choice(subs)["id"])
     except (KeyError, IndexError, TypeError) as e:
         logger.debug("Substitute lookup failed for food %s: %s", food_obj.get("id"), e)
     except OSError as e:  # RequestException inherits IOError/OSError
@@ -33,7 +36,9 @@ def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
     return food_obj
 
 
-def _batch_resolve_foods(api: TandoorAPI, food_objs: list[dict], logger: Logger) -> list[dict]:
+def _batch_resolve_foods(
+    provider: RecipeProvider, food_objs: list[dict], logger: Logger
+) -> list[dict]:
     """Resolve substitutions for a batch of foods using the shared thread pool.
 
     Parallelises the per-ingredient substitute lookups that were previously
@@ -51,7 +56,7 @@ def _batch_resolve_foods(api: TandoorAPI, food_objs: list[dict], logger: Logger)
 
     def _resolve(item: tuple[int, dict]) -> tuple[int, dict]:
         _, food = item
-        return item[0], _resolve_food(api, food, logger)
+        return item[0], _resolve_food(provider, food, logger)
 
     futures = _food_pool.map(_resolve, indexed)
     for idx, resolved in futures:
@@ -61,9 +66,9 @@ def _batch_resolve_foods(api: TandoorAPI, food_objs: list[dict], logger: Logger)
 
 
 def _extract_steps_and_ingredients(
-    api: TandoorAPI, details: dict, logger: Logger
+    provider: RecipeProvider, details: dict, logger: Logger
 ) -> tuple[list, list]:
-    """Extract ingredients and steps from a Tandoor recipe details response."""
+    """Extract ingredients and steps from a recipe details response."""
     raw_foods: list[dict] = []
     raw_ings: list[dict] = []
     steps = []
@@ -86,7 +91,7 @@ def _extract_steps_and_ingredients(
             )
 
     # Batch-resolve all food substitutions for this recipe
-    resolved_foods = _batch_resolve_foods(api, raw_foods, logger)
+    resolved_foods = _batch_resolve_foods(provider, raw_foods, logger)
 
     ingredients = []
     for ing, food_obj in zip(raw_ings, resolved_foods, strict=True):
@@ -101,7 +106,7 @@ def _extract_steps_and_ingredients(
 
 
 def fetch_recipe_details(
-    api: TandoorAPI,
+    provider: RecipeProvider,
     recipes: tuple | list,
     logger: Logger,
 ) -> List[Dict[str, Any]]:
@@ -128,7 +133,7 @@ def fetch_recipe_details(
             "cooking_time": None,
         }
         try:
-            details = api.get_recipe_details(r.id)
+            details = provider.get_recipe_details(r.id)
             img = details.get("image")
             recipe_data["image"] = img.get("file_url") if isinstance(img, dict) else img
             recipe_data["working_time"] = details.get("working_time")
@@ -139,7 +144,7 @@ def fetch_recipe_details(
                     {"id": kw["id"], "name": kw.get("name", "")} for kw in detail_kws
                 ]
             recipe_data["ingredients"], recipe_data["steps"] = _extract_steps_and_ingredients(
-                api, details, logger
+                provider, details, logger
             )
         except (TandoorError, KeyError, ValueError) as e:
             logger.warning("Failed to fetch details for recipe %s: %s", r.id, e)

@@ -854,6 +854,11 @@ document.addEventListener('alpine:init', () => {
 
         // ---- Step 6: Finish ----
 
+        generateAndFinish() {
+            const firstProfile = this.profileQueue?.[0]?.name || 'default';
+            window.location.href = `/?generate=${encodeURIComponent(firstProfile)}`;
+        },
+
         finishSetup() {
             window.location.href = '/';
         },

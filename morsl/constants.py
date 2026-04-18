@@ -39,6 +39,7 @@ MAX_HISTORY_ENTRIES = 100
 # Solver
 SOLVER_SLACK_EPSILON = 1e-6
 SOLVER_RANDOM_SCALE = 10
+DEFAULT_SOFT_WEIGHT = 10
 
 # Paths
 UPLOADS_DIR = Path("data/branding")
@@ -47,6 +48,7 @@ DEFAULT_FAVICON_PATH = ICONS_DIR / "default-favicon.svg"
 
 # Menu generation
 DEFAULT_CHOICES = 5
+DEFAULT_PANTRY_WEIGHT = 5
 
 # Settings factory defaults (settings-backed values)
 DEFAULT_MENU_POLL_SECONDS = 60

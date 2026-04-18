@@ -33,6 +33,8 @@ function menuApp() {
         // Recipe modal
         selectedRecipe: null,
         orderConfirm: null,  // recipe id that was just ordered
+        pendingOrder: null,  // { id, recipe_name, status }
+        _customerSSE: null,
 
         // Name prompt (reusable for orders and ratings)
         namePrompt: { show: false, name: '', callback: null, recipe: null, action: '', rating: 0, confirmStep: false },
@@ -234,10 +236,18 @@ function menuApp() {
             ]);
             this.state = 'ready';
             // Tier 2: heavier data — menu and icon mappings load in background
-            Promise.all([
+            await Promise.all([
                 this.loadMenu(),
                 this.loadIconMappings(),
             ]).catch(e => console.warn('Background load failed:', e));
+
+            // F5: Auto-generate from URL param (e.g. after setup wizard)
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoGenProfile = urlParams.get('generate');
+            if (autoGenProfile && this.shelves.length === 0) {
+                history.replaceState(null, '', '/');
+                this.switchProfile(autoGenProfile);
+            }
             // If shelves exist but no active deck, set to first shelf
             if (this.shelves.length > 0 && !this.activeDeckName) {
                 this.activeDeckName = this.shelves[0].name;
@@ -729,6 +739,15 @@ function menuApp() {
             return dayjs(isoString).format('dddd, MMMM D');
         },
 
+        formatRelaxedConstraint(rc) {
+            const ops = { '>=': 'at least', '<=': 'at most', '==': 'exactly' };
+            if (rc.operator && rc.original_count) {
+                const actual = Math.round(rc.original_count - rc.slack_value);
+                return `Relaxed "${rc.label}" from ${ops[rc.operator] || rc.operator} ${rc.original_count} to ${actual}`;
+            }
+            return `${rc.label} adjusted by ${rc.slack_value.toFixed(1)}`;
+        },
+
         scrollCarouselToStart() {
             const track = this.$refs.carouselTrack;
             if (track) track.scrollTo({ left: 0, behavior: 'smooth' });
@@ -1151,14 +1170,47 @@ function menuApp() {
                         }),
                     });
                     if (res.ok) {
+                        const order = await res.json();
+                        this.pendingOrder = { id: order.id, recipe_name: recipe.name, status: 'received' };
                         this.orderConfirm = recipe.id;
-                        const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
-                        setTimeout(() => { this.orderConfirm = null; }, toastMs);
+                        this._connectCustomerSSE(order.id);
                     }
                 } catch (e) {
                     console.warn('Failed to place order:', e);
                 }
             });
+        },
+
+        _connectCustomerSSE(orderId) {
+            if (this._customerSSE) this._customerSSE.close();
+            const es = new EventSource('/api/orders/customer-stream');
+            this._customerSSE = es;
+            es.addEventListener('status_update', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.order_id === orderId && this.pendingOrder) {
+                        this.pendingOrder.status = data.status;
+                        if (data.status === 'ready') {
+                            const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
+                            setTimeout(() => {
+                                this.pendingOrder = null;
+                                this.orderConfirm = null;
+                                es.close();
+                                this._customerSSE = null;
+                            }, toastMs * 3);
+                        }
+                    }
+                } catch (_) { /* ignore */ }
+            });
+            es.onerror = () => {
+                // Reconnect handled by browser EventSource
+            };
+        },
+
+        dismissPendingOrder() {
+            this.pendingOrder = null;
+            this.orderConfirm = null;
+            if (this._customerSSE) { this._customerSSE.close(); this._customerSSE = null; }
         },
 
         // ---- Meal Plan Save ----
@@ -1192,6 +1244,46 @@ function menuApp() {
                 }
             } catch (e) {
                 console.warn('Failed to load meal plan options:', e);
+            }
+        },
+
+        async quickSaveMealPlan() {
+            if (this.mealPlanSave.saving) return;
+            this.mealPlanSave.saving = true;
+            try {
+                // Fetch meal types to get default
+                const mtRes = await fetch('/api/meal-types');
+                if (!mtRes.ok) { alert('Failed to load meal types'); return; }
+                const mtData = await mtRes.json();
+                const mealTypes = Array.isArray(mtData) ? mtData : (mtData.results || []);
+                if (!mealTypes.length) { alert('No meal types configured'); return; }
+
+                const info = this.getShelfGenerations();
+                const gen = info?.generations?.[0];
+                if (!gen?.recipes?.length) { alert('No recipes to save'); return; }
+
+                const payload = {
+                    date: new Date().toISOString().slice(0, 10),
+                    meal_type_id: mealTypes[0].id,
+                    recipes: gen.recipes.map(r => ({ id: r.id, name: r.name })),
+                };
+                const res = await fetch('/api/meal-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (res.ok) {
+                    this.mealPlanToast = true;
+                    const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
+                    setTimeout(() => { this.mealPlanToast = false; }, toastMs);
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.detail || 'Failed to save meal plan');
+                }
+            } catch (e) {
+                alert('Failed to save meal plan');
+            } finally {
+                this.mealPlanSave.saving = false;
             }
         },
 
@@ -1312,10 +1404,12 @@ function menuApp() {
             this._kioskGestureCleanup = () => cleanupFns.forEach(fn => fn());
         },
 
-        kioskAdminAccess() {
+        kioskAdminAccess(target) {
+            target = target || '/admin';
             const pinFeatureOn = this.settings.admin_pin_enabled ||
                 (this.settings.kiosk_enabled && this.settings.kiosk_pin_enabled);
             if (pinFeatureOn && this.settings.has_pin) {
+                this._kioskAdminTarget = target;
                 this.showKioskPin = true;
                 this.showKioskPinText = false;
                 this.kioskPinValue = '';
@@ -1324,7 +1418,7 @@ function menuApp() {
                     if (this.$refs.kioskPinInput) this.$refs.kioskPinInput.focus();
                 });
             } else {
-                window.location.href = '/admin';
+                window.location.href = target;
             }
         },
 
@@ -1344,7 +1438,7 @@ function menuApp() {
                             sessionStorage.setItem(CONST.SS_ADMIN_TOKEN_TS, String(Date.now()));
                         }
                         this.showKioskPin = false;
-                        window.location.href = '/admin';
+                        window.location.href = this._kioskAdminTarget || '/admin';
                     } else {
                         this.kioskPinError = 'Incorrect PIN';
                         this.kioskPinValue = '';
