@@ -29,10 +29,8 @@ def _resolve_food(provider: RecipeProvider, food_obj: dict, logger: Logger) -> d
             return provider.get_ingredient(random.choice(subs)["id"])
     except (KeyError, IndexError, TypeError) as e:
         logger.debug("Substitute lookup failed for food %s: %s", food_obj.get("id"), e)
-    except OSError as e:  # RequestException inherits IOError/OSError
-        logger.warning(
-            "Unexpected error in substitute lookup for food %s: %s", food_obj.get("id"), e
-        )
+    except (TandoorError, OSError) as e:
+        logger.warning("Substitute lookup failed for food %s: %s", food_obj.get("id"), e)
     return food_obj
 
 
