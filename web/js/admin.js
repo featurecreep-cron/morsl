@@ -273,11 +273,11 @@ function adminApp() {
             if (token) {
                 opts.headers = { ...opts.headers, 'X-Admin-Token': token };
             }
-            if (this._adminAbort) {
+            if (!opts._skipAbort && this._adminAbort) {
                 opts.signal = this._adminAbort.signal;
             }
             const res = await fetch(url, opts);
-            if (res.status === 401) {
+            if (res.status === 401 && !opts._silent) {
                 if (!this.showPinGate) {
                     sessionStorage.removeItem(CONST.SS_ADMIN_TOKEN);
                     this.adminReady = false;
@@ -736,8 +736,8 @@ function adminApp() {
                         this._statusPollId = null;
                         this._stopGeneratingTick();
                         await this.loadMenu();
-                        this.loadHistory();
-                        this.loadAnalytics();
+                        this.loadHistory({ _silent: true, _skipAbort: true });
+                        this.loadAnalytics({ _silent: true, _skipAbort: true });
                     } else if (this.status.state === 'error') {
                         clearInterval(this._statusPollId);
                         this._statusPollId = null;
@@ -2631,11 +2631,13 @@ function adminApp() {
 
         // ---- History & Analytics ----
 
-        async loadHistory(page = 0) {
+        async loadHistory(fetchOpts = {}) {
+            const page = (typeof fetchOpts === 'number') ? fetchOpts : 0;
+            if (typeof fetchOpts === 'number') fetchOpts = {};
             this.historyLoading = true;
             try {
                 const offset = page * this.historyPageSize;
-                const res = await this.adminFetch(`/api/history?limit=${this.historyPageSize}&offset=${offset}`);
+                const res = await this.adminFetch(`/api/history?limit=${this.historyPageSize}&offset=${offset}`, fetchOpts);
                 if (res.ok) {
                     const data = await res.json();
                     this.history = data.entries;
@@ -2646,9 +2648,9 @@ function adminApp() {
             finally { this.historyLoading = false; }
         },
 
-        async loadAnalytics() {
+        async loadAnalytics(fetchOpts = {}) {
             try {
-                const res = await this.adminFetch('/api/history/analytics');
+                const res = await this.adminFetch('/api/history/analytics', fetchOpts);
                 if (res.ok) this.analytics = await res.json();
             } catch (e) { console.debug('loadAnalytics failed:', e); }
         },
