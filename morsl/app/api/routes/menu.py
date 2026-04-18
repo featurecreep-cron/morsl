@@ -80,7 +80,7 @@ def debug_history_state(
     for i, entry in enumerate(entries[:5]):
         try:
             HistoryEntryResponse(**entry)
-        except Exception as e:
+        except Exception as e:  # broad-except — debug diagnostic
             validation_errors.append(
                 {"index": i, "error": str(e), "entry_keys": sorted(entry.keys())}
             )
