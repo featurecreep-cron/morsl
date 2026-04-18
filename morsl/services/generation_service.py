@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import json
 import os
-import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -12,10 +11,14 @@ from logging import Logger
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from morsl.constants import GENERATION_SHUTDOWN_TIMEOUT
+from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_SOFT_WEIGHT, GENERATION_SHUTDOWN_TIMEOUT
+from morsl.providers.tandoor import TandoorProvider
 from morsl.services.history_service import HistoryService
 from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
+from morsl.services.sse_publisher import SSEPublisher
+from morsl.solver import RecipePicker
+from morsl.tandoor_api import TandoorAPI
 from morsl.utils import atomic_write_json, now
 
 
@@ -37,7 +40,7 @@ class GenerationStatus:
     warnings: List[str] = field(default_factory=list)
 
 
-class GenerationService:
+class GenerationService(SSEPublisher):
     """Manages asynchronous menu generation with state tracking."""
 
     def __init__(
@@ -49,8 +52,7 @@ class GenerationService:
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
         self._cached_menu: Optional[Dict[str, Any]] = None
-        self._subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
-        self._sub_lock = threading.Lock()
+        self._init_sse()
         self._cleanup_stale_temp_files()
         # Load menu into cache on startup
         self._cached_menu = self._load_menu_from_disk()
@@ -67,8 +69,11 @@ class GenerationService:
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         if not os.path.isfile(menu_path):
             return None
-        with open(menu_path) as f:
-            return json.load(f)
+        try:
+            with open(menu_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
 
     def clear_menu(self) -> bool:
         """Delete current_menu.json and clear cache. Returns True if a file was removed."""
@@ -160,7 +165,7 @@ class GenerationService:
                     }
                 )
 
-        except Exception as e:  # noqa: broad-except — state machine must capture any failure
+        except Exception as e:  # broad-except — state machine must capture any failure
             logger.warning("Menu generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
@@ -198,7 +203,10 @@ class GenerationService:
         logger: Logger,
     ) -> Dict[str, Any]:
         """Synchronous generation — runs in thread pool."""
-        service = MenuService(url=url, token=token, config=config, logger=logger)
+        cache = int(config.get("cache", API_CACHE_TTL_MINUTES))
+        api = TandoorAPI(url, token, logger, cache=cache)
+        provider = TandoorProvider(api)
+        service = MenuService(config=config, logger=logger, provider=provider)
         service.prepare_data()
 
         if len(service.recipes) < service.choices:
@@ -210,7 +218,7 @@ class GenerationService:
         solver_result = service.select_recipes()
 
         # Fetch full details (image + ingredients) for each selected recipe
-        recipes_out = fetch_recipe_details(service.tandoor, solver_result.recipes, logger)
+        recipes_out = fetch_recipe_details(service.provider, solver_result.recipes, logger)
 
         return {
             "recipes": recipes_out,
@@ -220,7 +228,13 @@ class GenerationService:
             "status": solver_result.status,
             "warnings": solver_result.warnings,
             "relaxed_constraints": [
-                {"label": rc.label, "slack_value": rc.slack_value, "weight": rc.weight}
+                {
+                    "label": rc.label,
+                    "slack_value": rc.slack_value,
+                    "weight": rc.weight,
+                    "operator": rc.operator,
+                    "original_count": rc.original_count,
+                }
                 for rc in solver_result.relaxed_constraints
             ],
         }
@@ -248,27 +262,106 @@ class GenerationService:
                 with contextlib.suppress(OSError):
                     os.unlink(os.path.join(self.data_dir, fname))
 
-    def subscribe(self) -> asyncio.Queue[Dict[str, Any]]:
-        """Create a new SSE subscriber queue for menu change events."""
-        q: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(maxsize=64)
-        with self._sub_lock:
-            self._subscribers.append(q)
-        return q
+    def swap_recipe(
+        self,
+        old_recipe_id: int,
+        config: Dict[str, Any],
+        url: str,
+        token: str,
+        logger: Logger,
+    ) -> Dict[str, Any]:
+        """Replace one recipe in the current menu by re-solving with locked recipes.
 
-    def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
-        """Remove subscriber queue."""
-        with self._sub_lock, contextlib.suppress(ValueError):
-            self._subscribers.remove(q)
+        Returns the new recipe dict (with full details). Raises RuntimeError if
+        no menu exists, the recipe is not found, or no replacement is available.
+        """
+        menu = self._cached_menu
+        if menu is None:
+            raise RuntimeError("No menu to swap from")
 
-    def _notify_subscribers(self, event: Dict[str, Any]) -> None:
-        """Push event to all SSE subscribers (non-blocking)."""
-        with self._sub_lock:
-            for q in self._subscribers:
-                with contextlib.suppress(asyncio.QueueFull):
-                    q.put_nowait(event)
+        old_index = None
+        for i, r in enumerate(menu["recipes"]):
+            if r["id"] == old_recipe_id:
+                old_index = i
+                break
+        if old_index is None:
+            raise RuntimeError(f"Recipe {old_recipe_id} not in current menu")
+
+        # Build provider and load recipe pool
+        cache = int(config.get("cache", API_CACHE_TTL_MINUTES))
+        api = TandoorAPI(url, token, logger, cache=cache)
+        provider = TandoorProvider(api)
+        service = MenuService(config=config, logger=logger, provider=provider)
+        service.prepare_data()
+
+        # Lock all current recipes except the one being swapped
+        locked_ids = {r["id"] for r in menu["recipes"] if r["id"] != old_recipe_id}
+        locked_recipes = [r for r in service.recipes if r.id in locked_ids]
+
+        # Remove the old recipe from the pool so it can't be re-selected
+        service.recipes = [r for r in service.recipes if r.id != old_recipe_id]
+        service._recipe_set = frozenset(service.recipes)
+
+        if len(service.recipes) < len(locked_recipes) + 1:
+            raise RuntimeError("No replacement recipes available in pool")
+
+        # Solve with locked recipes for total = locked + 1
+        picker = RecipePicker(
+            service.recipes,
+            len(locked_recipes) + 1,
+            logger=logger,
+            locked=locked_recipes,
+        )
+        service.recipe_picker = picker
+
+        # Apply constraints from the profile
+        handlers = {
+            "keyword": service._apply_keyword_constraint,
+            "food": service._apply_food_constraint,
+            "book": service._apply_book_constraint,
+            "rating": service._apply_rating_constraint,
+            "makenow": service._apply_makenow_constraint,
+        }
+        for c in service.constraints:
+            ctype = c.get("type")
+            exclude = c.get("exclude", False)
+            soft = c.get("soft", False)
+            weight = int(c.get("weight", DEFAULT_SOFT_WEIGHT)) if soft else int(c.get("weight", 0))
+
+            if ctype in handlers:
+                handlers[ctype](c, exclude, weight)
+            elif ctype in ("cookedon", "createdon"):
+                service._apply_date_constraint(c, ctype, exclude, weight)
+
+        try:
+            result = picker.solve()
+        except RuntimeError:
+            raise RuntimeError("No valid replacement found that satisfies constraints") from None
+
+        # Find the new recipe (the one not in locked_ids)
+        new_recipe = None
+        for r in result.recipes:
+            if r.id not in locked_ids:
+                new_recipe = r
+                break
+
+        if new_recipe is None:
+            raise RuntimeError("Solver did not select a new recipe")
+
+        # Fetch full details for the new recipe
+        new_details = fetch_recipe_details(provider, [new_recipe], logger)
+        if not new_details:
+            raise RuntimeError("Failed to fetch details for replacement recipe")
+
+        # Replace in menu and save
+        menu["recipes"][old_index] = new_details[0]
+        self._save_menu(menu)
+
+        return new_details[0]
 
     def _save_menu(self, menu_data: Dict[str, Any], *, clear_others: bool = False) -> None:
         """Atomic write and update in-memory cache."""
+        menu_data["clear_others"] = clear_others
         menu_path = os.path.join(self.data_dir, "current_menu.json")
         atomic_write_json(menu_path, menu_data)
         self._cached_menu = menu_data

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import threading
 from typing import Any, Dict
@@ -13,7 +12,7 @@ from morsl.constants import (
     DEFAULT_MENU_POLL_SECONDS,
     DEFAULT_TOAST_SECONDS,
 )
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, read_json
 
 # Keys that are exposed via the public endpoint (user-visible)
 PUBLIC_KEYS = frozenset(
@@ -179,9 +178,8 @@ class SettingsService:
 
     def _load(self) -> None:
         path = os.path.join(self.data_dir, "settings.json")
-        if os.path.isfile(path):
-            with open(path) as f:
-                stored = json.load(f)
+        stored = read_json(path)
+        if stored:
             # Migrate renamed keys
             if "kiosk_pin" in stored and "pin" not in stored:
                 stored["pin"] = stored.pop("kiosk_pin")

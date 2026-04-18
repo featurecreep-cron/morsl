@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import logging
 import os
 import re
+import secrets
 import sys
 import tempfile
 import threading
@@ -17,10 +20,9 @@ from tzlocal import get_localzone
 
 from morsl.constants import API_CACHE_MAXSIZE, API_CACHE_TTL_MINUTES
 
-# Global API cache: default 512 entries, 240-minute TTL
-_api_cache: cachetools.TTLCache = cachetools.TTLCache(
-    maxsize=API_CACHE_MAXSIZE, ttl=API_CACHE_TTL_MINUTES * 60
-)
+# Global API cache: LRU with manual per-entry TTL (respects operator config)
+_api_cache: cachetools.LRUCache = cachetools.LRUCache(maxsize=API_CACHE_MAXSIZE)
+_api_cache_timestamps: dict = {}  # key → (timestamp, ttl_seconds)
 _api_cache_lock = threading.Lock()
 
 
@@ -37,6 +39,59 @@ def safe_path(base_dir: str, *parts: str) -> str:
     return resolved
 
 
+_PIN_HASH_PREFIX = "scrypt$"
+
+
+def hash_pin(pin: str) -> str:
+    """Hash a PIN using scrypt. Returns 'scrypt$salt_hex$hash_hex'."""
+    if not pin:
+        return ""
+    salt = secrets.token_bytes(16)
+    derived = hashlib.scrypt(pin.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+    return f"{_PIN_HASH_PREFIX}{salt.hex()}${derived.hex()}"
+
+
+def verify_pin(pin: str, stored: str) -> bool:
+    """Verify a PIN against a stored hash or plaintext (migration).
+
+    Returns (valid, needs_rehash) — needs_rehash is True when the stored
+    value was plaintext and should be replaced with a hash.
+    """
+    if not stored:
+        return False
+    if stored.startswith(_PIN_HASH_PREFIX):
+        parts = stored.split("$")
+        if len(parts) != 3:
+            return False
+        salt = bytes.fromhex(parts[1])
+        expected = bytes.fromhex(parts[2])
+        derived = hashlib.scrypt(pin.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+        return secrets.compare_digest(derived, expected)
+    # Legacy plaintext — constant-time compare
+    import hmac
+
+    return hmac.compare_digest(pin, stored)
+
+
+def is_pin_hashed(stored: str) -> bool:
+    """Check if a stored PIN value is already hashed."""
+    return stored.startswith(_PIN_HASH_PREFIX) if stored else True
+
+
+def read_json(path: str, default: Any = None) -> Any:
+    """Read JSON from file with consistent error handling.
+
+    Returns default if the file doesn't exist or contains invalid JSON.
+    """
+    if not os.path.isfile(path):
+        return default
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return default
+
+
 def atomic_write_json(path: str, data: Any) -> None:
     """Write JSON to file atomically via temp file + os.replace()."""
     dir_path = os.path.dirname(path) or "."
@@ -47,6 +102,23 @@ def atomic_write_json(path: str, data: Any) -> None:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, path)
     except (OSError, TypeError, ValueError):
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
+
+
+def atomic_write_bytes(path: str, data: bytes) -> None:
+    """Write bytes to file atomically via temp file + os.replace()."""
+    dir_path = os.path.dirname(path) or "."
+    os.makedirs(dir_path, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
+    try:
+        os.write(fd, data)
+        os.close(fd)
+        os.replace(tmp_path, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.close(fd)
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise
@@ -187,10 +259,16 @@ def format_date(string: str, future: bool = False) -> tuple[datetime, bool]:
 
 
 def cached(func: FuncType) -> FuncType:
-    """Cache method results in the global API TTL cache (thread-safe)."""
+    """Cache method results in the global API cache (thread-safe).
+
+    Respects per-instance TTL via ``self.ttl`` (minutes) — the operator-configured
+    ``api_cache_minutes`` setting flows through here correctly.
+    """
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        import time as _time
+
         ttl: Optional[int] = kwargs.pop("ttl", None)
         if ttl is None:
             try:
@@ -199,20 +277,28 @@ def cached(func: FuncType) -> FuncType:
                 ttl = API_CACHE_TTL_MINUTES
         if not ttl or ttl <= 0:
             return func(self, *args, **kwargs)
+        ttl_seconds = ttl * 60
         # Stringify args to handle unhashable types (dicts, lists)
-        key_str = f"{func.__qualname__}|" + "|".join(str(x) for x in args)
+        # Include instance id to prevent cache cross-contamination between instances
+        key_str = f"{func.__qualname__}|{id(self)}|" + "|".join(str(x) for x in args)
         if kwargs:
             key_str += "|" + str(sorted(kwargs.items()))
         key = cachetools.keys.hashkey(key_str)
         with _api_cache_lock:
             try:
-                return _api_cache[key]
+                ts, stored_ttl = _api_cache_timestamps.get(key, (0, 0))
+                if _time.monotonic() - ts < stored_ttl:
+                    return _api_cache[key]
+                # Expired — remove stale entry
+                _api_cache.pop(key, None)
+                _api_cache_timestamps.pop(key, None)
             except KeyError:
                 pass
         result = func(self, *args, **kwargs)
         with _api_cache_lock:
-            try:  # noqa: SIM105 — value too large for cache
+            try:
                 _api_cache[key] = result
+                _api_cache_timestamps[key] = (_time.monotonic(), ttl_seconds)
             except ValueError:
                 pass
         return result

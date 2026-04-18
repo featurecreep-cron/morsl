@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from morsl.constants import API_CACHE_TTL_MINUTES, GENERATION_SHUTDOWN_TIMEOUT
+from morsl.providers.tandoor import TandoorProvider
 from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationState
 from morsl.services.menu_service import MenuService
@@ -87,19 +88,24 @@ class WeeklyGenerationService:
         self._status = WeeklyGenerationStatus()
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
+        self._plan_cache: Dict[str, Dict[str, Any]] = {}
 
     def get_status(self) -> WeeklyGenerationStatus:
         return self._status
 
     def get_plan(self, template_name: str) -> Optional[Dict[str, Any]]:
-        """Load a generated weekly plan from disk."""
+        """Load a generated weekly plan (cached in memory after first read)."""
         _validate_template_name(template_name)
+        if template_name in self._plan_cache:
+            return self._plan_cache[template_name]
         path = safe_path(self.plans_dir, f"{template_name}.json")
         if not os.path.isfile(path):
             return None
         try:
             with open(path) as f:
-                return json.load(f)
+                plan = json.load(f)
+            self._plan_cache[template_name] = plan
+            return plan
         except json.JSONDecodeError:
             logger.warning("Corrupted weekly plan file: %s", path)
             return None
@@ -107,6 +113,7 @@ class WeeklyGenerationService:
     def clear_plan(self, template_name: str) -> bool:
         """Delete a weekly plan file. Returns True if removed."""
         _validate_template_name(template_name)
+        self._plan_cache.pop(template_name, None)
         path = safe_path(self.plans_dir, f"{template_name}.json")
         if os.path.isfile(path):
             os.unlink(path)
@@ -196,44 +203,57 @@ class WeeklyGenerationService:
             self._status.completed_at = now()
             self._status.warnings = result.get("warnings", [])
 
-        except Exception as e:  # noqa: broad-except — state machine must capture any failure
+        except Exception as e:  # broad-except — state machine must capture any failure
             logger.warning("Weekly generation failed", exc_info=True)
             self._status.state = GenerationState.ERROR
             self._status.completed_at = now()
             self._status.error = str(e)
 
-    def _generate_for_profile(
+    def _prepare_profile_data(
         self,
         profile_name: str,
         total_needed: int,
         config_service: ConfigService,
-        url: str,
-        token: str,
         app_logger: logging.Logger,
-        cache_minutes: int,
-        deduplicate: bool,
-        exclude_ids: set,
+        shared_provider: TandoorProvider,
     ) -> Dict[str, Any]:
-        """Generate recipes for a single profile, returning results and warnings."""
-        self._status.profile_progress[profile_name] = "generating"
-        warnings: List[str] = []
+        """Fetch data for a profile (HTTP-heavy). Safe to run in parallel."""
+        self._status.profile_progress[profile_name] = "preparing"
 
         try:
             config = config_service.load_profile(profile_name)
         except FileNotFoundError:
             msg = f"Profile '{profile_name}' not found, skipping"
             self._status.profile_progress[profile_name] = "error"
+            return {"error": msg, "service": None, "profile_name": profile_name}
+
+        config["choices"] = total_needed
+
+        service = MenuService(config=config, logger=app_logger, provider=shared_provider)
+        service.prepare_data()
+        return {"error": None, "service": service, "profile_name": profile_name}
+
+    def _solve_profile(
+        self,
+        prepared: Dict[str, Any],
+        total_needed: int,
+        deduplicate: bool,
+        exclude_ids: set,
+        app_logger: logging.Logger,
+    ) -> Dict[str, Any]:
+        """Apply dedup filter and solve for a prepared profile. Must run sequentially."""
+        profile_name = prepared["profile_name"]
+        warnings: List[str] = []
+
+        if prepared["error"]:
             return {
-                "slot_result": {"status": "error", "warnings": [msg]},
-                "warnings": [msg],
+                "slot_result": {"status": "error", "warnings": [prepared["error"]]},
+                "warnings": [prepared["error"]],
                 "recipes": None,
             }
 
-        config["choices"] = total_needed
-        config["cache"] = cache_minutes
-
-        service = MenuService(url=url, token=token, config=config, logger=app_logger)
-        service.prepare_data()
+        service = prepared["service"]
+        self._status.profile_progress[profile_name] = "generating"
 
         if deduplicate and exclude_ids:
             original_count = len(service.recipes)
@@ -302,23 +322,43 @@ class WeeklyGenerationService:
             app_settings = settings_service.get_all()
             cache_minutes = app_settings.get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
-        # 3. Run each profile sequentially for dedup
+        # 3a. Parallel data-fetch phase — all profiles prepare concurrently
+        # Share a single provider instance across all profiles to leverage
+        # the global cache for overlapping recipe pools.
+        from concurrent.futures import ThreadPoolExecutor
+
+        shared_api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
+        shared_provider = TandoorProvider(shared_api)
+
+        def _prepare(item):
+            name, needed = item
+            return self._prepare_profile_data(
+                name,
+                needed,
+                config_service,
+                app_logger,
+                shared_provider,
+            )
+
+        with ThreadPoolExecutor(max_workers=len(sorted_profiles)) as pool:
+            prepared_list = list(pool.map(_prepare, sorted_profiles))
+
+        # Build lookup: profile_name → prepared result (preserving sort order)
+        prepared_map = {p["profile_name"]: p for p in prepared_list}
+
+        # 3b. Sequential solve phase — dedup requires serial exclude_ids propagation
         all_warnings: List[str] = []
         exclude_ids: set = set()
         profile_recipes: Dict[str, list] = {}
         slot_results: Dict[str, Dict[str, Any]] = {}
 
         for profile_name, total_needed in sorted_profiles:
-            result = self._generate_for_profile(
-                profile_name,
+            result = self._solve_profile(
+                prepared_map[profile_name],
                 total_needed,
-                config_service,
-                url,
-                token,
-                app_logger,
-                cache_minutes,
                 deduplicate,
                 exclude_ids,
+                app_logger,
             )
             slot_results[profile_name] = result["slot_result"]
             all_warnings.extend(result["warnings"])
@@ -332,8 +372,7 @@ class WeeklyGenerationService:
         for recipes in profile_recipes.values():
             all_recipe_objs.extend(recipes)
 
-        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
-        details_list = fetch_recipe_details(api, all_recipe_objs, app_logger)
+        details_list = fetch_recipe_details(shared_provider, all_recipe_objs, app_logger)
 
         detail_map: Dict[int, Dict[str, Any]] = {}
         for detail in details_list:
@@ -432,9 +471,10 @@ class WeeklyGenerationService:
         """Single-slot regeneration — runs in thread pool."""
         config = config_service.load_profile(profile_name)
         config["choices"] = recipes_per_day
-        config["cache"] = cache_minutes
 
-        service = MenuService(url=url, token=token, config=config, logger=app_logger)
+        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
+        provider = TandoorProvider(api)
+        service = MenuService(config=config, logger=app_logger, provider=provider)
         service.prepare_data()
 
         if exclude_ids:
@@ -449,8 +489,7 @@ class WeeklyGenerationService:
 
         solver_result = service.select_recipes()
 
-        api = TandoorAPI(url, token, app_logger, cache=cache_minutes)
-        return fetch_recipe_details(api, solver_result.recipes, app_logger)
+        return fetch_recipe_details(service.provider, solver_result.recipes, app_logger)
 
     async def wait_for_completion(self, timeout: float = 300.0) -> WeeklyGenerationStatus:
         """Wait for an in-flight generation to finish."""
@@ -472,3 +511,4 @@ class WeeklyGenerationService:
         os.makedirs(self.plans_dir, exist_ok=True)
         path = safe_path(self.plans_dir, f"{template_name}.json")
         atomic_write_json(path, plan_data)
+        self._plan_cache[template_name] = plan_data

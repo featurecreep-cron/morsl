@@ -100,15 +100,22 @@ class TestEventEmission:
         assert event["type"] == "menu_updated"
         assert event["clear_others"] is True
 
-    def test_clear_others_not_persisted_in_json(self, tmp_path):
-        """clear_others must NOT be in the saved JSON — it's SSE-only."""
+    def test_clear_others_persisted_in_json(self, tmp_path):
+        """clear_others is persisted so HTTP clients can read it on reconnect."""
         svc = GenerationService(data_dir=str(tmp_path))
         svc._save_menu(
             {"recipes": [], "generated_at": "2024-01-01"},
             clear_others=True,
         )
         saved = json.loads((tmp_path / "current_menu.json").read_text())
-        assert "clear_others" not in saved
+        assert saved["clear_others"] is True
+
+    def test_clear_others_defaults_false_in_json(self, tmp_path):
+        """Non-clearing generations persist clear_others=false."""
+        svc = GenerationService(data_dir=str(tmp_path))
+        svc._save_menu({"recipes": [], "generated_at": "2024-01-01"})
+        saved = json.loads((tmp_path / "current_menu.json").read_text())
+        assert saved["clear_others"] is False
 
     @pytest.mark.asyncio
     async def test_start_generation_emits_generating(self, tmp_path, mock_logger):

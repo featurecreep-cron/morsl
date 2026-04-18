@@ -41,7 +41,7 @@
         </div>
     </div>
 
-    <!-- Header: branding -->
+    <!-- Header: branding centered -->
     <header class="menu-header" x-ref="menuHeader">
         <div class="menu-brand">
             <div x-show="logoUrl" x-ref="menuLogo" class="menu-logo" aria-hidden="true"></div>
@@ -85,7 +85,6 @@
                             :title="category.description || category.subtitle || ''">
                         <span class="explore-btn-icon" x-html="getCategoryIcon(category)"></span>
                         <span class="explore-btn-label" x-text="category.display_name || category.id"></span>
-                        <span class="explore-btn-subtitle" x-text="category.subtitle || '\u00a0'"></span>
                     </button>
                 </template>
             </div>
@@ -136,6 +135,19 @@
         </template>
     </nav>
 
+    <!-- Warnings / relaxed constraints banner -->
+    <div class="warnings-bar" x-show="warnings.length > 0 || relaxedConstraints.length > 0"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+        <template x-for="w in warnings" :key="w">
+            <span class="warning-badge" x-text="w"></span>
+        </template>
+        <template x-for="rc in relaxedConstraints" :key="rc.label + rc.slack_value">
+            <span class="relaxed-badge" x-text="formatRelaxedConstraint(rc)"></span>
+        </template>
+    </div>
+
     <!-- Floating mixing indicator (glass only, no popup) -->
     <div class="mixing-indicator"
          x-show="state === 'generating'"
@@ -152,25 +164,26 @@
     <div class="content-area"
          x-show="state === 'ready' || state === 'generating'">
 
-        <!-- Menu date -->
-        <div class="menu-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></div>
-
         <!-- Deck tab strip -->
         <div class="deck-strip" x-show="shelves.length > 1">
             <template x-for="shelf in shelves" :key="'tab-' + shelf.name">
                 <div class="deck-card"
                      :class="{ 'deck-card--active': shelf.name === activeDeckName }"
-                     @click="activateDeck(shelf.name)">
+                     @click="activateDeck(shelf.name)"
+                     @contextmenu.prevent="removeShelf(shelf.name)"
+                     @touchstart="deckLongPress.start($event, shelf.name)"
+                     @touchend="deckLongPress.cancel()"
+                     @touchmove="deckLongPress.cancel()">
                     <div class="deck-card-stack">
                         <div class="deck-card-face">
                             <img class="deck-card-img" x-show="deckPreview(shelf)?.image" :src="deckPreview(shelf)?.image" :alt="deckPreview(shelf)?.name || ''">
+                            <div class="deck-card-placeholder" x-show="!deckPreview(shelf)?.image" x-html="placeholderSvg(deckPreview(shelf))"></div>
                             <div class="deck-card-overlay">
                                 <span class="deck-card-title" x-text="formatDisplayName(shelf.name)"></span>
                                 <span class="deck-card-count" x-text="itemNounText(shelf.generations.reduce((sum, g) => sum + (g.recipes ? g.recipes.length : 0), 0), resolveNoun(shelf.name))"></span>
                             </div>
                         </div>
                     </div>
-                    <button class="deck-card-close" @click.stop="removeShelf(shelf.name)" aria-label="Remove shelf">&times;</button>
                 </div>
             </template>
         </div>
@@ -258,13 +271,13 @@
                                     </ul>
                                 </div>
                                 <span class="tap-hint">Tap for recipe</span>
-                                <!-- Order button (floating bottom-right) -->
+                                <!-- Request button (floating bottom-right) -->
                                 <button class="card-fab card-fab--order"
                                         x-show="settings.orders_enabled !== false"
                                         :class="{ ordered: orderConfirm === item.id }"
                                         @click.stop="orderDrink(item)"
-                                        :title="orderConfirm === item.id ? 'Ordered!' : 'Order this recipe'"
-                                        :aria-label="orderConfirm === item.id ? 'Ordered!' : 'Order this recipe'">
+                                        :title="orderConfirm === item.id ? 'Requested!' : 'Request this recipe'"
+                                        :aria-label="orderConfirm === item.id ? 'Requested!' : 'Request this recipe'">
                                     <span x-show="orderConfirm === item.id">&#10003;</span>
                                     <span x-show="orderConfirm !== item.id" x-html="getHeadingIcon()" style="width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:inherit;"></span>
                                 </button>
@@ -274,23 +287,29 @@
                 </template>
             </div>
             </div><!-- .carousel-wrapper -->
+
+            <!-- Footer: slogan (inside carousel-container to hug below cards) -->
+            <footer class="menu-footer" x-show="(state === 'ready' || state === 'generating') && (sloganFooter || sloganHeader)">
+                <p class="footer-slogan" x-text="sloganFooter || sloganHeader"></p>
+            </footer>
         </main>
 
-        <!-- Footer (inside content-area so it scrolls with content) -->
-        <footer class="menu-footer text-center" x-show="state === 'ready'">
-            <div class="footer-qr-row" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
-                <div class="footer-qr" x-show="settings.qr_wifi_string" x-ref="footerQrWifi">
-                    <div class="footer-qr-code"></div>
-                    <span class="footer-qr-label">Join WiFi</span>
-                </div>
-                <div class="footer-qr" x-show="settings.qr_menu_url" x-ref="footerQrMenu">
-                    <div class="footer-qr-code"></div>
-                    <span class="footer-qr-label">Open Menu</span>
-                </div>
-            </div>
-            <p class="menu-slogan" x-show="sloganFooter" x-text="sloganFooter"></p>
-        </footer>
     </div><!-- .content-area -->
+
+    <!-- Top-right corner: date + QR codes -->
+    <div class="top-right-corner">
+        <span class="corner-date" x-show="generatedAt && mainCarouselRecipes.length > 0" x-text="formatMenuDate(generatedAt)"></span>
+        <div class="qr-corner" x-show="settings.qr_show_on_menu && (settings.qr_wifi_string || settings.qr_menu_url)">
+            <div class="qr-corner-item" x-show="settings.qr_wifi_string" x-ref="cornerQrWifi">
+                <div class="qr-corner-code"></div>
+                <span class="qr-corner-label">WiFi</span>
+            </div>
+            <div class="qr-corner-item" x-show="settings.qr_menu_url" x-ref="cornerQrMenu">
+                <div class="qr-corner-code"></div>
+                <span class="qr-corner-label">Menu</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Name prompt (bottom sheet) -->
     <div class="name-prompt-backdrop"
@@ -321,7 +340,7 @@
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0">
                 <div class="name-prompt-header">
-                    <span id="name-prompt-title" class="name-prompt-title" x-text="namePrompt.action === 'rate' ? (namePrompt.recipe?.name || 'Rate') : 'Who\u2019s ordering?'"></span>
+                    <span id="name-prompt-title" class="name-prompt-title" x-text="namePrompt.action === 'rate' ? (namePrompt.recipe?.name || 'Rate') : 'Who\u2019s requesting?'"></span>
                     <button class="name-prompt-skip" @click="skipNamePrompt()" aria-label="Close">&times;</button>
                 </div>
                 <div class="name-prompt-stars" x-show="namePrompt.action === 'rate'" role="group" aria-label="Choose rating">
@@ -385,10 +404,31 @@
         </div>
     </div>
 
-    <!-- Order confirmation toast -->
+    <!-- Order status toast (persistent until dismissed or ready) -->
+    <div class="order-toast order-status-toast"
+         role="alert" aria-live="assertive" aria-atomic="true"
+         x-show="pendingOrder"
+         :class="{ 'order-status-ready': pendingOrder?.status === 'ready' }"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-4"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0 transform translate-y-4">
+        <span class="order-toast-icon" x-text="pendingOrder?.status === 'ready' ? '&#10003;' : '&#9201;'"></span>
+        <span class="order-toast-text">
+            <span x-text="pendingOrder?.recipe_name"></span>
+            <span x-show="pendingOrder?.status === 'received'"> &mdash; Order received</span>
+            <span x-show="pendingOrder?.status === 'preparing'"> &mdash; Being prepared...</span>
+            <span x-show="pendingOrder?.status === 'ready'"> &mdash; Ready!</span>
+        </span>
+        <button class="order-toast-dismiss" @click="dismissPendingOrder()" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <!-- Simple confirmation toast (fallback when no pending order) -->
     <div class="order-toast"
          role="alert" aria-live="assertive" aria-atomic="true"
-         x-show="orderConfirm"
+         x-show="orderConfirm && !pendingOrder"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 transform translate-y-4"
          x-transition:enter-end="opacity-100 transform translate-y-0"
@@ -396,7 +436,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0 transform translate-y-4">
         <span class="order-toast-icon">&#10003;</span>
-        <span class="order-toast-text">Order placed!</span>
+        <span class="order-toast-text">Request placed!</span>
     </div>
 
     <!-- Meal plan save toast -->
@@ -412,17 +452,6 @@
         <span class="order-toast-icon">&#10003;</span>
         <span class="order-toast-text">Saved to meal plan!</span>
     </div>
-
-    <!-- Floating save-to-meal-plan button -->
-    <button class="meal-plan-fab"
-            x-show="settings.meal_plan_enabled !== false && mainCarouselRecipes.length > 0 && !mealPlanSave.show"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 transform scale-90"
-            x-transition:enter-end="opacity-100 transform scale-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0 transform scale-90"
-            @click="openMealPlanSave()">Save to Meal Plan</button>
 
     <!-- Meal plan save bottom sheet -->
     <div class="name-prompt-backdrop"
@@ -549,9 +578,15 @@
          x-transition:leave-end="opacity-0">
         <a href="/admin" class="nav-menu-item" role="menuitem"
            @click.prevent="kioskAdminAccess()">Admin</a>
+        <a href="/admin#weekly" class="nav-menu-item" role="menuitem"
+           x-show="!settings.kiosk_enabled"
+           @click.prevent="kioskAdminAccess('/admin#weekly')">Plan Your Week</a>
         <a href="#" class="nav-menu-item" role="menuitem"
            x-show="settings.meal_plan_enabled !== false && mainCarouselRecipes.length > 0"
-           @click.prevent="openMealPlanSave(); navOpen = false">Save to Meal Plan</a>
+           @click.prevent="quickSaveMealPlan(); navOpen = false">Quick Save to Meal Plan</a>
+        <a href="#" class="nav-menu-item" role="menuitem"
+           x-show="settings.meal_plan_enabled !== false && mainCarouselRecipes.length > 0"
+           @click.prevent="openMealPlanSave(); navOpen = false">Save to Meal Plan...</a>
         <span class="nav-menu-version" x-show="appVersion" x-text="appVersion"></span>
     </div>
 
@@ -625,7 +660,7 @@
                     x-show="selectedRecipe && settings.orders_enabled !== false"
                     :disabled="orderConfirm === selectedRecipe?.id">
                 <span class="btn-order-icon"><span x-show="orderConfirm === selectedRecipe?.id">&#10003;</span><span x-show="orderConfirm !== selectedRecipe?.id" x-html="getHeadingIcon()" style="width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:inherit;"></span></span>
-                <span x-text="orderConfirm === selectedRecipe?.id ? 'Ordered!' : 'Order'"></span>
+                <span x-text="orderConfirm === selectedRecipe?.id ? 'Requested!' : 'Request'"></span>
             </button>
         </div>
     </div>

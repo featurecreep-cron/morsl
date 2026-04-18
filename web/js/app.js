@@ -33,6 +33,8 @@ function menuApp() {
         // Recipe modal
         selectedRecipe: null,
         orderConfirm: null,  // recipe id that was just ordered
+        pendingOrder: null,  // { id, recipe_name, status }
+        _customerSSE: null,
 
         // Name prompt (reusable for orders and ratings)
         namePrompt: { show: false, name: '', callback: null, recipe: null, action: '', rating: 0, confirmStep: false },
@@ -68,6 +70,28 @@ function menuApp() {
         // Category shelves (persistent per-category rows)
         shelves: [],          // [{name, generations: [{recipes, generatedAt}], currentIndex: 0}, ...]
         activeDeckName: null, // which shelf is in the main carousel
+
+        // Long press handler for deck card removal (touch devices)
+        deckLongPress: {
+            _timer: null,
+            _fired: false,
+            start(e, name) {
+                this._fired = false;
+                this._timer = setTimeout(() => {
+                    this._fired = true;
+                    // Prevent the click from firing after long press
+                    e.target.closest('.deck-card')?.addEventListener('click', this._blockClick, { capture: true, once: true });
+                    // Access Alpine component from the event target
+                    const app = Alpine.$data(e.target);
+                    if (app?.removeShelf) app.removeShelf(name);
+                }, 500);
+            },
+            cancel() {
+                clearTimeout(this._timer);
+                this._timer = null;
+            },
+            _blockClick(e) { e.stopPropagation(); e.preventDefault(); },
+        },
         _targetShelf: null,      // shelf name for current generation
 
         // Meal plan save
@@ -204,23 +228,29 @@ function menuApp() {
             } catch (e) { /* ignore corrupt data */ }
             this._loadRecentNames();
             this.loadShelves();
+            // Tier 1: fast UI chrome — settings, profiles, categories
             await Promise.all([
                 this.loadCategories(),
                 this.loadProfiles(),
-                this.loadMenu(),
                 this.loadSettings(),
-                this.loadIconMappings(),
             ]);
+            this.state = 'ready';
+            // Tier 2: heavier data — menu and icon mappings load in background
+            await Promise.all([
+                this.loadMenu(),
+                this.loadIconMappings(),
+            ]).catch(e => console.warn('Background load failed:', e));
+
+            // F5: Auto-generate from URL param (e.g. after setup wizard)
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoGenProfile = urlParams.get('generate');
+            if (autoGenProfile && this.shelves.length === 0) {
+                history.replaceState(null, '', '/');
+                this.switchProfile(autoGenProfile);
+            }
             // If shelves exist but no active deck, set to first shelf
             if (this.shelves.length > 0 && !this.activeDeckName) {
                 this.activeDeckName = this.shelves[0].name;
-            }
-            // If no menu loaded and a default profile is configured, highlight its category
-            if (this.recipes.length === 0) {
-                const profile = this.profiles.find(p => p.default);
-                if (profile && profile.category) {
-                    this.categoryPanelOpen = profile.category;
-                }
             }
             // Prefetch brand logo and loading icon SVGs for theme-aware inline rendering
             if (this.settings.logo_url) {
@@ -303,7 +333,7 @@ function menuApp() {
             this.$nextTick(() => {
                 const render = (ref, data) => {
                     if (!ref || !data) return;
-                    const container = ref.querySelector('.footer-qr-code');
+                    const container = ref.querySelector('.qr-corner-code');
                     if (!container) return;
                     try {
                         const qr = qrcode(0, 'M');
@@ -312,8 +342,8 @@ function menuApp() {
                         container.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 1 });
                     } catch (e) { /* skip */ }
                 };
-                render(this.$refs.footerQrWifi, this.settings.qr_wifi_string);
-                render(this.$refs.footerQrMenu, this.settings.qr_menu_url);
+                render(this.$refs.cornerQrWifi, this.settings.qr_wifi_string);
+                render(this.$refs.cornerQrMenu, this.settings.qr_menu_url);
             });
         },
 
@@ -372,7 +402,10 @@ function menuApp() {
             try {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
-                    this.applyMenuData(await res.json(), { clearOthers });
+                    const data = await res.json();
+                    // clear_others may be persisted in the menu JSON (schedule flag)
+                    const effectiveClear = clearOthers || !!data.clear_others;
+                    this.applyMenuData(data, { clearOthers: effectiveClear });
                     this.state = 'ready';
                 } else if (res.status === 404) {
                     // No server menu — check if generation failed
@@ -428,6 +461,8 @@ function menuApp() {
                 if (clearOthers && versionChanged) {
                     this.shelves = [];
                     this.activeDeckName = null;
+                    this._carouselCache = null;
+                    this._carouselCacheKey = null;
                 }
 
                 if (this.shelves.length === 0) {
@@ -511,8 +546,16 @@ function menuApp() {
                 }
             });
 
-            this._menuSSE.addEventListener('connected', () => {
+            this._menuSSE.addEventListener('connected', (e) => {
                 this._sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS;
+                // Reload page if server version changed (new deployment)
+                try {
+                    const data = JSON.parse(e.data);
+                    if (this.appVersion && data.version && data.version !== this.appVersion) {
+                        location.reload();
+                        return;
+                    }
+                } catch (_) { /* ignore */ }
                 // Sync state on reconnect — may have missed events while disconnected
                 this._debouncedLoadMenu();
             });
@@ -546,6 +589,7 @@ function menuApp() {
         startMenuPolling() {
             this._visibilityHandler = () => {
                 if (document.visibilityState === 'visible') {
+                    this._checkAppVersion();
                     // Only fetch if SSE is disconnected or version might be stale
                     if (!this._menuSSE || this._menuSSE.readyState !== EventSource.OPEN) {
                         this._debouncedLoadMenu();
@@ -695,6 +739,15 @@ function menuApp() {
             return dayjs(isoString).format('dddd, MMMM D');
         },
 
+        formatRelaxedConstraint(rc) {
+            const ops = { '>=': 'at least', '<=': 'at most', '==': 'exactly' };
+            if (rc.operator && rc.original_count) {
+                const actual = Math.round(rc.original_count - rc.slack_value);
+                return `Relaxed "${rc.label}" from ${ops[rc.operator] || rc.operator} ${rc.original_count} to ${actual}`;
+            }
+            return `${rc.label} adjusted by ${rc.slack_value.toFixed(1)}`;
+        },
+
         scrollCarouselToStart() {
             const track = this.$refs.carouselTrack;
             if (track) track.scrollTo({ left: 0, behavior: 'smooth' });
@@ -794,6 +847,12 @@ function menuApp() {
                 const res = await fetch('/api/menu');
                 if (res.ok) {
                     const data = await res.json();
+                    // SSE may have already delivered this menu — skip duplicate shelf add
+                    if (data.version && data.version === this.menuVersion) {
+                        this._targetShelf = null;
+                        this.state = 'ready';
+                        return;
+                    }
                     const target = this._targetShelf || data.profile || this.activeProfile || 'Menu';
                     this._targetShelf = null;
                     this.addShelf(target, data.recipes || []);
@@ -818,6 +877,8 @@ function menuApp() {
         },
 
         addShelf(name, recipes) {
+            this._carouselCache = null;
+            this._carouselCacheKey = null;
             const existing = this.shelves.find(s => s.name === name);
             const generation = { recipes, generatedAt: new Date().toISOString() };
             if (existing) {
@@ -1109,14 +1170,47 @@ function menuApp() {
                         }),
                     });
                     if (res.ok) {
+                        const order = await res.json();
+                        this.pendingOrder = { id: order.id, recipe_name: recipe.name, status: 'received' };
                         this.orderConfirm = recipe.id;
-                        const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
-                        setTimeout(() => { this.orderConfirm = null; }, toastMs);
+                        this._connectCustomerSSE(order.id);
                     }
                 } catch (e) {
                     console.warn('Failed to place order:', e);
                 }
             });
+        },
+
+        _connectCustomerSSE(orderId) {
+            if (this._customerSSE) this._customerSSE.close();
+            const es = new EventSource('/api/orders/customer-stream');
+            this._customerSSE = es;
+            es.addEventListener('status_update', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.order_id === orderId && this.pendingOrder) {
+                        this.pendingOrder.status = data.status;
+                        if (data.status === 'ready') {
+                            const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
+                            setTimeout(() => {
+                                this.pendingOrder = null;
+                                this.orderConfirm = null;
+                                es.close();
+                                this._customerSSE = null;
+                            }, toastMs * 3);
+                        }
+                    }
+                } catch (_) { /* ignore */ }
+            });
+            es.onerror = () => {
+                // Reconnect handled by browser EventSource
+            };
+        },
+
+        dismissPendingOrder() {
+            this.pendingOrder = null;
+            this.orderConfirm = null;
+            if (this._customerSSE) { this._customerSSE.close(); this._customerSSE = null; }
         },
 
         // ---- Meal Plan Save ----
@@ -1150,6 +1244,46 @@ function menuApp() {
                 }
             } catch (e) {
                 console.warn('Failed to load meal plan options:', e);
+            }
+        },
+
+        async quickSaveMealPlan() {
+            if (this.mealPlanSave.saving) return;
+            this.mealPlanSave.saving = true;
+            try {
+                // Fetch meal types to get default
+                const mtRes = await fetch('/api/meal-types');
+                if (!mtRes.ok) { alert('Failed to load meal types'); return; }
+                const mtData = await mtRes.json();
+                const mealTypes = Array.isArray(mtData) ? mtData : (mtData.results || []);
+                if (!mealTypes.length) { alert('No meal types configured'); return; }
+
+                const info = this.getShelfGenerations();
+                const gen = info?.generations?.[0];
+                if (!gen?.recipes?.length) { alert('No recipes to save'); return; }
+
+                const payload = {
+                    date: new Date().toISOString().slice(0, 10),
+                    meal_type_id: mealTypes[0].id,
+                    recipes: gen.recipes.map(r => ({ id: r.id, name: r.name })),
+                };
+                const res = await fetch('/api/meal-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (res.ok) {
+                    this.mealPlanToast = true;
+                    const toastMs = (this.settings.toast_seconds ?? CONST.DEFAULT_TOAST_SECONDS) * 1000;
+                    setTimeout(() => { this.mealPlanToast = false; }, toastMs);
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.detail || 'Failed to save meal plan');
+                }
+            } catch (e) {
+                alert('Failed to save meal plan');
+            } finally {
+                this.mealPlanSave.saving = false;
             }
         },
 
@@ -1270,10 +1404,12 @@ function menuApp() {
             this._kioskGestureCleanup = () => cleanupFns.forEach(fn => fn());
         },
 
-        kioskAdminAccess() {
+        kioskAdminAccess(target) {
+            target = target || '/admin';
             const pinFeatureOn = this.settings.admin_pin_enabled ||
                 (this.settings.kiosk_enabled && this.settings.kiosk_pin_enabled);
             if (pinFeatureOn && this.settings.has_pin) {
+                this._kioskAdminTarget = target;
                 this.showKioskPin = true;
                 this.showKioskPinText = false;
                 this.kioskPinValue = '';
@@ -1282,7 +1418,7 @@ function menuApp() {
                     if (this.$refs.kioskPinInput) this.$refs.kioskPinInput.focus();
                 });
             } else {
-                window.location.href = '/admin';
+                window.location.href = target;
             }
         },
 
@@ -1302,7 +1438,7 @@ function menuApp() {
                             sessionStorage.setItem(CONST.SS_ADMIN_TOKEN_TS, String(Date.now()));
                         }
                         this.showKioskPin = false;
-                        window.location.href = '/admin';
+                        window.location.href = this._kioskAdminTarget || '/admin';
                     } else {
                         this.kioskPinError = 'Incorrect PIN';
                         this.kioskPinValue = '';

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -102,9 +103,34 @@ class TandoorAPI:
             content = json.loads(response.content)
             new_results = content.get("results", [])
             self.logger.debug(f"Retrieved {len(new_results)} results.")
-            results = results + new_results
+            results.extend(new_results)
             url = content.get("next", None)
         return results
+
+    def _unpack_list(self, response_data: Any) -> List[Dict[str, Any]]:
+        """Normalize a response that may be a raw list or a paginated envelope.
+
+        Handles three shapes for forward-compatibility with Tandoor Next:
+        1. Raw list ``[...]`` (current Tandoor)
+        2. Paginated dict, single page ``{results: [...], next: null}``
+        3. Paginated dict, multi-page ``{results: [...], next: "http://..."}``
+        """
+        if isinstance(response_data, list):
+            return response_data
+        items = response_data.get("results", [])
+        next_url = response_data.get("next")
+        while next_url:
+            resp = self.session.get(next_url, timeout=DEFAULT_TIMEOUT)
+            if resp.status_code != 200:
+                self.logger.warning(
+                    f"Failed to fetch next page ({next_url}): {resp.status_code} — "
+                    f"returning {len(items)} partial results"
+                )
+                break
+            page = json.loads(resp.content)
+            items.extend(page.get("results", []))
+            next_url = page.get("next")
+        return items
 
     @cached
     def get_unpaged_results(self, url: str, obj_id: Union[str, int], **kwargs) -> Dict[str, Any]:
@@ -175,8 +201,20 @@ class TandoorAPI:
         if filters is not None:
             if not isinstance(filters, list):
                 filters = [filters]
-            for f in filters:
-                recipes += self.get_paged_results(url, {"page_size": self.page_size, "filter": f})
+            if len(filters) == 1:
+                recipes += self.get_paged_results(
+                    url, {"page_size": self.page_size, "filter": filters[0]}
+                )
+            elif filters:
+                with ThreadPoolExecutor(max_workers=len(filters)) as pool:
+                    results = pool.map(
+                        lambda f: self.get_paged_results(
+                            url, {"page_size": self.page_size, "filter": f}
+                        ),
+                        filters,
+                    )
+                    for result in results:
+                        recipes += result
 
         self.logger.debug(f"Returning {len(recipes)} total recipes.")
         return recipes
@@ -216,6 +254,15 @@ class TandoorAPI:
         self.logger.debug(f"Returning {len(keywords)} total keywords.")
         return keywords
 
+    def get_keyword(
+        self, kw_id: str | int, params: dict[str, Any] | None = None, **kwargs
+    ) -> dict[str, Any]:
+        """Fetch a single keyword by ID."""
+        url = f"{self.url}keyword/"
+        keyword = self.get_unpaged_results(url, kw_id, **kwargs)
+        self.logger.debug(f"Returning keyword {keyword['id']}: {keyword['name']}.")
+        return keyword
+
     def get_food_tree(
         self, food_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> List[Dict[str, Any]]:
@@ -245,6 +292,12 @@ class TandoorAPI:
         self.logger.debug(f"Returning food {food['id']}: {food['name']}.")
         return food
 
+    @cached
+    def get_onhand_foods(self) -> List[Dict[str, Any]]:
+        """Fetch all foods marked as on-hand."""
+        url = f"{self.url}food/"
+        return self.get_paged_results(url, {"onhand": 1, "page_size": self.page_size})
+
     def get_book(
         self, book_id: Union[str, int], params: Optional[Dict[str, Any]] = None, **kwargs
     ) -> Dict[str, Any]:
@@ -266,8 +319,10 @@ class TandoorAPI:
             list: List of book contents.
         """
 
-        url = f"{self.url}recipe-book-entry/?book={book.id}"
-        book_entries = self.get_unpaged_results(url, "", **kwargs)
+        url = f"{self.url}recipe-book-entry/"
+        book_entries = self.get_paged_results(
+            url, {"book": book.id, "page_size": self.page_size}, **kwargs
+        )
         recipes = [be["recipe_content"] for be in book_entries]
         if book.filter:
             recipes += self.get_recipes(filters=book.filter)
@@ -281,6 +336,7 @@ class TandoorAPI:
         url = f"{self.url}custom-filter/"
         return self.get_paged_results(url, {"page_size": self.page_size}, **kwargs)
 
+    @cached
     def get_mealplan_recipes(
         self,
         mealtype_id: Optional[Union[List[int], int]] = None,
@@ -314,7 +370,10 @@ class TandoorAPI:
             f"{date.strftime('%Y-%m-%d')} with meal type IDs: "
             f"{mealtype_id}."
         )
-        return [r["recipe"] for r in self.get_unpaged_results(url, "", **kwargs)]
+        response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
+        if response.status_code != 200:
+            raise TandoorAPIError(response.status_code, response.text)
+        return [r["recipe"] for r in self._unpack_list(json.loads(response.content))]
 
     def create_meal_plan(
         self,
@@ -348,19 +407,27 @@ class TandoorAPI:
 
         return plan
 
-    def get_meal_plans(self, date: datetime, **kwargs) -> Dict[str, Any]:
+    @cached
+    def get_meal_plans(self, date: datetime, **kwargs) -> List[Dict[str, Any]]:
         url = f"{self.url}meal-plan/?from_date={date.strftime('%Y-%m-%d')}"
-        return self.get_unpaged_results(url, "", **kwargs)
+        response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
+        if response.status_code != 200:
+            raise TandoorAPIError(response.status_code, response.text)
+        return self._unpack_list(json.loads(response.content))
 
     def delete_meal_plan(self, obj_id: Union[str, int], **kwargs) -> None:
         url = f"{self.url}meal-plan/"
         self.delete_object(url, obj_id)
         self.logger.debug(f"Succesfully deleted meal plan {obj_id}.")
 
+    _VALID_SUBSTITUTE_TYPES = {"food"}
+
     @cached
     def get_food_substitutes(
         self, food_id: Union[str, int], substitute: str
     ) -> List[Dict[str, Any]]:
+        if substitute not in self._VALID_SUBSTITUTE_TYPES:
+            raise ValueError(f"Invalid substitute type: {substitute}")
         url = f"{self.url}{substitute}/{food_id}/substitutes/"
         self.logger.debug(f"Connecting to tandoor api at url: {url}")
         response = self.session.get(url, params={"onhand": 1}, timeout=DEFAULT_TIMEOUT)
@@ -391,7 +458,7 @@ class TandoorAPI:
                 f"Failed to fetch meal types. Status code: {response.status_code}: {response.text}"
             )
             raise TandoorAPIError(response.status_code, response.text)
-        return json.loads(response.content)
+        return self._unpack_list(json.loads(response.content))
 
     def create_meal_type(
         self, name: str, color: str = "#FF5722", order: int = 0, **kwargs

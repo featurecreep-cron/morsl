@@ -75,12 +75,6 @@ def delete_category(
 ) -> None:
     """Delete a category and clear it from affected profiles."""
     try:
-        svc.delete_category(cat_id)
+        svc.delete_category(cat_id, config_service=config_svc)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Category not found: {cat_id}") from None
-    # Clear category field on affected profiles
-    for p in config_svc.list_profiles():
-        if p.category == cat_id:
-            raw = config_svc.get_profile_raw(p.name)
-            raw["category"] = ""
-            config_svc.update_profile(p.name, raw)

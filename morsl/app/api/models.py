@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, Field, computed_field
 
 from morsl.constants import API_CACHE_TTL_MINUTES
 
@@ -45,6 +45,8 @@ class RelaxedConstraintResponse(BaseModel):
     label: str
     slack_value: float
     weight: float
+    operator: str = ""
+    original_count: int = 0
 
 
 class SolverResultResponse(BaseModel):
@@ -65,6 +67,7 @@ class MenuResponse(BaseModel):
     profile: str = ""
     warnings: List[str] = []
     relaxed_constraints: List[RelaxedConstraintResponse] = []
+    clear_others: bool = False
 
     @computed_field
     @property
@@ -157,9 +160,13 @@ class RatingRequest(BaseModel):
 
 class OrderRequest(BaseModel):
     recipe_id: int
-    recipe_name: str
+    recipe_name: str = Field(max_length=200)
     servings: int = 1
-    customer_name: Optional[str] = None
+    customer_name: Optional[str] = Field(default=None, max_length=100)
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
 
 
 class MealTypeCreateRequest(BaseModel):
@@ -296,6 +303,28 @@ class TemplateUpdateRequest(BaseModel):
     description: str = ""
     slots: List[TemplateSlot]
     deduplicate: bool = True
+
+
+# ---- Shopping List ----
+
+
+class ShoppingItemResponse(BaseModel):
+    food: str
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+    source_recipes: List[str] = []
+
+
+class ShoppingListResponse(BaseModel):
+    items: List[ShoppingItemResponse] = []
+
+
+# ---- Recipe Swap ----
+
+
+class SwapRequest(BaseModel):
+    old_recipe_id: int
+    profile: str = "default"
 
 
 class TemplateSummaryResponse(BaseModel):

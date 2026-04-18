@@ -564,6 +564,8 @@ const _SVG_ALLOWED_ELEMENTS = new Set(['svg', 'g', 'path', 'circle', 'ellipse', 
     'pattern', 'symbol', 'marker', 'filter', 'feGaussianBlur',
     'feOffset', 'feBlend', 'feColorMatrix', 'feComposite', 'feFlood',
     'feMerge', 'feMergeNode', 'title', 'desc', 'metadata', 'image']);
+// Elements that may carry href/xlink:href pointing to executable URIs
+const _SVG_HREF_SAFE_ELEMENTS = new Set(['use', 'image']);
 
 // Mirrors backend _ALLOWED_ATTRS (custom_icon_service.py)
 const _SVG_ALLOWED_ATTRS = new Set([
@@ -597,6 +599,11 @@ function sanitizeSVG(svgString) {
         for (const attr of [...el.attributes]) {
             const name = attr.name;
             if (name.startsWith('on') || !_SVG_ALLOWED_ATTRS.has(name)) {
+                el.removeAttribute(name);
+                continue;
+            }
+            // Strip href/xlink:href from elements that could execute URIs (e.g. <a>)
+            if ((name === 'href' || name === 'xlink:href') && !_SVG_HREF_SAFE_ELEMENTS.has(el.localName)) {
                 el.removeAttribute(name);
                 continue;
             }

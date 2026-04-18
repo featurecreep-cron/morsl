@@ -39,10 +39,10 @@ def create_template(
 
     try:
         return svc.create_template(name, config)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-    except FileExistsError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid template name") from None
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="Template already exists") from None
 
 
 @router.get("/{name}", response_model=TemplateDetailResponse)
@@ -52,10 +52,10 @@ def get_template(
 ) -> dict:
     try:
         return svc.get_template(name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid template name") from None
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found") from None
 
 
 @router.put("/{name}", response_model=TemplateDetailResponse)
@@ -73,10 +73,10 @@ def update_template(
 
     try:
         return svc.update_template(name, config)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid template name") from None
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found") from None
 
 
 @router.delete("/{name}", status_code=204)
@@ -86,7 +86,7 @@ def delete_template(
 ) -> None:
     try:
         svc.delete_template(name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid template name") from None
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found") from None

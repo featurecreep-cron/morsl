@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Dict
 
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, read_json
 
 
 class IconMappingService:
@@ -33,12 +32,8 @@ class IconMappingService:
 
     def _load(self) -> None:
         path = os.path.join(self.data_dir, "icon-mappings.json")
-        if os.path.isfile(path):
-            with open(path) as f:
-                raw = json.load(f)
-            self._data = {
-                "keyword_icons": raw.get("keyword_icons", {}),
-                "food_icons": raw.get("food_icons", {}),
-            }
-        else:
-            self._data = {"keyword_icons": {}, "food_icons": {}}
+        raw = read_json(path, {})
+        self._data = {
+            "keyword_icons": raw.get("keyword_icons", {}),
+            "food_icons": raw.get("food_icons", {}),
+        }

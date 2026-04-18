@@ -14,6 +14,7 @@ from morsl.app.api.routes.profiles import router as profiles_router
 from morsl.app.api.routes.proxy import router as proxy_router
 from morsl.app.api.routes.schedules import router as schedules_router
 from morsl.app.api.routes.settings import router as settings_router
+from morsl.app.api.routes.shopping import router as shopping_router
 from morsl.app.api.routes.templates import router as templates_router
 from morsl.app.api.routes.weekly_generation import router as weekly_generation_router
 
@@ -30,5 +31,6 @@ api_router.include_router(proxy_router)
 api_router.include_router(orders_router)
 api_router.include_router(schedules_router)
 api_router.include_router(settings_router)
+api_router.include_router(shopping_router)
 api_router.include_router(templates_router)
 api_router.include_router(weekly_generation_router)

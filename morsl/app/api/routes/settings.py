@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import hmac
+import ipaddress
 import logging
-import os
-import tempfile
+import socket
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
@@ -33,10 +33,30 @@ from morsl.constants import BRANDING_IMAGE_MAX_SIZE, DEFAULT_FAVICON_PATH, ICONS
 from morsl.services.category_service import CategoryService
 from morsl.services.config_service import ConfigService
 from morsl.services.settings_service import DEFAULTS, SettingsService
+from morsl.utils import atomic_write_bytes, hash_pin, is_pin_hashed
+from morsl.utils import verify_pin as verify_pin_hash
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+def _reject_private_url(url: str) -> Optional[str]:
+    """Return an error message if the URL resolves to a private/internal address, else None."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        return "Invalid URL"
+    try:
+        resolved = socket.getaddrinfo(hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            addr = ipaddress.ip_address(sockaddr[0])
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return "URL must not point to internal/private addresses"
+    except (socket.gaierror, OSError):
+        return "Could not resolve hostname"
+    return None
+
 
 ALLOWED_IMAGE_EXTS = {".svg", ".png", ".jpg", ".jpeg", ".webp"}
 
@@ -111,10 +131,15 @@ def update_settings(
         raise HTTPException(
             400, f"Use POST /settings/credentials for: {', '.join(sorted(cred_in_body))}"
         )
-    # Revoke tokens if PIN value is actually changing
+    # Hash and store PIN if it's being changed
     if "pin" in body:
-        current_pin = svc.get_all().get("pin", "")
-        if body["pin"] != current_pin:
+        new_pin = body["pin"]
+        current = svc.get_all()
+        stored_pin = current.get("pin", "")
+        pin_changed = not new_pin or not verify_pin_hash(new_pin, stored_pin)
+        if new_pin:
+            body["pin"] = hash_pin(new_pin)
+        if pin_changed:
             revoke_admin_tokens()
     result = svc.update(body)
     return _mask_secrets(result)
@@ -126,9 +151,41 @@ def get_public_settings(svc: SettingsService = Depends(get_settings_service)) ->
     return svc.get_public()
 
 
+_pin_failures: Dict[str, list] = {}  # ip -> [timestamp, ...]
+_PIN_RATE_WINDOW = 60  # seconds
+_PIN_MAX_ATTEMPTS = 5
+_PIN_MAX_TRACKED_IPS = 1024
+
+
+def _check_pin_rate_limit(client_ip: str) -> None:
+    """Raise 429 if too many failed PIN attempts from this IP."""
+    now = time.time()
+    # GC: prune stale IPs to prevent unbounded dict growth
+    if len(_pin_failures) > _PIN_MAX_TRACKED_IPS:
+        stale = [
+            ip for ip, ts in _pin_failures.items() if not ts or now - ts[-1] >= _PIN_RATE_WINDOW
+        ]
+        for ip in stale:
+            del _pin_failures[ip]
+    attempts = _pin_failures.get(client_ip, [])
+    # Prune old attempts outside the window
+    attempts = [t for t in attempts if now - t < _PIN_RATE_WINDOW]
+    _pin_failures[client_ip] = attempts
+    if len(attempts) >= _PIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed attempts. Try again in {_PIN_RATE_WINDOW} seconds.",
+        )
+
+
+def _record_pin_failure(client_ip: str) -> None:
+    _pin_failures.setdefault(client_ip, []).append(time.time())
+
+
 @router.post("/verify-pin")
 def verify_pin(
     body: PinRequest,
+    request: Request,
     svc: SettingsService = Depends(get_settings_service),
 ) -> Dict[str, Any]:
     """Verify admin/kiosk PIN. Returns valid=true and a session token on success."""
@@ -141,9 +198,19 @@ def verify_pin(
     stored_pin = settings.get("pin", "")
     if not stored_pin:
         return {"valid": True}
-    valid = hmac.compare_digest(body.pin, stored_pin)
+
+    client_ip = request.client.host if request.client else "unknown"
+    _check_pin_rate_limit(client_ip)
+
+    valid = verify_pin_hash(body.pin, stored_pin)
     if valid:
+        # Transparently migrate plaintext PINs to hashed storage
+        if not is_pin_hashed(stored_pin):
+            svc.update({"pin": hash_pin(body.pin)})
+        # Clear failures on success
+        _pin_failures.pop(client_ip, None)
         return {"valid": True, "token": create_admin_token()}
+    _record_pin_failure(client_ip)
     return {"valid": False}
 
 
@@ -172,8 +239,13 @@ def get_setup_status(
 async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
     """Test a Tandoor API connection with the given credentials."""
     url = str(body.url).rstrip("/")
+    # SSRF protection: resolve hostname and reject internal/loopback addresses
+    _err = _reject_private_url(url)
+    if _err:
+        return {"success": False, "error": _err}
+
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=False) as client:
             resp = await client.get(
                 f"{url}/api/food/?limit=1",
                 headers={"Authorization": f"Bearer {body.token}"},
@@ -221,21 +293,19 @@ def _save_upload(file: UploadFile, prefix: str) -> str:
     filename = f"{prefix}-{int(time.time())}{ext}"
     dest = UPLOADS_DIR / filename
 
-    # Atomic write
-    fd, tmp_path = tempfile.mkstemp(dir=str(UPLOADS_DIR), suffix=".tmp")
-    closed = False
-    try:
-        os.write(fd, content)
-        os.close(fd)
-        closed = True
-        os.replace(tmp_path, str(dest))
-    except OSError:
-        if not closed:
-            os.close(fd)
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
+    # Sanitize SVG uploads to prevent stored XSS
+    if ext == ".svg":
+        try:
+            from defusedxml.ElementTree import fromstring
 
+            fromstring(content)  # reject malformed/malicious XML
+            from py_svg_hush import filter_svg
+
+            content = filter_svg(content)
+        except (ValueError, SyntaxError, OSError):
+            raise HTTPException(400, "Invalid or unsafe SVG content") from None
+
+    atomic_write_bytes(str(dest), content)
     return f"/uploads/branding/{filename}"
 
 
@@ -285,7 +355,7 @@ def upload_favicon(
         logger.info("Regenerated icons from %s", source_path)
     except (OSError, ValueError) as e:
         logger.error("Icon generation failed: %s", e)
-        raise HTTPException(500, f"Icon generation failed: {e}") from None
+        raise HTTPException(500, "Icon generation failed") from None
 
     return svc.update({"favicon_url": url})
 
@@ -365,12 +435,11 @@ def reset_branding(
     return svc.update(updates)
 
 
-@router.post("/factory-reset", dependencies=[Depends(require_admin)])
 def _reset_step(errors: list, label: str, fn) -> None:
     """Run a factory reset step, collecting errors instead of raising."""
     try:
         fn()
-    except Exception as e:  # noqa: broad-except — error collection during factory reset
+    except Exception as e:  # broad-except — error collection during factory reset
         errors.append(f"{label}: {e}")
 
 
@@ -393,6 +462,7 @@ def _regenerate_default_icons() -> None:
         generate_icons(DEFAULT_FAVICON_PATH, ICONS_DIR)
 
 
+@router.post("/factory-reset", dependencies=[Depends(require_admin)])
 def factory_reset(
     settings: Settings = Depends(get_settings),
     svc: SettingsService = Depends(get_settings_service),

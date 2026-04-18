@@ -50,13 +50,17 @@ body {
 /* ---- Header / Branding ---- */
 .menu-header {
     flex: 0 0 auto;
-    padding: 0.5rem 1rem 0.25rem;
-    text-align: center;
+    padding: 0.25rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 48px;
 }
 
 .menu-title {
     font-family: var(--heading-font);
-    font-size: clamp(1.3rem, 4vw, 2rem);
+    font-size: clamp(1.1rem, 3vw, 1.6rem);
     color: var(--accent-color);
     text-shadow: var(--title-shadow, none);
     letter-spacing: var(--heading-letter-spacing, normal);
@@ -68,7 +72,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
 }
 
 .menu-brand-text {
@@ -78,7 +82,7 @@ body {
 
 .menu-logo {
     height: 100%;
-    max-height: 3.5rem;
+    max-height: 2.5rem;
     width: auto;
     align-self: stretch;
     object-fit: contain;
@@ -88,19 +92,21 @@ body {
     font-family: var(--accent-font, var(--body-font));
     font-style: italic;
     color: var(--accent-color-dim);
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     letter-spacing: var(--heading-letter-spacing, normal);
-    margin: 0.1rem 0 0;
+    margin: 0;
 }
+
+/* (menu-date moved to top-right corner) */
 
 /* ---- Category Bar ---- */
 .category-bar {
     flex: 0 0 auto;
     display: flex;
-    gap: 0.75rem;
-    padding: 0.5rem 1rem;
+    gap: 0.4rem;
+    padding: 0.25rem 1rem;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     flex-wrap: wrap;
 }
 
@@ -142,23 +148,21 @@ body {
     border-color: var(--btn-active-border);
 }
 
-/* ---- Explore Buttons (vertical icon + label) ---- */
-/* UX: Large touch targets with prominent icons that dominate the button */
+/* ---- Explore Buttons (compact horizontal pills) ---- */
 .explore-btn {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
-    padding: 0.4rem 0.5rem 0.6rem;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
     background: var(--btn-bg);
     color: var(--accent-color);
-    border: 2px solid var(--btn-border);
-    border-radius: 1rem;
+    border: 1px solid var(--btn-border);
+    border-radius: 2rem;
     cursor: pointer;
     transition: all 0.2s;
-    width: 120px;
-    min-height: 100px;
+    height: 38px;
 }
 
 .explore-btn:hover:not(:disabled),
@@ -166,41 +170,21 @@ body {
     background: var(--btn-active-bg);
     color: var(--btn-active-text);
     border-color: var(--accent-color);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .explore-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
-@media (max-width: 480px) {
-    .explore-btn {
-        flex: 1 1 0;
-        min-width: 0;
-        width: auto;
-        min-height: 80px;
-    }
-    .explore-btn-icon {
-        width: 40px;
-        height: 40px;
-    }
-    .explore-btn-label {
-        font-size: clamp(0.55rem, 2.5vw, 0.75rem);
-        letter-spacing: 0.03em;
-    }
-    .explore-btn-subtitle {
-        font-size: clamp(0.5rem, 2vw, 0.65rem);
-    }
-}
 
-/* UX: Icons should be the visual focus - large and prominent */
 .explore-btn-icon {
-    width: 56px;
-    height: 56px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
 }
 
 .explore-btn-icon svg {
@@ -213,22 +197,13 @@ body {
     font-family: var(--heading-font);
     font-size: 0.75rem;
     text-align: center;
-    line-height: 1.4;
+    line-height: 1.2;
     white-space: nowrap;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     font-weight: 600;
-    max-width: 100%;
 }
 
-.explore-btn-subtitle {
-    font-size: 0.65rem;
-    opacity: 0.6;
-    font-style: italic;
-    text-align: center;
-    line-height: 1.2;
-    margin-top: -0.25rem;
-}
 
 
 .category-panel {
@@ -276,43 +251,43 @@ body {
     color: var(--btn-text);
     border: 1px solid var(--btn-border);
     border-radius: 2rem;
-    padding: 0.3rem 1rem;
+    padding: 0.25rem 0.75rem;
     font-family: var(--body-font);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s;
     text-transform: capitalize;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 0;
+    gap: 0.3rem;
+    height: 34px;
 }
 
 .category-chip--with-icon {
-    flex-direction: column;
-    gap: 0.15rem;
-    padding: 0.3rem;
-    min-width: 80px;
-    height: 80px;
+    flex-direction: row;
+    gap: 0.3rem;
+    padding: 0.25rem 0.7rem;
+    min-width: auto;
+    height: 38px;
     justify-content: center;
     overflow: hidden;
     border-radius: 0.75rem;
 }
 
 .category-chip--with-icon .chip-svg-icon {
-    width: 40px;
-    height: 40px;
+    width: 20px;
+    height: 20px;
 }
 
 .category-chip--with-icon .chip-count {
     display: none;
 }
 
-/* UX: Chip icons sized to match explore buttons for visual consistency */
 .chip-svg-icon {
-    width: 56px;
-    height: 56px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -379,21 +354,16 @@ body {
     flex-direction: column;
 }
 
-/* ---- Menu Date ---- */
-.menu-date {
-    flex: 0 0 auto;
-    text-align: center;
-    font-family: var(--heading-font);
-    font-size: 1.1rem;
-    color: var(--accent-color);
-    padding: 0.25rem 1rem 0;
-    letter-spacing: 0.02em;
-}
+/* (menu-date moved into top-right corner as .corner-date) */
 
 /* ---- Carousel ---- */
 .carousel-container {
     flex: 1 1 auto;
-    min-height: 150px;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .carousel-wrapper {
@@ -408,7 +378,7 @@ body {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     gap: 1rem;
-    padding: 0.5rem 1rem;
+    padding: 0.25rem 1rem;
 }
 
 .carousel-track::-webkit-scrollbar {
@@ -594,6 +564,10 @@ body {
     padding-top: 0.75rem;
     border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
     width: 100%;
+    max-height: 40vh;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
 .ingredient-inline {
@@ -704,33 +678,7 @@ body {
 }
 
 
-/* ---- Meal Plan Floating Action Button ---- */
-.meal-plan-fab {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    z-index: 500;
-    padding: 0.6rem 1.2rem;
-    border-radius: 999px;
-    border: 1px solid var(--btn-border);
-    background: var(--accent-color);
-    color: #fff;
-    font-family: var(--body-font);
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    transition: all 0.2s;
-}
-
-.meal-plan-fab:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-}
-
-.meal-plan-fab:active {
-    transform: scale(0.97);
-}
+/* (meal-plan-fab removed — accessible via hamburger menu) */
 
 
 /* ---- Deck Card Strip ---- */
@@ -738,7 +686,7 @@ body {
     flex: 0 0 auto;
     display: flex;
     gap: 0.75rem;
-    padding: 0.5rem 1rem;
+    padding: 0.25rem 1rem;
     overflow-x: auto;
     scrollbar-width: none;
     justify-content: center;
@@ -829,6 +777,22 @@ body {
     display: block;
 }
 
+.deck-card-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card-bg);
+    color: var(--accent-color);
+    opacity: 0.8;
+}
+
+.deck-card-placeholder svg {
+    width: 85%;
+    height: 85%;
+}
+
 /* Gradient overlay with category name + count */
 .deck-card-overlay {
     position: absolute;
@@ -865,50 +829,11 @@ body {
     line-height: 1.3;
 }
 
-/* Close button floats at top-right corner of the card */
-.deck-card-close {
-    position: absolute;
-    top: -10px;
-    right: -10px;
-    z-index: 10;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 1px solid var(--btn-border);
-    background: var(--card-bg);
-    color: var(--text-muted);
-    font-size: 1rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.deck-card-close::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 44px;
-    height: 44px;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-}
-
-.deck-card:hover .deck-card-close {
-    opacity: 1;
-}
-
-.deck-card-close:hover {
-    background: var(--btn-active-bg);
-    color: var(--btn-active-text);
-}
-
-.deck-card--active .deck-card-close {
-    display: none;
+/* Long press hint: suppress text selection on deck cards */
+.deck-card {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 @media (max-width: 575.98px) {
@@ -918,9 +843,6 @@ body {
     }
     .deck-card-title {
         font-size: 0.65rem;
-    }
-    .deck-card-close {
-        opacity: 1;
     }
 }
 
@@ -1827,6 +1749,31 @@ body {
     white-space: nowrap;
 }
 
+.order-status-toast {
+    white-space: normal;
+    max-width: 90vw;
+}
+
+.order-status-ready {
+    background: var(--success-bg, #22c55e);
+    color: var(--bg-color, #0d0d0d);
+}
+
+.order-toast-dismiss {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    margin-left: 0.25rem;
+    opacity: 0.7;
+}
+
+.order-toast-dismiss:hover {
+    opacity: 1;
+}
+
 /* ---- Warnings Bar ---- */
 .warnings-bar {
     display: flex;
@@ -1845,47 +1792,85 @@ body {
     font-family: var(--body-font);
 }
 
-/* ---- Footer ---- */
-.menu-footer {
-    flex: 0 0 auto;
-    padding: 0.15rem 1rem 0.25rem;
-    margin-top: auto;
+.relaxed-badge {
+    background: var(--info-bg, rgba(59, 130, 246, 0.15));
+    color: var(--info-text, #60a5fa);
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.8rem;
+    font-family: var(--body-font);
 }
-.footer-qr-row {
+
+/* ---- Top-right Corner (date + QR) ---- */
+.top-right-corner {
+    position: fixed;
+    top: 0.4rem;
+    right: 0.5rem;
+    z-index: 50;
     display: flex;
-    justify-content: flex-start;
-    gap: 1rem;
-    margin-bottom: 0.35rem;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+}
+.corner-date {
+    font-family: var(--heading-font);
+    font-size: 0.95rem;
+    color: var(--accent-color);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.qr-corner {
+    display: flex;
+    gap: 0.4rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+.qr-corner:hover {
+    opacity: 1;
 }
 @media (max-width: 600px) {
-    .footer-qr-row { display: none; }
+    .qr-corner { display: none; }
 }
-.footer-qr {
+.qr-corner-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
+    gap: 0.1rem;
 }
-.footer-qr-code {
-    width: 80px;
-    height: 80px;
+.qr-corner-code {
+    width: 40px;
+    height: 40px;
     background: #fff;
-    border-radius: 4px;
-    padding: 3px;
+    border-radius: 3px;
+    padding: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.footer-qr-code svg {
+.qr-corner-code svg {
     width: 100%;
     height: 100%;
 }
-.footer-qr-label {
-    font-size: 0.65rem;
+.qr-corner-label {
+    font-size: 0.5rem;
     color: var(--accent-color-dim, #999);
     font-family: var(--body-font);
     letter-spacing: 0.03em;
     text-transform: uppercase;
+}
+
+/* ---- Footer (slogan only) ---- */
+.menu-footer {
+    flex: 0 0 auto;
+    text-align: center;
+    padding: 0.1rem 1rem 0.25rem;
+}
+.footer-slogan {
+    font-family: var(--accent-font, var(--body-font));
+    font-style: italic;
+    color: var(--accent-color-dim);
+    font-size: 0.75rem;
+    margin: 0;
 }
 
 /* ---- Hamburger Navigation ---- */

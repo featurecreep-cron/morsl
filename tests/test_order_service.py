@@ -414,6 +414,72 @@ class TestGetMealTypeAPI:
         mock_api.get_meal_type.assert_called_once()
 
 
+class TestOrderStatus:
+    """F6: Order status tracking."""
+
+    def test_update_and_get_status(self, order_service):
+        order_service.update_status("order-1", "ready")
+        assert order_service.get_status("order-1") == "ready"
+
+    def test_get_status_default(self, order_service):
+        assert order_service.get_status("nonexistent") == "received"
+
+    def test_initial_status_on_store_and_notify(self, order_service):
+        today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        order = {
+            "id": "local-status-1",
+            "recipe_id": 1,
+            "recipe_name": "Test",
+            "timestamp": today,
+            "servings": 1,
+            "meal_plan_id": None,
+            "customer_name": None,
+        }
+        order_service.store_and_notify(order)
+        assert order_service.get_status("local-status-1") == "received"
+
+    def test_delete_order_clears_status(self, order_service):
+        today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        order = {
+            "id": "local-status-2",
+            "recipe_id": 1,
+            "recipe_name": "Test",
+            "timestamp": today,
+            "servings": 1,
+            "meal_plan_id": None,
+            "customer_name": None,
+        }
+        order_service.store_order(order)
+        order_service.update_status("local-status-2", "ready")
+        assert order_service.get_status("local-status-2") == "ready"
+        order_service.delete_order("local-status-2")
+        assert order_service.get_status("local-status-2") == "received"  # default
+
+    def test_clear_orders_clears_status(self, order_service, mock_api):
+        order_service._api = mock_api
+        mock_api.get_meal_plans_by_type.return_value = []
+        order_service.update_status("order-a", "ready")
+        order_service.update_status("order-b", "preparing")
+        order_service.clear_orders()
+        assert order_service.get_status("order-a") == "received"  # cleared to default
+        assert order_service.get_status("order-b") == "received"
+
+    def test_customer_subscribe_unsubscribe(self, order_service):
+        q = order_service.subscribe_customer()
+        assert q in order_service._customer_subscribers
+        order_service.unsubscribe_customer(q)
+        assert q not in order_service._customer_subscribers
+
+    def test_update_status_notifies_customer_subscribers(self, order_service):
+        q = order_service.subscribe_customer()
+        order_service.update_status("order-notify", "ready")
+        assert not q.empty()
+        event = q.get_nowait()
+        assert event["order_id"] == "order-notify"
+        assert event["status"] == "ready"
+        order_service.unsubscribe_customer(q)
+
+
 class TestParseCustomerName:
     def test_with_name(self):
         assert OrderService._parse_customer_name("Ordered by Alice at 12:00:00") == "Alice"

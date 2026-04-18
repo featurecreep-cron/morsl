@@ -849,7 +849,7 @@
                             <span x-show="saving">Creating...</span>
                         </button>
                     </div>
-                    <p class="setup-hint" x-show="!hasActiveConstraint" style="text-align:center;margin-top:0.5rem;">Add at least one constraint to continue</p>
+                    <p class="setup-hint" x-show="!hasActiveConstraint" style="text-align:center;margin-top:0.5rem;color:var(--accent-color);font-weight:600;">Toggle at least one rule above to create this profile</p>
                 </div>
             </div>
             </template>
@@ -963,7 +963,7 @@
                     <p class="setup-subtitle">Your meal plan generator is ready. Let's see what's on the menu.</p>
 
                     <div class="setup-actions" style="justify-content:center;">
-                        <a class="setup-btn setup-btn-primary" href="/admin#generate">Generate First Menu</a>
+                        <button class="setup-btn setup-btn-primary" @click="generateAndFinish()">Generate First Menu</button>
                         <button class="setup-btn setup-btn-secondary" @click="finishSetup()">Show Me the Menu</button>
                     </div>
                 </div>

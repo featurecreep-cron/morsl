@@ -7,11 +7,14 @@ import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from morsl.services.sse_publisher import SSEPublisher
 from morsl.tandoor_api import TandoorAPI, TandoorError
 from morsl.utils import now
 
+_MAX_SERVER_ORDERS = 1000
 
-class OrderService:
+
+class OrderService(SSEPublisher):
     """Order tracking via Tandoor meal plans with SSE notification.
 
     Orders are stored as Tandoor meal plan entries using a configured meal type.
@@ -27,8 +30,13 @@ class OrderService:
         self._cached_meal_type: Optional[Dict[str, Any]] = None
         self._cached_meal_type_id: Optional[int] = None
         self._lock = threading.Lock()
-        self._subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
+        self._init_sse()
         self._server_orders: List[Dict[str, Any]] = []
+        # Order status tracking (in-memory, ephemeral)
+        self._order_status: Dict[str, str] = {}
+        # Customer-facing SSE subscribers (separate from admin order stream)
+        self._customer_subscribers: List[asyncio.Queue] = []
+        self._customer_sub_lock = threading.Lock()
 
     def _get_api(self) -> TandoorAPI:
         """Lazy-initialize API client (thread-safe)."""
@@ -119,19 +127,25 @@ class OrderService:
             "customer_name": customer_name,
         }
 
-        self._notify(order)
+        self._set_initial_status(order["id"])
+        self._notify_subscribers(order)
         return order
 
     def store_and_notify(self, order: Dict[str, Any]) -> None:
         """Store an order in the server-side in-memory list and notify SSE subscribers."""
         with self._lock:
             self._server_orders.append(order)
-        self._notify(order)
+            if len(self._server_orders) > _MAX_SERVER_ORDERS:
+                self._server_orders = self._server_orders[-_MAX_SERVER_ORDERS:]
+        self._set_initial_status(order["id"])
+        self._notify_subscribers(order)
 
     def store_order(self, order: Dict[str, Any]) -> None:
         """Store an order in the server-side in-memory list."""
         with self._lock:
             self._server_orders.append(order)
+            if len(self._server_orders) > _MAX_SERVER_ORDERS:
+                self._server_orders = self._server_orders[-_MAX_SERVER_ORDERS:]
 
     def get_server_orders(
         self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
@@ -275,6 +289,7 @@ class OrderService:
         else:
             api = self._get_api()
             api.delete_meal_plan(int(order_id))
+        self._clear_status(order_id)
 
     def clear_orders(
         self, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None
@@ -291,20 +306,64 @@ class OrderService:
         api = self._get_api()
         for order in tandoor_orders:
             api.delete_meal_plan(order["meal_plan_id"])
+            self._clear_status(str(order["id"]))
+
+        # Clear all status entries for server orders too
+        with self._lock:
+            self._order_status.clear()
 
         return len(tandoor_orders) + server_count
 
-    def subscribe(self) -> asyncio.Queue[Dict[str, Any]]:
-        """Create a new SSE subscriber queue."""
-        q: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+    # ---- Order Status Tracking ----
+
+    def update_status(self, order_id: str, status: str) -> None:
+        """Set order status and notify customer subscribers."""
         with self._lock:
-            self._subscribers.append(q)
+            self._order_status[order_id] = status
+        self._notify_customer_subscribers({"order_id": order_id, "status": status})
+
+    def get_status(self, order_id: str) -> str:
+        """Get order status. Returns 'received' if not explicitly set."""
+        with self._lock:
+            return self._order_status.get(order_id, "received")
+
+    def _set_initial_status(self, order_id: str) -> None:
+        """Set initial 'received' status for a new order."""
+        with self._lock:
+            self._order_status[order_id] = "received"
+
+    def _clear_status(self, order_id: str) -> None:
+        """Remove status entry for a deleted order."""
+        with self._lock:
+            self._order_status.pop(order_id, None)
+
+    def subscribe_customer(self) -> asyncio.Queue:
+        """Create a new customer SSE subscriber queue."""
+        q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        with self._customer_sub_lock:
+            self._customer_subscribers.append(q)
         return q
 
-    def unsubscribe(self, q: asyncio.Queue[Dict[str, Any]]) -> None:
-        """Remove subscriber queue."""
-        with self._lock, contextlib.suppress(ValueError):
-            self._subscribers.remove(q)
+    def unsubscribe_customer(self, q: asyncio.Queue) -> None:
+        """Remove customer subscriber queue."""
+        with self._customer_sub_lock, contextlib.suppress(ValueError):
+            self._customer_subscribers.remove(q)
+
+    def _notify_customer_subscribers(self, event: Dict[str, Any]) -> None:
+        """Push event to all customer SSE subscribers."""
+        with self._customer_sub_lock:
+            subscribers = list(self._customer_subscribers)
+        dead: List[asyncio.Queue] = []
+        for q in subscribers:
+            try:
+                q.put_nowait(event)
+            except asyncio.QueueFull:
+                dead.append(q)
+        if dead:
+            with self._customer_sub_lock:
+                for q in dead:
+                    with contextlib.suppress(ValueError):
+                        self._customer_subscribers.remove(q)
 
     @staticmethod
     def _build_timestamp(from_date: str, note: str) -> str:
@@ -339,19 +398,3 @@ class OrderService:
         if at_pos <= len("Ordered by "):
             return None
         return note[len("Ordered by ") : at_pos]
-
-    def _notify(self, order: Dict[str, Any]) -> None:
-        """Push order to all subscribers (non-blocking)."""
-        with self._lock:
-            subscribers = list(self._subscribers)
-        dead: List[asyncio.Queue[Dict[str, Any]]] = []
-        for q in subscribers:
-            try:
-                q.put_nowait(order)
-            except asyncio.QueueFull:
-                dead.append(q)
-        if dead:
-            with self._lock:
-                for q in dead:
-                    with contextlib.suppress(ValueError):
-                        self._subscribers.remove(q)

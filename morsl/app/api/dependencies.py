@@ -56,10 +56,16 @@ def revoke_admin_tokens() -> None:
 
 
 def _cleanup_expired_tokens() -> None:
-    """Prune tokens beyond the max size. Call while holding _admin_tokens_lock."""
+    """Prune expired and excess tokens. Call while holding _admin_tokens_lock."""
+    now = time.time()
+    # Remove tokens older than the maximum possible TTL (5 minutes)
+    max_ttl = max(PIN_IMMEDIATE_GRACE_SECONDS, 300)
+    expired = [tok for tok, created in _admin_tokens.items() if now - created > max_ttl]
+    for tok in expired:
+        del _admin_tokens[tok]
+    # Also enforce size limit
     if len(_admin_tokens) <= ADMIN_TOKEN_CACHE_MAXSIZE:
         return
-    # Remove oldest tokens to get back under the limit
     sorted_tokens = sorted(_admin_tokens.items(), key=lambda x: x[1])
     excess = len(_admin_tokens) - ADMIN_TOKEN_CACHE_MAXSIZE
     for tok, _ in sorted_tokens[:excess]:
@@ -216,6 +222,21 @@ def get_weekly_generation_service(
 
 def get_logger(settings: Settings = Depends(get_settings)) -> Logger:
     return setup_logging(log=settings.log_level, log_to_stdout=settings.log_to_stdout)
+
+
+def get_provider(
+    settings: Settings = Depends(get_settings),
+    settings_svc: SettingsService = Depends(get_settings_service),
+    logger: Logger = Depends(get_logger),
+):
+    """Build a TandoorProvider from current credentials."""
+    from morsl.constants import API_CACHE_TTL_MINUTES
+    from morsl.providers.tandoor import TandoorProvider
+    from morsl.tandoor_api import TandoorAPI
+
+    url, token = resolve_credentials(settings, settings_svc)
+    api = TandoorAPI(url, token, logger, cache=API_CACHE_TTL_MINUTES)
+    return TandoorProvider(api)
 
 
 def get_credentials(

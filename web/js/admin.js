@@ -379,6 +379,12 @@ function adminApp() {
                     this.loadCustomFilters(),
                 ]);
                 this.adminReady = true;
+                // Hash-based tab activation (e.g., /admin#weekly)
+                const tabTiers = { generate: 'essential', profiles: 'essential', weekly: 'essential', settings: 'essential', orders: 'advanced', branding: 'advanced' };
+                const hash = window.location.hash.replace('#', '');
+                if (hash && tabTiers[hash] && this.tierVisible(tabTiers[hash])) {
+                    this.activeTab = hash;
+                }
             } catch (e) {
                 if (e.name === 'AbortError') return; // 401 triggered abort
                 throw e;
@@ -1133,7 +1139,12 @@ function adminApp() {
         // Toggle between soft and hard constraint
         toggleConstraintSoft(c) {
             c.soft = !c.soft;
-            if (!c.soft) delete c.soft;  // Remove if false to keep JSON clean
+            if (c.soft) {
+                c.weight = c.weight || 10;
+            } else {
+                delete c.soft;
+                delete c.weight;
+            }
         },
 
         // Sync UI date fields (date_direction, date_days) to backend fields (within_days, older_than_days)
@@ -1274,6 +1285,79 @@ function adminApp() {
         // Auto-generate a label for a constraint based on its settings
         autoGenerateLabel(c) {
             return this.getConstraintSummary(c);
+        },
+
+        // Human-readable description of a constraint (friendlier than getConstraintSummary)
+        describeConstraint(c) {
+            if (!c) return '';
+            const type = c.type;
+            const items = c.items || [];
+            const names = items.slice(0, 4).map(i => this.getItemDisplayName(i, type));
+            const nameStr = names.join(', ') + (items.length > 4 ? ` +${items.length - 4} more` : '');
+            const count = c.count || 0;
+            const op = c.operator || '>=';
+
+            if (type === 'keyword' || type === 'food' || type === 'book') {
+                const typeLabel = type === 'keyword' ? 'keywords' : type === 'food' ? 'foods' : 'books';
+                if (c.exclude) {
+                    return items.length ? `Exclude ${typeLabel}: ${nameStr}` : `Exclude ${typeLabel}`;
+                }
+                if (op === '==' && count === 0) {
+                    return items.length ? `Exclude ${typeLabel}: ${nameStr}` : `Exclude ${typeLabel}`;
+                }
+                if (op === '>=') return items.length ? `At least ${count} from: ${nameStr}` : `At least ${count} ${typeLabel}`;
+                if (op === '<=') return items.length ? `At most ${count} from: ${nameStr}` : `At most ${count} ${typeLabel}`;
+                if (op === '==') return items.length ? `Exactly ${count} from: ${nameStr}` : `Exactly ${count} ${typeLabel}`;
+            }
+            if (type === 'rating') {
+                const min = c.min !== undefined ? c.min : 0;
+                if (min > 0) return `Rating ${min}+ stars`;
+                return `Rating filter`;
+            }
+            if (type === 'cookedon') {
+                const days = c.date_days ?? c.within_days ?? c.older_than_days ?? 30;
+                const dir = c.date_direction ?? (c.older_than_days !== undefined ? 'older' : 'within');
+                if (c.exclude || (op === '==' && count === 0)) return `Avoid recipes cooked in last ${days} days`;
+                if (dir === 'older') return `${count}+ not cooked in ${days} days`;
+                return `${count}+ cooked within last ${days} days`;
+            }
+            if (type === 'createdon') {
+                const days = c.date_days ?? c.within_days ?? c.older_than_days ?? 30;
+                const dir = c.date_direction ?? (c.older_than_days !== undefined ? 'older' : 'within');
+                if (dir === 'within') return `Include ${count}+ recipes added in last ${days} days`;
+                return `${count}+ recipes added over ${days} days ago`;
+            }
+            if (type === 'makenow') return `At least ${count} with on-hand ingredients`;
+            return this.getConstraintSummary(c);
+        },
+
+        // Quick-add constraint presets matching wizard page concepts
+        quickAddConstraint(preset) {
+            const presets = {
+                'theme-keywords':    { type: 'keyword', operator: '>=', count: 1, items: [], label: 'Theme' },
+                'avoid-keywords':    { type: 'keyword', operator: '==', count: 0, exclude: true, items: [], label: 'Avoid' },
+                'include-foods':     { type: 'food', operator: '>=', count: 1, items: [], label: 'Include Foods' },
+                'avoid-foods':       { type: 'food', operator: '==', count: 0, exclude: true, items: [], label: 'Avoid Foods' },
+                'from-books':        { type: 'book', operator: '>=', count: 1, items: [], label: 'From Books' },
+                'min-rating':        { type: 'rating', operator: '>=', count: 1, min: 4, label: 'Min Rating' },
+                'avoid-recent':      { type: 'cookedon', operator: '==', count: 0, exclude: true, within_days: 14, date_direction: 'within', date_days: 14, label: 'Avoid Recent' },
+                'include-new':       { type: 'createdon', operator: '>=', count: 1, within_days: 30, date_direction: 'within', date_days: 30, label: 'Include New' },
+            };
+            const c = presets[preset];
+            if (!c) return;
+            const newConstraint = { ...c };
+
+            // Insert in type-grouped position
+            const lastOfType = this.profileEditor.constraints.reduce((last, x, i) => x.type === c.type ? i : last, -1);
+            if (lastOfType >= 0) {
+                this.profileEditor.constraints.splice(lastOfType + 1, 0, newConstraint);
+                this.expandedConstraint = lastOfType + 1;
+            } else {
+                this.profileEditor.constraints.push(newConstraint);
+                this.expandedConstraint = this.profileEditor.constraints.length - 1;
+            }
+            this.collapsedGroups[c.type] = false;
+            this.showAddConstraintMenu = false;
         },
 
         // Add an item (keyword/food/book) to a constraint's items array
@@ -1682,8 +1766,8 @@ function adminApp() {
         clearOrders() {
             this.confirmModal = {
                 show: true,
-                title: 'Clear All Orders?',
-                message: 'This will remove all orders from the queue. This cannot be undone.',
+                title: 'Clear All Requests?',
+                message: 'This will remove all requests from the queue. This cannot be undone.',
                 confirmText: 'Clear All',
                 onConfirm: async () => {
                     try {
@@ -1693,6 +1777,18 @@ function adminApp() {
                     } catch (e) { /* silent */ }
                 },
             };
+        },
+
+        async markOrderReady(order) {
+            try {
+                await this.adminFetch(`/api/orders/${order.id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'ready' }),
+                });
+            } catch (e) {
+                console.warn('Failed to mark order ready:', e);
+            }
         },
 
         async deleteOrder(order) {

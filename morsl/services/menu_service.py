@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
+from morsl.constants import DEFAULT_CHOICES, DEFAULT_PANTRY_WEIGHT, DEFAULT_SOFT_WEIGHT
 from morsl.models import (
     Book,
     Food,
@@ -15,8 +16,11 @@ from morsl.models import (
     make_recipe,
 )
 from morsl.solver import RecipePicker
-from morsl.tandoor_api import TandoorAPI, TandoorError
+from morsl.tandoor_api import TandoorError
 from morsl.utils import format_date
+
+if TYPE_CHECKING:
+    from morsl.providers.base import RecipeProvider
 
 
 def _build_rating_condition(c: Dict[str, Any]):
@@ -65,9 +69,16 @@ class MenuService:
 
     Accepts plain Python types so both CLI and API can use it.
     Uses v2 profile format with unified constraints array.
+
+    Operates against a ``RecipeProvider`` — not a specific recipe app's API.
     """
 
-    def __init__(self, url: str, token: str, config: Dict[str, Any], logger: Logger) -> None:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        logger: Logger,
+        provider: RecipeProvider,
+    ) -> None:
         self.logger = logger
         self.config = config
         self.include_children: bool = config.get("include_children", True)
@@ -75,11 +86,12 @@ class MenuService:
         self.min_choices: Optional[int] = (
             int(config["min_choices"]) if config.get("min_choices") else None
         )
-        self.cache: int = int(config.get("cache", API_CACHE_TTL_MINUTES))
 
-        self.tandoor = TandoorAPI(url, token, self.logger, cache=self.cache)
+        self.provider = provider
         self.recipes: List[Recipe] = []
         self.recipe_picker: Optional[RecipePicker] = None
+        self.pantry: bool = bool(config.get("pantry", False))
+        self.pantry_weight: int = int(config.get("pantry_weight", DEFAULT_PANTRY_WEIGHT))
 
         # Parse unified constraints array (v2 format)
         self.constraints: List[Dict[str, Any]] = self._parse_constraints(
@@ -124,26 +136,54 @@ class MenuService:
         return parsed
 
     def prepare_recipes(self) -> None:
-        """Load recipe pool from Tandoor API."""
+        """Load recipe pool from provider."""
         recipes_param = self.config.get("recipes")
         filters_param = self.config.get("filters", [])
         plan_type = self.config.get("plan_type", [])
 
         if not recipes_param and not filters_param and not plan_type:
-            for r in self.tandoor.get_recipes(all_recipes=True):
+            for r in self.provider.get_recipes(all_recipes=True):
                 self.recipes.append(make_recipe(r))
         else:
-            for r in self.tandoor.get_recipes(params=recipes_param, filters=filters_param):
+            for r in self.provider.get_recipes(params=recipes_param, filters=filters_param):
                 self.recipes.append(make_recipe(r))
             mp_date = self.config.get("mp_date")
-            for r in self.tandoor.get_mealplan_recipes(
+            for r in self.provider.get_mealplan_recipes(
                 mealtype_id=plan_type, date=mp_date, params=recipes_param
             ):
                 self.recipes.append(make_recipe(r))
-        self.recipes = list(set(self.recipes))
+        self.recipes = list(dict.fromkeys(self.recipes))
+        self._recipe_set = frozenset(self.recipes)
+
+    def _inject_pantry_constraint(self) -> None:
+        """Auto-add a soft makenow constraint when pantry mode is enabled."""
+        from morsl.providers.base import Capability
+
+        if not self.pantry:
+            return
+        if not (self.provider.capabilities() & Capability.ONHAND):
+            self.logger.info("Provider does not support ONHAND — skipping pantry constraint")
+            return
+
+        # Check if user already has a makenow constraint
+        has_makenow = any(c.get("type") == "makenow" for c in self.constraints)
+        if has_makenow:
+            return
+
+        self.constraints.append(
+            {
+                "type": "makenow",
+                "count": 1,
+                "operator": ">=",
+                "soft": True,
+                "weight": self.pantry_weight,
+                "label": "pantry",
+            }
+        )
 
     def prepare_constraints(self) -> None:
-        """Prepare all constraints by fetching related data from API."""
+        """Prepare all constraints by fetching related data from provider."""
+        self._inject_pantry_constraint()
         for constraint in self.constraints:
             ctype = constraint.get("type")
 
@@ -158,37 +198,61 @@ class MenuService:
             # rating, cookedon, createdon don't need API prep
 
     def _prepare_keyword_constraint(self, constraint: Dict[str, Any]) -> None:
-        """Fetch keyword tree and resolve to Keyword objects."""
+        """Fetch tag tree and resolve to Keyword objects."""
         item_ids = constraint.get("item_ids", [])
         include_children = constraint.get("include_children", self.include_children)
 
         kw_tree: List[Dict[str, Any]] = []
-        for kw_id in item_ids:
-            if include_children:
-                kw_tree += self.tandoor.get_keyword_tree(kw_id)
-            else:
-                kw_tree.append(self.tandoor.get_keyword(kw_id))
+        if len(item_ids) <= 1:
+            for kw_id in item_ids:
+                if include_children:
+                    kw_tree += self.provider.get_tag_tree(kw_id)
+                else:
+                    kw_tree.append(self.provider.get_tag(kw_id))
+        else:
+            fetch = self.provider.get_tag_tree if include_children else self.provider.get_tag
+            with ThreadPoolExecutor(max_workers=len(item_ids)) as pool:
+                results = pool.map(fetch, item_ids)
+                for result in results:
+                    if isinstance(result, list):
+                        kw_tree += result
+                    else:
+                        kw_tree.append(result)
 
         constraint["keywords"] = list({make_keyword(k) for k in kw_tree})
 
     def _prepare_food_constraint(self, constraint: Dict[str, Any]) -> None:
-        """Fetch food data and find matching recipes."""
+        """Fetch ingredient data and find matching recipes."""
         item_ids = constraint.get("item_ids", [])
         except_ids = constraint.get("except_ids", [])
 
         # Fetch Food objects for logging — skip items that fail
         food_list: List[Food] = []
-        for fd_id in item_ids:
-            try:
-                food_list.append(make_food(self.tandoor.get_food(fd_id)))
-            except TandoorError:
-                self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+        if len(item_ids) <= 1:
+            for fd_id in item_ids:
+                try:
+                    food_list.append(make_food(self.provider.get_ingredient(fd_id)))
+                except TandoorError:
+                    self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+        else:
+
+            def _fetch_food(fd_id):
+                try:
+                    return make_food(self.provider.get_ingredient(fd_id))
+                except TandoorError:
+                    self.logger.warning(f"Failed to fetch food {fd_id}, skipping")
+                    return None
+
+            with ThreadPoolExecutor(max_workers=len(item_ids)) as pool:
+                for food in pool.map(_fetch_food, item_ids):
+                    if food is not None:
+                        food_list.append(food)
         constraint["foods"] = food_list
 
         # Find recipes with these foods
         params: Dict[str, List[int]] = {"foods_or": item_ids, "foods_or_not": except_ids}
         found_recipes: List[Recipe] = []
-        for r in self.tandoor.get_recipes(params=params):
+        for r in self.provider.get_recipes(params=params):
             found_recipes.append(make_recipe(r))
 
         self.logger.info(
@@ -198,17 +262,17 @@ class MenuService:
         constraint["matching_recipes"] = _apply_date_filters(found_recipes, constraint)
 
     def _prepare_book_constraint(self, constraint: Dict[str, Any]) -> None:
-        """Fetch book data and find matching recipes."""
+        """Fetch collection data and find matching recipes."""
         item_ids = constraint.get("item_ids", [])
 
         book_list: List[Book] = []
         for bk_id in item_ids:
-            book_list.append(make_book(self.tandoor.get_book(bk_id)))
+            book_list.append(make_book(self.provider.get_collection(bk_id)))
         constraint["books"] = book_list
 
         found_recipes: List[Recipe] = []
         for bk in book_list:
-            for r in self.tandoor.get_book_recipes(bk):
+            for r in self.provider.get_collection_recipes(bk):
                 found_recipes.append(make_recipe(r))
 
         constraint["matching_recipes"] = _apply_date_filters(found_recipes, constraint)
@@ -218,9 +282,25 @@ class MenuService:
         self.prepare_recipes()
         self.prepare_constraints()
 
+    def _build_constraint_label(self, c) -> str:
+        """Build a human-readable label for a constraint."""
+        ctype = c.get("type", "constraint")
+        items = c.get("items", [])
+        if items:
+            names = [i.get("name", f"#{i.get('id', '?')}") for i in items[:3]]
+            item_str = ",".join(names)
+            if len(items) > 3:
+                item_str += f"+{len(items) - 3}"
+            return f"{ctype}:{item_str}"
+        label = c.get("label", "")
+        if label:
+            return f"{ctype}:{label}"
+        return ctype
+
     def _apply_keyword_constraint(self, c, exclude, weight) -> None:
         found = Recipe.recipes_with_keyword(self.recipes, c.get("keywords", []))
         found = _apply_date_filters(found, c)
+        label = self._build_constraint_label(c)
         self.recipe_picker.add_keyword_constraint(
             found,
             c["count"],
@@ -228,9 +308,11 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def _apply_food_constraint(self, c, exclude, weight) -> None:
+        label = self._build_constraint_label(c)
         self.recipe_picker.add_food_constraint(
             c.get("matching_recipes", []),
             c["count"],
@@ -238,9 +320,11 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def _apply_book_constraint(self, c, exclude, weight) -> None:
+        label = self._build_constraint_label(c)
         self.recipe_picker.add_book_constraint(
             c.get("matching_recipes", []),
             c["count"],
@@ -248,17 +332,19 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def _prepare_makenow_constraint(self, constraint: Dict[str, Any]) -> None:
         """Fetch recipes that can be made with on-hand ingredients."""
-        recipes = self.tandoor.get_recipes(params={"makenow": True})
+        recipes = self.provider.get_recipes(params={"makenow": True})
         found = [make_recipe(r) for r in recipes]
-        found = [r for r in found if r in self.recipes]
+        found = [r for r in found if r in self._recipe_set]
         found = _apply_date_filters(found, constraint)
         constraint["matching_recipes"] = found
 
     def _apply_makenow_constraint(self, c, exclude, weight) -> None:
+        label = self._build_constraint_label(c)
         self.recipe_picker.add_book_constraint(
             c.get("matching_recipes", []),
             c["count"],
@@ -266,12 +352,14 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def _apply_rating_constraint(self, c, exclude, weight) -> None:
         found = _apply_date_filters(list(self.recipes), c)
         rating_condition = _build_rating_condition(c)
         found = Recipe.recipes_with_rating(found, rating_condition)
+        label = self._build_constraint_label(c)
         self.recipe_picker.add_rating_constraints(
             found,
             c["count"],
@@ -279,11 +367,13 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def _apply_date_constraint(self, c, date_field, exclude, weight) -> None:
         found = _resolve_date_recipes(self.recipes, c, date_field)
         found = _apply_date_filters(found, c)
+        label = self._build_constraint_label(c)
         adder = (
             self.recipe_picker.add_cookedon_constraints
             if date_field == "cookedon"
@@ -296,6 +386,7 @@ class MenuService:
             exclude=exclude,
             weight=weight,
             upper_bound=c.get("upper_bound"),
+            label=label,
         )
 
     def select_recipes(self) -> SolverResult:
@@ -316,7 +407,7 @@ class MenuService:
             ctype = c.get("type")
             exclude = c.get("exclude", False)
             soft = c.get("soft", False)
-            weight = 1 if soft else int(c.get("weight", 0))
+            weight = int(c.get("weight", DEFAULT_SOFT_WEIGHT)) if soft else int(c.get("weight", 0))
 
             if ctype in handlers:
                 handlers[ctype](c, exclude, weight)

@@ -5,19 +5,28 @@ from __future__ import annotations
 import random
 from concurrent.futures import ThreadPoolExecutor
 from logging import Logger
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
-from morsl.tandoor_api import TandoorAPI, TandoorError
+from morsl.tandoor_api import TandoorError
+
+if TYPE_CHECKING:
+    from morsl.providers.base import RecipeProvider
+
+# Module-level shared pools — avoids recreating threads on every generation
+# Separate pools prevent contention: detail fetches submit food-substitute
+# lookups back to _food_pool, so they never compete for threads.
+_detail_pool = ThreadPoolExecutor(max_workers=10)
+_food_pool = ThreadPoolExecutor(max_workers=20)
 
 
-def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
+def _resolve_food(provider: RecipeProvider, food_obj: dict, logger: Logger) -> dict:
     """Resolve on-hand food substitution for a single ingredient."""
     if food_obj.get("food_onhand"):
         return food_obj
     try:
-        subs = api.get_food_substitutes(food_obj["id"], substitute="food")
+        subs = provider.get_ingredient_substitutes(food_obj["id"], substitute_type="food")
         if subs:
-            return api.get_food(random.choice(subs)["id"])
+            return provider.get_ingredient(random.choice(subs)["id"])
     except (KeyError, IndexError, TypeError) as e:
         logger.debug("Substitute lookup failed for food %s: %s", food_obj.get("id"), e)
     except OSError as e:  # RequestException inherits IOError/OSError
@@ -27,25 +36,49 @@ def _resolve_food(api: TandoorAPI, food_obj: dict, logger: Logger) -> dict:
     return food_obj
 
 
+def _batch_resolve_foods(
+    provider: RecipeProvider, food_objs: list[dict], logger: Logger
+) -> list[dict]:
+    """Resolve substitutions for a batch of foods using the shared thread pool.
+
+    Parallelises the per-ingredient substitute lookups that were previously
+    sequential within each recipe.
+    """
+    # Split into on-hand (no lookup needed) and off-hand (need substitute check)
+    indexed: list[tuple[int, dict]] = []
+    results: list[dict] = list(food_objs)  # shallow copy — positions preserved
+    for i, food in enumerate(food_objs):
+        if not food.get("food_onhand"):
+            indexed.append((i, food))
+
+    if not indexed:
+        return results
+
+    def _resolve(item: tuple[int, dict]) -> tuple[int, dict]:
+        _, food = item
+        return item[0], _resolve_food(provider, food, logger)
+
+    futures = _food_pool.map(_resolve, indexed)
+    for idx, resolved in futures:
+        results[idx] = resolved
+
+    return results
+
+
 def _extract_steps_and_ingredients(
-    api: TandoorAPI, details: dict, logger: Logger
+    provider: RecipeProvider, details: dict, logger: Logger
 ) -> tuple[list, list]:
-    """Extract ingredients and steps from a Tandoor recipe details response."""
-    ingredients = []
+    """Extract ingredients and steps from a recipe details response."""
+    raw_foods: list[dict] = []
+    raw_ings: list[dict] = []
     steps = []
     for step in details.get("steps", []):
         for ing in step.get("ingredients", []):
             food_obj = ing.get("food")
             if not food_obj or not food_obj.get("name"):
                 continue
-            food_obj = _resolve_food(api, food_obj, logger)
-            ingredients.append(
-                {
-                    "amount": ing.get("amount"),
-                    "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
-                    "food": food_obj["name"],
-                }
-            )
+            raw_foods.append(food_obj)
+            raw_ings.append(ing)
         instruction = step.get("instruction", "").strip()
         if instruction:
             steps.append(
@@ -56,17 +89,30 @@ def _extract_steps_and_ingredients(
                     "order": step.get("order", 0),
                 }
             )
+
+    # Batch-resolve all food substitutions for this recipe
+    resolved_foods = _batch_resolve_foods(provider, raw_foods, logger)
+
+    ingredients = []
+    for ing, food_obj in zip(raw_ings, resolved_foods, strict=True):
+        ingredients.append(
+            {
+                "amount": ing.get("amount"),
+                "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
+                "food": food_obj["name"],
+            }
+        )
     return ingredients, steps
 
 
 def fetch_recipe_details(
-    api: TandoorAPI,
+    provider: RecipeProvider,
     recipes: tuple | list,
     logger: Logger,
 ) -> List[Dict[str, Any]]:
     """Fetch full details (image, ingredients, steps) for a list of Recipe objects.
 
-    Uses a thread pool for parallel API calls. Each recipe gets on-hand
+    Uses a shared thread pool for parallel API calls. Each recipe gets on-hand
     food substitution when available.
     """
 
@@ -87,8 +133,9 @@ def fetch_recipe_details(
             "cooking_time": None,
         }
         try:
-            details = api.get_recipe_details(r.id)
-            recipe_data["image"] = details.get("image")
+            details = provider.get_recipe_details(r.id)
+            img = details.get("image")
+            recipe_data["image"] = img.get("file_url") if isinstance(img, dict) else img
             recipe_data["working_time"] = details.get("working_time")
             recipe_data["cooking_time"] = details.get("cooking_time")
             detail_kws = details.get("keywords", [])
@@ -97,11 +144,10 @@ def fetch_recipe_details(
                     {"id": kw["id"], "name": kw.get("name", "")} for kw in detail_kws
                 ]
             recipe_data["ingredients"], recipe_data["steps"] = _extract_steps_and_ingredients(
-                api, details, logger
+                provider, details, logger
             )
         except (TandoorError, KeyError, ValueError) as e:
             logger.warning("Failed to fetch details for recipe %s: %s", r.id, e)
         return recipe_data
 
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        return list(pool.map(_fetch_one, recipes))
+    return list(_detail_pool.map(_fetch_one, recipes))

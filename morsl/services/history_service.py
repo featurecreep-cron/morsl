@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -8,7 +7,7 @@ from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 from morsl.constants import MAX_HISTORY_ENTRIES
-from morsl.utils import atomic_write_json
+from morsl.utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +109,10 @@ class HistoryService:
 
     def _load(self) -> None:
         path = os.path.join(self.data_dir, "generation_history.json")
-        if os.path.isfile(path):
-            try:
-                with open(path) as f:
-                    data = json.load(f)
-                if isinstance(data, list):
-                    self._entries = data[: self.MAX_ENTRIES]
-                else:
-                    self._entries = []
-            except (json.JSONDecodeError, OSError):
+        data = read_json(path)
+        if isinstance(data, list):
+            self._entries = data[: self.MAX_ENTRIES]
+        else:
+            if data is not None:
                 logger.warning("Corrupt generation_history.json — starting fresh")
-                self._entries = []
+            self._entries = []
