@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useProfilesStore } from '@/stores/profiles'
 import { useTheme } from '@/composables/useTheme'
+import { preloadCustomIcons } from '@/utils/icons'
 
 const settings = useSettingsStore()
 const profiles = useProfilesStore()
@@ -11,7 +12,7 @@ const profiles = useProfilesStore()
 useTheme()
 
 onMounted(async () => {
-  await Promise.all([settings.load(), profiles.load()])
+  await Promise.all([settings.load(), profiles.load(), preloadCustomIcons()])
 })
 </script>
 

@@ -682,6 +682,20 @@ export function getCustomIconKeys(): string[] {
   return Object.keys(_customIconCache)
 }
 
+/** Preload all custom icons from the server into the cache. Call on app startup. */
+export async function preloadCustomIcons(): Promise<void> {
+  try {
+    const res = await fetch('/api/custom-icons/all')
+    if (!res.ok) return
+    const svgMap: Record<string, string> = await res.json()
+    for (const [key, svg] of Object.entries(svgMap)) {
+      registerCustomIcon(key, svg)
+    }
+  } catch {
+    // Custom icons not available — non-fatal
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Returns array of all icon key strings (built-in + custom) */
