@@ -1,0 +1,67 @@
+/* ========================================
+   Cobalt Theme
+   Ultra-dark background, electric blue accents,
+   high contrast tech aesthetic.
+   Inspired by Bootswatch Cyborg.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #060606;
+    --color-scheme: dark;
+    --bg-image: radial-gradient(ellipse at top, rgba(42, 159, 214, 0.04), transparent);
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(173, 175, 174, 0.95);
+    --text-muted: rgba(173, 175, 174, 0.68);
+    --accent-color: #2a9fd6;
+    --accent-color-dim: rgba(42, 159, 214, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(42, 159, 214, 0.08);
+    --card-border: 1px solid rgba(42, 159, 214, 0.18);
+    --card-radius: 0.75rem;
+    --card-hover-shadow: 0 4px 24px rgba(42, 159, 214, 0.15);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: rgba(42, 159, 214, 0.80);
+    --btn-border: rgba(42, 159, 214, 0.35);
+    --btn-active-bg: rgba(42, 159, 214, 0.12);
+    --btn-active-text: #2a9fd6;
+    --btn-active-border: #2a9fd6;
+
+    /* Modal */
+    --modal-bg: #111111;
+    --modal-border: 1px solid rgba(42, 159, 214, 0.22);
+    --divider-color: rgba(42, 159, 214, 0.10);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(42, 159, 214, 0.18);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.03);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --overlay-bg: rgba(0, 0, 0, 0.75);
+    --focus-ring: 0 0 0 2px rgba(42, 159, 214, 0.30);
+    --input-bg: rgba(255, 255, 255, 0.04);
+
+    /* Misc */
+    --star-color: #2a9fd6;
+    --logo-filter: invert(1) sepia(0.2) saturate(3) hue-rotate(180deg) brightness(1.0);
+    --warning-bg: rgba(42, 159, 214, 0.12);
+    --warning-text: #2a9fd6;
+
+    /* Theme Family: Glass */
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    --card-backdrop: blur(10px);
+    --btn-radius: 1.5rem;
+    --modal-radius: 1rem;
+    --heading-letter-spacing: normal;
+}

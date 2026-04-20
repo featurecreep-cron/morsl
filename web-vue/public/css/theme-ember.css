@@ -1,0 +1,66 @@
+/* ========================================
+   Ember Theme
+   Deep dark background, warm amber-orange accents,
+   smoldering warmth with rich depth.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #0f0a08;
+    --color-scheme: dark;
+    --bg-image: none;
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(240, 225, 210, 0.90);
+    --text-muted: rgba(240, 225, 210, 0.52);
+    --accent-color: #e07840;
+    --accent-color-dim: rgba(224, 120, 64, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(224, 120, 64, 0.05);
+    --card-border: 1px solid rgba(224, 120, 64, 0.18);
+    --card-radius: 0.25rem;
+    --card-hover-shadow: 0 4px 24px rgba(224, 120, 64, 0.14);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: rgba(224, 120, 64, 0.82);
+    --btn-border: rgba(224, 120, 64, 0.35);
+    --btn-active-bg: rgba(224, 120, 64, 0.12);
+    --btn-active-text: #e07840;
+    --btn-active-border: #e07840;
+
+    /* Modal */
+    --modal-bg: #1a1210;
+    --modal-border: 1px solid rgba(224, 120, 64, 0.22);
+    --divider-color: rgba(224, 120, 64, 0.10);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(224, 120, 64, 0.16);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --overlay-bg: rgba(0, 0, 0, 0.72);
+    --focus-ring: 0 0 0 2px rgba(224, 120, 64, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.04);
+
+    /* Misc */
+    --star-color: #e07840;
+    --logo-filter: invert(1) sepia(0.4) saturate(2) hue-rotate(340deg) brightness(1.0);
+    --warning-bg: rgba(224, 120, 64, 0.14);
+    --warning-text: #e07840;
+
+    /* Theme Family: Material */
+    --card-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.12);
+    --card-backdrop: none;
+    --btn-radius: 0.25rem;
+    --modal-radius: 0.5rem;
+    --heading-letter-spacing: 0.08em;
+}

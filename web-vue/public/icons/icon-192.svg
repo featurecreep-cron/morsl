@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2ba5a"/>
+      <stop offset="100%" stop-color="#b8922e"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="192" height="192" rx="24" fill="#0d0d0d"/>
+  <!-- Glass outline: trapezoid, wider at top, rounded bottom -->
+  <path fill="none" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"
+        d="M42 34 h108 l-21 118 a12 12 0 0 1-12 10 h-42 a12 12 0 0 1-12-10 Z"/>
+  <!-- Liquid fill -->
+  <path fill="url(#gold)" opacity="0.35"
+        d="M58 96 l-9.5 56 a12 12 0 0 0 12 10 h42 a12 12 0 0 0 12-10 l-9.5-56 Z"/>
+  <!-- Ice cube (tilted rectangle) -->
+  <rect fill="url(#gold)" x="73" y="66" width="54" height="38" rx="4"
+        transform="rotate(-20, 100, 85)"/>
+</svg>

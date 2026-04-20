@@ -1,0 +1,66 @@
+/* ========================================
+   Espresso Theme
+   Deep navy background, ice blue accents,
+   cool elegance with modern sans-serif.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #0a0e1a;
+    --color-scheme: dark;
+    --bg-image: radial-gradient(ellipse at top, rgba(126, 200, 227, 0.04), transparent);
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(255, 255, 255, 0.90);
+    --text-muted: rgba(255, 255, 255, 0.45);
+    --accent-color: #7ec8e3;
+    --accent-color-dim: rgba(126, 200, 227, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(126, 200, 227, 0.08);
+    --card-border: 1px solid rgba(126, 200, 227, 0.15);
+    --card-radius: 0.75rem;
+    --card-hover-shadow: 0 4px 24px rgba(126, 200, 227, 0.12);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: rgba(126, 200, 227, 0.75);
+    --btn-border: rgba(126, 200, 227, 0.35);
+    --btn-active-bg: rgba(126, 200, 227, 0.12);
+    --btn-active-text: #7ec8e3;
+    --btn-active-border: #7ec8e3;
+
+    /* Modal */
+    --modal-bg: #0f1525;
+    --modal-border: 1px solid rgba(126, 200, 227, 0.20);
+    --divider-color: rgba(126, 200, 227, 0.10);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(126, 200, 227, 0.15);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --overlay-bg: rgba(0, 0, 0, 0.7);
+    --focus-ring: 0 0 0 2px rgba(126, 200, 227, 0.25);
+    --input-bg: rgba(255, 255, 255, 0.05);
+
+    /* Misc */
+    --star-color: #7ec8e3;
+    --logo-filter: invert(1) sepia(0.1) saturate(3) hue-rotate(170deg) brightness(1.1);
+    --warning-bg: rgba(126, 200, 227, 0.12);
+    --warning-text: #7ec8e3;
+
+    /* Theme Family: Glass */
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    --card-backdrop: blur(10px);
+    --btn-radius: 1.5rem;
+    --modal-radius: 1rem;
+    --heading-letter-spacing: normal;
+}

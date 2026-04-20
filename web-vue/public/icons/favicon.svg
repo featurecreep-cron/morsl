@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <style>
+    rect { fill: #f0f0f0; }
+    @media (prefers-color-scheme: dark) { rect { fill: #1a1a1a; } }
+  </style>
+  <rect width="32" height="32" rx="6"/>
+  <image width="24" height="24" x="4" y="4" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABmJLR0QA/wD/AP+gvaeTAAABL0lEQVRIie3UvyuFURzH8ZefG5FBmaT8BcqOUUaD1SQDg0EZLOqO/gMZZJAU401Gpqsom0QyUsRAflzDedTt9tx7jptF3XedznA+z+fz/Z5znkOT/0ILZnGGT7zhCBN/Zb6JMo6xigIu8YX5Ro07MF1hvlK13oldvGeBY78xHxC2o4wXFIVOqukROnnNtHtZcJRDPGKyhnE1nVgUzqcQEw9l1SykVFLFFu4ri2rNEQ1mc6mBgBL60FUv4CabRxsIGBU6eI4Ji3jCVKJxG5aEa7uW8kE/ToWzmEvQb2TaHeF6J9GOC+wnaG+xXcukFh9C68NYjgR0yz/PKA9C6ynjJM8glnqFA+Fe1xt3OM8zqLdFP/RgJKJJeh7yWJe+RTN5BrF3phXj6I3orjX25zfhG+SuS12hri9JAAAAAElFTkSuQmCC"/>
+</svg>

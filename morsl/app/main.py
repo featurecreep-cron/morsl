@@ -357,7 +357,7 @@ def _needs_setup() -> bool:
 def setup_page(request: Request) -> Response:
     if not _needs_setup() and "mode" not in request.query_params:
         return RedirectResponse(url="/admin")
-    return FileResponse("web/setup.html")
+    return FileResponse("web/index.html")
 
 
 @app.get("/admin")
@@ -365,7 +365,7 @@ def setup_page(request: Request) -> Response:
 def admin_page() -> Response:
     if _needs_setup():
         return RedirectResponse(url="/setup")
-    return FileResponse("web/admin.html")
+    return FileResponse("web/index.html")
 
 
 @app.get("/")
