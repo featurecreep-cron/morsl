@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import type { Recipe } from '@/types/api'
 import { useMenuStore } from '@/stores/menu'
 import { useSettingsStore } from '@/stores/settings'
 import { ratingStars, formatIngredient } from '@/utils/formatting'
-import { STOCK_ICON_SVG } from '@/utils/icons'
+import { getPlaceholderSvg } from '@/utils/icons'
 
 const props = defineProps<{
   recipe: Recipe
@@ -17,6 +17,19 @@ const stars = computed(() => ratingStars(props.recipe.rating))
 const hasImage = computed(() => !!props.recipe.image)
 const isOrdered = computed(() => menu.orderConfirm === props.recipe.id)
 const ingredients = computed(() => props.recipe.ingredients ?? [])
+const placeholderSvg = computed(() =>
+  getPlaceholderSvg(props.recipe, menu.activeProfile, menu.iconMappings, settings.logoUrl),
+)
+
+const ingredientsRef = ref<HTMLElement | null>(null)
+const ingredientsOverflow = ref(false)
+
+onMounted(() => {
+  nextTick(() => {
+    const el = ingredientsRef.value
+    if (el) ingredientsOverflow.value = el.scrollHeight > el.clientHeight
+  })
+})
 
 function onCardClick() {
   menu.openRecipe(props.recipe)
@@ -44,7 +57,7 @@ function onOrder(e: Event) {
     <!-- Image or placeholder -->
     <img v-if="hasImage" :src="recipe.image!" :alt="recipe.name" class="cocktail-image" loading="lazy">
     <!-- eslint-disable-next-line vue/no-v-html -->
-    <div v-else class="cocktail-placeholder" v-html="STOCK_ICON_SVG" />
+    <div v-else class="cocktail-placeholder" v-html="placeholderSvg" />
 
     <!-- Header -->
     <div class="cocktail-header">
@@ -55,7 +68,9 @@ function onOrder(e: Event) {
     </div>
 
     <!-- Inline ingredients -->
-    <div v-if="ingredients.length > 0" class="cocktail-ingredients-section">
+    <div v-if="ingredients.length > 0" ref="ingredientsRef"
+         class="cocktail-ingredients-section"
+         :class="{ 'ingredients-overflow': ingredientsOverflow }">
       <ul class="ingredient-inline">
         <li v-for="(ing, idx) in ingredients" :key="idx">
           {{ formatIngredient(ing) }}
@@ -169,6 +184,9 @@ function onOrder(e: Event) {
   width: 100%;
   max-height: 40vh;
   overflow: hidden;
+}
+
+.cocktail-ingredients-section.ingredients-overflow {
   mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
