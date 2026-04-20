@@ -1,7 +1,7 @@
 <template>
-  <button class="nav-hamburger" v-show="admin.adminReady" @click="admin.navOpen = !admin.navOpen" aria-label="Navigation menu">&#9776;</button>
+  <button ref="hamburgerBtn" class="nav-hamburger" v-show="admin.adminReady" @click="admin.navOpen = !admin.navOpen" aria-label="Navigation menu">&#9776;</button>
   <Transition name="nav-fade">
-    <div class="nav-menu" v-show="admin.adminReady && admin.navOpen" role="menu" v-click-outside="() => admin.navOpen = false">
+    <div class="nav-menu" v-show="admin.adminReady && admin.navOpen" role="menu" v-click-outside="closeNav">
       <a href="/" class="nav-menu-item" role="menuitem">Menu</a>
       <a href="/docs" class="nav-menu-item" role="menuitem">API Docs</a>
       <span class="nav-menu-version" v-show="admin.appVersion">{{ admin.appVersion }}</span>
@@ -46,16 +46,25 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 
 const admin = useAdminStore()
+const hamburgerBtn = ref<HTMLElement | null>(null)
+
+function closeNav(e: Event) {
+  // Don't close if the click was on the hamburger button (it toggles via its own handler)
+  if (hamburgerBtn.value?.contains(e.target as Node)) return
+  admin.navOpen = false
+}
 
 const vClickOutside = {
-  mounted(el: HTMLElement, binding: { value: () => void }) {
-    (el as HTMLElement & { _clickOutside: (e: Event) => void })._clickOutside = (e: Event) => {
-      if (!el.contains(e.target as Node)) binding.value()
+  mounted(el: HTMLElement, binding: { value: (e: Event) => void }) {
+    const handler = (e: Event) => {
+      if (!el.contains(e.target as Node)) binding.value(e)
     }
-    document.addEventListener('click', (el as HTMLElement & { _clickOutside: (e: Event) => void })._clickOutside)
+    ;(el as HTMLElement & { _clickOutside: (e: Event) => void })._clickOutside = handler
+    document.addEventListener('click', handler)
   },
   unmounted(el: HTMLElement) {
     document.removeEventListener('click', (el as HTMLElement & { _clickOutside: (e: Event) => void })._clickOutside)
