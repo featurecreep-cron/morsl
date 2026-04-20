@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import '@/assets/admin.css'
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref, provide } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import AdminHeader from '@/components/admin/AdminHeader.vue'
 import GenerateTab from '@/components/admin/GenerateTab.vue'
@@ -15,8 +15,12 @@ import TemplateDrawer from '@/components/admin/TemplateDrawer.vue'
 import AdminConfirmModal from '@/components/admin/AdminConfirmModal.vue'
 import AdminRecipeModal from '@/components/admin/AdminRecipeModal.vue'
 import AdminToasts from '@/components/admin/AdminToasts.vue'
+import IconPicker from '@/components/admin/IconPicker.vue'
 
 const admin = useAdminStore()
+
+const iconPickerRef = ref<InstanceType<typeof IconPicker> | null>(null)
+provide('iconPickerRef', iconPickerRef)
 
 onMounted(() => {
   admin.init()
@@ -143,6 +147,7 @@ function focusPrevTab(e: KeyboardEvent) {
     <!-- Drawers & Modals -->
     <ProfileDrawer />
     <TemplateDrawer />
+    <IconPicker ref="iconPickerRef" />
     <AdminConfirmModal />
     <AdminRecipeModal />
     <AdminToasts />

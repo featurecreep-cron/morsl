@@ -28,6 +28,7 @@ export const CONST = {
   LS_MENU_SHELVES: 'menu-shelves',
   LS_ACTIVE_DECK: 'menu-active-deck',
   LS_RECENT_NAMES: 'recentNames',
+  LS_DISCOVER_GENS: 'menu-discover-generations',
 
   // sessionStorage keys
   SS_ADMIN_TOKEN: 'admin-token',

@@ -3,7 +3,7 @@ import type { Category, ProfileSummary } from '@/types/api'
 import { useMenuStore } from '@/stores/menu'
 import { useProfilesStore } from '@/stores/profiles'
 import { useSettingsStore } from '@/stores/settings'
-import { getBrandIcon, STOCK_ICON_SVG } from '@/utils/icons'
+import { getBrandIcon, getIconByKey } from '@/utils/icons'
 
 const menu = useMenuStore()
 const profilesStore = useProfilesStore()
@@ -11,18 +11,17 @@ const settings = useSettingsStore()
 
 function getProfileIcon(profile: ProfileSummary): string {
   if (profile.icon) {
-    // Named icons would come from the icons.js library; use brand as fallback
-    return getBrandIcon(settings.logoUrl)
+    return getIconByKey(profile.icon)
   }
   return getBrandIcon(settings.logoUrl)
 }
 
 function getCategoryIcon(category: Category): string {
   if (category.icon === 'logo') return getBrandIcon(settings.logoUrl)
-  if (category.icon) return STOCK_ICON_SVG
+  if (category.icon) return getIconByKey(category.icon)
   const profiles = profilesStore.categorizedProfiles[category.id] || []
   if (profiles.length > 0 && profiles[0].icon) {
-    return STOCK_ICON_SVG
+    return getIconByKey(profiles[0].icon)
   }
   return getBrandIcon(settings.logoUrl)
 }

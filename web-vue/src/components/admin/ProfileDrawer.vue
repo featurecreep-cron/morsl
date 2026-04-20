@@ -135,26 +135,24 @@
 </template>
 
 <script setup lang="ts">
+import { inject } from 'vue'
 import ToggleSetting from '@/components/shared/ToggleSetting.vue'
 import ConstraintEditor from '@/components/admin/ConstraintEditor.vue'
 import { useAdminStore } from '@/stores/admin'
-import { STOCK_ICON_SVG } from '@/utils/icons'
+import { getIconByKey } from '@/utils/icons'
+import type { IconPickerExposed } from '@/types/api'
 
 const admin = useAdminStore()
 
+const iconPickerRef = inject<{ value: IconPickerExposed | null }>('iconPickerRef')
+
 function resolveIconHtml(key: string): string {
   if (!key) return ''
-  if (key.startsWith('custom:')) {
-    return `<img src="/api/icons/${encodeURIComponent(key)}" style="width:100%;height:100%;object-fit:contain" alt="${key}">`
-  }
-  return STOCK_ICON_SVG
+  return getIconByKey(key)
 }
 
 function pickProfileIcon() {
-  const w = window as unknown as { iconPicker?: { show: (current: string, cb: (k: string) => void) => void } }
-  if (w.iconPicker) {
-    w.iconPicker.show(admin.profileEditor.icon || '', (k: string) => { admin.profileEditor.icon = k })
-  }
+  iconPickerRef?.value?.show(admin.profileEditor.icon || '', (k: string) => { admin.profileEditor.icon = k })
 }
 
 function onFilterAdd(event: Event) {

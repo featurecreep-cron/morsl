@@ -97,28 +97,23 @@
 </template>
 
 <script setup lang="ts">
+import { inject } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { itemNounText } from '@/utils/formatting'
-import { STOCK_ICON_SVG } from '@/utils/icons'
+import { STOCK_ICON_SVG, getIconByKey } from '@/utils/icons'
+import type { IconPickerExposed } from '@/types/api'
 
 const admin = useAdminStore()
 const stockIconSvg = STOCK_ICON_SVG
 
+const iconPickerRef = inject<{ value: IconPickerExposed | null }>('iconPickerRef')
+
 function resolveIconHtml(key: string): string {
   if (!key) return ''
-  // Custom icons start with "custom:" — render as img from API
-  if (key.startsWith('custom:')) {
-    return `<img src="/api/icons/${encodeURIComponent(key)}" style="width:100%;height:100%;object-fit:contain" alt="${key}">`
-  }
-  // Built-in icons — use stock SVG as fallback
-  return STOCK_ICON_SVG
+  return getIconByKey(key)
 }
 
 function pickCategoryIcon() {
-  // Icon picker integration — calls the global icon picker if available
-  const w = window as unknown as { iconPicker?: { show: (current: string, cb: (k: string) => void) => void } }
-  if (w.iconPicker) {
-    w.iconPicker.show(admin.categoryForm.icon, (k: string) => { admin.categoryForm.icon = k })
-  }
+  iconPickerRef?.value?.show(admin.categoryForm.icon, (k: string) => { admin.categoryForm.icon = k })
 }
 </script>

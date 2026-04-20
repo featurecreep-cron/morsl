@@ -7,6 +7,8 @@ import type {
   PendingOrder,
 } from '@/types/api'
 import { CONST } from '@/constants'
+import { useProfilesStore } from '@/stores/profiles'
+import { useSettingsStore } from '@/stores/settings'
 
 export const useMenuStore = defineStore('menu', () => {
   // Application state
@@ -40,6 +42,9 @@ export const useMenuStore = defineStore('menu', () => {
 
   // Polling handles
   let _statusPollId: ReturnType<typeof setInterval> | null = null
+
+  // Customer order SSE
+  let _customerSSE: EventSource | null = null
 
   // Recipe modal
   const selectedRecipe = ref<Recipe | null>(null)
@@ -373,6 +378,28 @@ export const useMenuStore = defineStore('menu', () => {
     categoryPanelOpen.value = categoryPanelOpen.value === id ? null : id
   }
 
+  function discover() {
+    const profilesStore = useProfilesStore()
+    const settingsStore = useSettingsStore()
+    const available = profilesStore.visibleProfiles
+    if (available.length === 0) return
+
+    // Check discover generation limit
+    const maxGens = settingsStore.settings?.max_discover_generations ?? CONST.DEFAULT_MAX_DISCOVER_GENS
+    try {
+      const count = parseInt(localStorage.getItem(CONST.LS_DISCOVER_GENS) || '0', 10)
+      if (count >= maxGens) return
+      localStorage.setItem(CONST.LS_DISCOVER_GENS, String(count + 1))
+    } catch {
+      // ignore localStorage errors
+    }
+
+    const pick = available.find(p => p.is_default || p.default)
+      || available[Math.floor(Math.random() * available.length)]
+    _targetShelf.value = pick.name
+    generate(pick.name)
+  }
+
   // ---- Shelf Management ----
 
   function addShelf(name: string, recipeList: Recipe[], genAt?: string) {
@@ -570,6 +597,7 @@ export const useMenuStore = defineStore('menu', () => {
         const order = (await res.json()) as { id: number }
         pendingOrder.value = { id: order.id, recipe_name: recipe.name, status: 'received' }
         orderConfirm.value = recipe.id
+        _connectCustomerSSE(order.id)
         return order.id
       }
     } catch (e) {
@@ -578,9 +606,42 @@ export const useMenuStore = defineStore('menu', () => {
     return null
   }
 
+  function _connectCustomerSSE(orderId: number) {
+    if (_customerSSE) _customerSSE.close()
+    const es = new EventSource(`/api/orders/customer-stream?order_id=${orderId}`)
+    _customerSSE = es
+    es.addEventListener('status_update', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { order_id: number; status: string }
+        if (data.order_id === orderId && pendingOrder.value) {
+          pendingOrder.value = { ...pendingOrder.value, status: data.status }
+          if (data.status === 'ready') {
+            const settingsStore = useSettingsStore()
+            const toastMs = settingsStore.toastSeconds * 1000
+            setTimeout(() => {
+              pendingOrder.value = null
+              orderConfirm.value = null
+              es.close()
+              _customerSSE = null
+            }, toastMs * 3)
+          }
+        }
+      } catch {
+        // ignore malformed events
+      }
+    })
+    es.onerror = () => {
+      // Reconnect handled by browser EventSource
+    }
+  }
+
   function dismissPendingOrder() {
     pendingOrder.value = null
     orderConfirm.value = null
+    if (_customerSSE) {
+      _customerSSE.close()
+      _customerSSE = null
+    }
   }
 
   // ---- Meal Plan ----
@@ -722,6 +783,13 @@ export const useMenuStore = defineStore('menu', () => {
     }
   }
 
+  function cleanupCustomerSSE() {
+    if (_customerSSE) {
+      _customerSSE.close()
+      _customerSSE = null
+    }
+  }
+
   // ---- Init helpers ----
 
   function restorePreviousRecipes() {
@@ -794,6 +862,7 @@ export const useMenuStore = defineStore('menu', () => {
     retryGeneration,
     selectCategory,
     toggleCategoryPanel,
+    discover,
     addShelf,
     removeShelf,
     activateDeck,
@@ -812,6 +881,7 @@ export const useMenuStore = defineStore('menu', () => {
     submitKioskPin,
     debouncedLoadMenu,
     stopStatusPolling,
+    cleanupCustomerSSE,
 
     // SSE handlers
     handleSSEGenerating,

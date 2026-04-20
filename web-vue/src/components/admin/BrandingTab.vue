@@ -258,14 +258,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, inject } from 'vue'
 import BrandingImageField from '@/components/admin/BrandingImageField.vue'
 import ToggleSetting from '@/components/shared/ToggleSetting.vue'
 import SearchDropdown from '@/components/shared/SearchDropdown.vue'
 import { useAdminStore } from '@/stores/admin'
 import { STOCK_ICON_SVG } from '@/utils/icons'
+import type { IconPickerExposed } from '@/types/api'
 
 const admin = useAdminStore()
+
+const iconPickerRef = inject<{ value: IconPickerExposed | null }>('iconPickerRef')
 
 // WiFi QR local state
 const wifiSsid = ref(String(admin.settings.qr_wifi_ssid || ''))
@@ -295,11 +298,10 @@ function resolveIconHtml(key: string): string {
 
 // Icon picker bridge
 function pickIcon(current: string, cb: (k: string) => void) {
-  const w = window as unknown as { iconPicker?: { show: (current: string, cb: (k: string) => void) => void } }
-  if (w.iconPicker) w.iconPicker.show(current, cb)
+  iconPickerRef?.value?.show(current, cb)
 }
 
-// Custom icons management (bridges to global iconPicker)
+// Custom icons management (via IconPicker component)
 interface CustomIconEntry {
   key: string
   editing: boolean
@@ -309,8 +311,8 @@ interface CustomIconEntry {
 const customIcons = ref<CustomIconEntry[]>([])
 
 function refreshCustomIcons() {
-  const w = window as unknown as { iconPicker?: { customIcons?: Array<{ key: string }> } }
-  customIcons.value = (w.iconPicker?.customIcons || []).map(i => reactive({
+  const icons = iconPickerRef?.value?.getCustomIcons?.() || []
+  customIcons.value = icons.map((i: { key: string }) => reactive({
     key: i.key,
     editing: false,
     newName: '',
@@ -320,28 +322,25 @@ function refreshCustomIcons() {
 // Refresh on mount
 refreshCustomIcons()
 
-function uploadCustomIcon(event: Event) {
-  const w = window as unknown as { iconPicker?: { uploadIcon: (e: Event) => void } }
-  if (w.iconPicker) {
-    w.iconPicker.uploadIcon(event)
-    setTimeout(refreshCustomIcons, 500)
+async function uploadCustomIcon(event: Event) {
+  if (iconPickerRef?.value) {
+    await iconPickerRef.value.uploadCustomIcon(event)
+    refreshCustomIcons()
   }
 }
 
-function renameIcon(icon: CustomIconEntry) {
-  const w = window as unknown as { iconPicker?: { renameCustomIcon: (key: string, name: string) => void } }
-  if (w.iconPicker) {
-    w.iconPicker.renameCustomIcon(icon.key, icon.newName)
+async function renameIcon(icon: CustomIconEntry) {
+  if (iconPickerRef?.value) {
+    await iconPickerRef.value.renameCustomIcon(icon.key, icon.newName)
     icon.editing = false
-    setTimeout(refreshCustomIcons, 300)
+    refreshCustomIcons()
   }
 }
 
-function deleteIcon(key: string) {
-  const w = window as unknown as { iconPicker?: { deleteCustomIcon: (key: string) => void } }
-  if (w.iconPicker) {
-    w.iconPicker.deleteCustomIcon(key)
-    setTimeout(refreshCustomIcons, 300)
+async function deleteIcon(key: string) {
+  if (iconPickerRef?.value) {
+    await iconPickerRef.value.deleteCustomIcon(key)
+    refreshCustomIcons()
   }
 }
 </script>

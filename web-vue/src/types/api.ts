@@ -468,3 +468,15 @@ export interface CustomFilter {
   id: number
   name: string
 }
+
+/** Public API exposed by the IconPicker component via defineExpose. */
+export interface IconPickerExposed {
+  show: (currentValue: string, onSelect: (key: string) => void) => void
+  close: () => void
+  renameCustomIcon: (key: string, newName: string) => Promise<{ key: string } | null>
+  deleteCustomIcon: (key: string) => Promise<void>
+  uploadCustomIcon: (event: Event) => Promise<void>
+  loadCustomIcons: () => Promise<void>
+  getCustomIcons: () => { key: string; name: string }[]
+  customIcons: { key: string; name: string }[]
+}
