@@ -29,7 +29,7 @@
             <p class="pin-gate-error" v-show="admin.pinError">{{ admin.pinError }}</p>
             <button type="submit" class="pin-gate-submit">Unlock</button>
           </form>
-          <button class="pin-gate-back" @click="window.location.href = '/'">Back to menu</button>
+          <button class="pin-gate-back" @click="navigateTo('/')">Back to menu</button>
         </div>
       </div>
     </Transition>
@@ -42,6 +42,8 @@ import { useAdminStore } from '@/stores/admin'
 
 const admin = useAdminStore()
 const pinGateInput = ref<HTMLInputElement | null>(null)
+
+function navigateTo(url: string) { window.location.href = url }
 
 function onPinInput() {
   if (admin.pinInput.length >= 4) admin.submitPin()

@@ -330,7 +330,7 @@ const sortedThemes = computed(() =>
 
 function startCredEdit() {
   admin.credEditing = true
-  admin.credUrl = admin.settings.tandoor_url || ''
+  admin.credUrl = String(admin.settings.tandoor_url || '')
   admin.credToken = ''
   admin.credTestResult = null
   admin.credError = ''

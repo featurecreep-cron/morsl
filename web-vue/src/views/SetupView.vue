@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useSetupStore } from '@/stores/setup'
 import { CONST } from '@/constants'
 import ProgressBar from '@/components/setup/ProgressBar.vue'
@@ -9,6 +9,8 @@ import ChipList from '@/components/setup/ChipList.vue'
 import NumberControl from '@/components/setup/NumberControl.vue'
 
 const store = useSetupStore()
+
+function navigateTo(url: string) { window.location.href = url }
 
 // Computed exclusion sets for search boxes
 const themeExcludeIds = computed(() => store.keywordExclusionSet())
@@ -208,7 +210,7 @@ onMounted(() => {
           <div class="setup-actions">
             <button
               class="setup-btn setup-btn-secondary"
-              @click="store.addProfileMode ? (window.location.href = '/admin') : (store.step = 1)"
+              @click="store.addProfileMode ? navigateTo('/admin') : (store.step = 1)"
             >
               Back
             </button>

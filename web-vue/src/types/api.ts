@@ -10,6 +10,7 @@ export interface Recipe {
   created_at: string
   ingredients?: Ingredient[]
   description?: string
+  steps?: Step[]
 }
 
 /** Current menu state from /api/menu. */

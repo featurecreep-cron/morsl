@@ -97,13 +97,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { itemNounText } from '@/utils/formatting'
 import { STOCK_ICON_SVG } from '@/utils/icons'
 
 const admin = useAdminStore()
-const categoryListRef = ref<HTMLElement | null>(null)
 const stockIconSvg = STOCK_ICON_SVG
 
 function resolveIconHtml(key: string): string {

@@ -267,14 +267,10 @@ import { STOCK_ICON_SVG } from '@/utils/icons'
 
 const admin = useAdminStore()
 
-// Template refs
-const qrMenuPreview = ref<HTMLElement | null>(null)
-const qrWifiPreview = ref<HTMLElement | null>(null)
-
 // WiFi QR local state
-const wifiSsid = ref(admin.settings.qr_wifi_ssid || '')
-const wifiPassword = ref(admin.settings.qr_wifi_password || '')
-const wifiEncryption = ref(admin.settings.qr_wifi_encryption || 'WPA')
+const wifiSsid = ref(String(admin.settings.qr_wifi_ssid || ''))
+const wifiPassword = ref(String(admin.settings.qr_wifi_password || ''))
+const wifiEncryption = ref(String(admin.settings.qr_wifi_encryption || 'WPA'))
 
 function saveWifi() {
   admin.saveWifiQr(wifiSsid.value, wifiPassword.value, wifiEncryption.value)

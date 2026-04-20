@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProfilesStore } from '@/stores/profiles'
-import type { ProfileSummary, Category } from '@/types/api'
+import type { ProfileSummary } from '@/types/api'
 
 function makeProfile(overrides: Partial<ProfileSummary> = {}): ProfileSummary {
   return {

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed } from 'vue'
 import { CONST } from '@/constants'
-import { THEME_REGISTRY, type ThemeEntry } from '@/theme-registry'
+import { THEME_REGISTRY } from '@/theme-registry'
 import type {
   AdminConstraint,
   AdminConstraintType,
@@ -27,7 +27,6 @@ import type {
   ScheduleForm,
   Template,
   TemplateEditorState,
-  TemplateSlot,
   WeeklyPlanDay,
   WeeklyStatus,
 } from '@/types/api'
@@ -397,7 +396,7 @@ export const useAdminStore = defineStore('admin', () => {
   let _mappingKwDebounceId: ReturnType<typeof setTimeout> | null = null
   let _mappingFoodDebounceId: ReturnType<typeof setTimeout> | null = null
   let _orderSSE: EventSource | null = null
-  let _sseRetryDelay = CONST.SSE_INITIAL_RETRY_MS
+  let _sseRetryDelay: number = CONST.SSE_INITIAL_RETRY_MS
 
   function destroy() {
     if (_statusPollId) { clearInterval(_statusPollId); _statusPollId = null }
@@ -673,9 +672,9 @@ export const useAdminStore = defineStore('admin', () => {
   function getConstraintLabel(type: string, condition: unknown[]): string {
     if (!Array.isArray(condition) || condition.length === 0) return 'Any'
     if (type === 'keyword') {
-      return condition.map((id: number) => keywordMap.value[id]?.name || `#${id}`).join(', ')
+      return condition.map((id) => keywordMap.value[id as number]?.name || `#${id}`).join(', ')
     } else if (type === 'food') {
-      return condition.map((id: number) => foodMap.value[id]?.name || `#${id}`).join(', ')
+      return condition.map((id) => foodMap.value[id as number]?.name || `#${id}`).join(', ')
     } else if (type === 'rating') {
       return condition.join(' - ')
     } else if (type === 'cookedon' || type === 'createdon') {
@@ -973,7 +972,7 @@ export const useAdminStore = defineStore('admin', () => {
       delete cleaned.label
       delete cleaned.date_mode
       if (c.type === 'cookedon' || c.type === 'createdon') {
-        syncDateFields(cleaned as AdminConstraint)
+        syncDateFields(cleaned as unknown as AdminConstraint)
       }
       delete cleaned.goal
       delete cleaned.date_direction
@@ -1103,11 +1102,11 @@ export const useAdminStore = defineStore('admin', () => {
     if (type === 'keyword' || type === 'food' || type === 'book') {
       newConstraint.items = []
     } else if (type === 'rating') {
-      (newConstraint as Record<string, unknown>).min_rating = 3
+      (newConstraint as unknown as Record<string, unknown>).min_rating = 3
     } else if (type === 'cookedon' || type === 'createdon') {
       newConstraint.date_direction = 'within'
       newConstraint.date_days = 30
-      ;(newConstraint as Record<string, unknown>).within_days = 30
+      ;(newConstraint as unknown as Record<string, unknown>).within_days = 30
     }
 
     const lastOfType = profileEditor.value.constraints.reduce(
@@ -1241,11 +1240,11 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function isConstraintSoft(c: AdminConstraint): boolean {
-    return (c as Record<string, unknown>).soft === true
+    return (c as unknown as Record<string, unknown>).soft === true
   }
 
   function toggleConstraintSoft(c: AdminConstraint) {
-    const record = c as Record<string, unknown>
+    const record = c as unknown as Record<string, unknown>
     record.soft = !record.soft
     if (record.soft) {
       c.weight = c.weight || 10
@@ -1256,7 +1255,7 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function syncDateFields(c: AdminConstraint) {
-    const record = c as Record<string, unknown>
+    const record = c as unknown as Record<string, unknown>
     if (c.date_direction === 'within') {
       record.within_days = c.date_days || 30
       delete record.older_than_days
@@ -1267,7 +1266,7 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function initDateFields(c: AdminConstraint) {
-    const record = c as Record<string, unknown>
+    const record = c as unknown as Record<string, unknown>
     if (record.older_than_days !== undefined) {
       c.date_direction = 'older'
       c.date_days = record.older_than_days as number
@@ -1307,13 +1306,13 @@ export const useAdminStore = defineStore('admin', () => {
       if (max < 5) return `${opLabel} ${c.count} rated up to ${max} stars`
       return `${opLabel} ${c.count} (any rating)`
     } else if (c.type === 'cookedon') {
-      const record = c as Record<string, unknown>
+      const record = c as unknown as Record<string, unknown>
       const days = c.date_days ?? (record.within_days as number) ?? (record.older_than_days as number) ?? 30
       const direction = c.date_direction ?? ((record.older_than_days !== undefined) ? 'older' : 'within')
       if (direction === 'older') return `${opLabel} ${c.count} made more than ${days} days ago`
       return `${opLabel} ${c.count} made within last ${days} days`
     } else if (c.type === 'createdon') {
-      const record = c as Record<string, unknown>
+      const record = c as unknown as Record<string, unknown>
       const days = c.date_days ?? (record.within_days as number) ?? (record.older_than_days as number) ?? 30
       const direction = c.date_direction ?? ((record.older_than_days !== undefined) ? 'older' : 'within')
       if (direction === 'older') return `${opLabel} ${c.count} added more than ${days} days ago`
@@ -1332,7 +1331,7 @@ export const useAdminStore = defineStore('admin', () => {
     const nameStr = names.join(', ') + (items.length > 4 ? ` +${items.length - 4} more` : '')
     const count = c.count || 0
     const op = c.operator || '>='
-    const record = c as Record<string, unknown>
+    const record = c as unknown as Record<string, unknown>
 
     if (type === 'keyword' || type === 'food' || type === 'book') {
       const typeLabel = type === 'keyword' ? 'keywords' : type === 'food' ? 'foods' : 'books'
