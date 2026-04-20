@@ -27,6 +27,8 @@ from morsl.app.api.dependencies import (
 )
 from morsl.app.api.routes import api_router
 from morsl.constants import GENERATION_SHUTDOWN_TIMEOUT, GZIP_MIN_SIZE, ICONS_DIR, UPLOADS_DIR
+from morsl.db import close_all as close_all_db
+from morsl.migrate_json_to_db import migrate as migrate_json_to_db
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +246,14 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
 
     _ensure_data_dirs(settings)
+
+    # Run JSON-to-SQLite migration (idempotent, non-destructive)
+    try:
+        if migrate_json_to_db(settings.data_dir):
+            logger.info("Migrated JSON data to SQLite")
+    except Exception:  # broad-except — non-fatal startup
+        logger.warning("JSON-to-SQLite migration failed (non-fatal)", exc_info=True)
+
     _generate_startup_icons(settings)
 
     try:
@@ -255,6 +265,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Server shutting down, cancelling background tasks...")
     await _shutdown_services(settings)
+    close_all_db()
     logger.info("Shutdown complete")
 
 

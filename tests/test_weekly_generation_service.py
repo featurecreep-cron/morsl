@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from morsl.services.generation_service import GenerationState
@@ -35,29 +33,29 @@ class TestPlanCRUD:
         assert weekly_service.get_plan("weeknight") is None
 
     def test_save_and_get_plan(self, weekly_service):
-        plan = {"template": "weeknight", "days": {}, "warnings": []}
+        plan = {"template": "weeknight", "days": {}, "warnings": [], "week_start": "2024-01-01"}
         weekly_service._save_plan("weeknight", plan)
         loaded = weekly_service.get_plan("weeknight")
         assert loaded["template"] == "weeknight"
 
-    def test_save_creates_directory(self, weekly_service):
-        weekly_service._save_plan("weeknight", {"template": "weeknight"})
-        assert os.path.isdir(weekly_service.plans_dir)
+    def test_save_creates_no_files(self, tmp_path, weekly_service):
+        """Plans are stored in DB, not as files."""
+        plan = {"template": "weeknight", "week_start": "2024-01-01"}
+        weekly_service._save_plan("weeknight", plan)
+        # No weekly_plans directory should be created
+        import os
 
-    def test_clear_plan_removes_file(self, weekly_service):
-        weekly_service._save_plan("weeknight", {"template": "weeknight"})
+        plans_dir = os.path.join(str(tmp_path), "weekly_plans")
+        assert not os.path.isdir(plans_dir)
+
+    def test_clear_plan_removes_entry(self, weekly_service):
+        plan = {"template": "weeknight", "week_start": "2024-01-01"}
+        weekly_service._save_plan("weeknight", plan)
         assert weekly_service.clear_plan("weeknight") is True
         assert weekly_service.get_plan("weeknight") is None
 
     def test_clear_plan_returns_false_when_missing(self, weekly_service):
         assert weekly_service.clear_plan("weeknight") is False
-
-    def test_get_plan_handles_corrupt_json(self, weekly_service, tmp_path):
-        os.makedirs(weekly_service.plans_dir, exist_ok=True)
-        plan_path = os.path.join(weekly_service.plans_dir, "weeknight.json")
-        with open(plan_path, "w") as f:
-            f.write("{invalid json")
-        assert weekly_service.get_plan("weeknight") is None
 
 
 class TestWeeklyStateTransitions:

@@ -32,6 +32,14 @@ web/icons/favicon.svg
 web/icons/favicon-*.png
 web/icons/apple-touch-icon.png
 
+# Frontend build
+web-vue/node_modules/
+web-vue/dist/
+web/assets/
+
+# SQLite databases
+data/*.db
+
 # IDE
 .vscode/
 .idea/

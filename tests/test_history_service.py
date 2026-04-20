@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from morsl.services.history_service import HistoryService
 
 
@@ -14,8 +12,8 @@ class TestHistoryService:
 
     def test_add_and_list(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))
-        svc.add_entry({"id": "a", "status": "ok"})
-        svc.add_entry({"id": "b", "status": "ok"})
+        svc.add_entry({"id": "a", "status": "ok", "profile": "test"})
+        svc.add_entry({"id": "b", "status": "ok", "profile": "test"})
         entries, total = svc.list_entries()
         assert total == 2
         assert entries[0]["id"] == "b"  # newest first
@@ -24,7 +22,7 @@ class TestHistoryService:
     def test_list_pagination(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))
         for i in range(10):
-            svc.add_entry({"id": str(i)})
+            svc.add_entry({"id": str(i), "profile": "test"})
         entries, total = svc.list_entries(limit=3, offset=2)
         assert total == 10
         assert len(entries) == 3
@@ -41,13 +39,13 @@ class TestHistoryService:
 
     def test_get_entry_not_found(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))
-        svc.add_entry({"id": "a"})
+        svc.add_entry({"id": "a", "profile": "test"})
         assert svc.get_entry("missing") is None
 
     def test_clear(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))
-        svc.add_entry({"id": "a"})
-        svc.add_entry({"id": "b"})
+        svc.add_entry({"id": "a", "profile": "test"})
+        svc.add_entry({"id": "b", "profile": "test"})
         svc.clear()
         entries, total = svc.list_entries()
         assert total == 0
@@ -55,7 +53,7 @@ class TestHistoryService:
 
     def test_persistence(self, tmp_path):
         svc1 = HistoryService(data_dir=str(tmp_path))
-        svc1.add_entry({"id": "persisted", "status": "ok"})
+        svc1.add_entry({"id": "persisted", "status": "ok", "profile": "test"})
 
         svc2 = HistoryService(data_dir=str(tmp_path))
         entries, total = svc2.list_entries()
@@ -65,21 +63,9 @@ class TestHistoryService:
     def test_max_entries_trimmed(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))
         for i in range(svc.MAX_ENTRIES + 10):
-            svc.add_entry({"id": str(i)})
+            svc.add_entry({"id": str(i), "profile": "test"})
         _, total = svc.list_entries(limit=9999)
         assert total == svc.MAX_ENTRIES
-
-    def test_load_corrupt_json(self, tmp_path):
-        (tmp_path / "generation_history.json").write_text("not json")
-        svc = HistoryService(data_dir=str(tmp_path))
-        _entries, total = svc.list_entries()
-        assert total == 0
-
-    def test_load_non_list_json(self, tmp_path):
-        (tmp_path / "generation_history.json").write_text(json.dumps({"not": "a list"}))
-        svc = HistoryService(data_dir=str(tmp_path))
-        _entries, total = svc.list_entries()
-        assert total == 0
 
     def test_analytics_empty(self, tmp_path):
         svc = HistoryService(data_dir=str(tmp_path))

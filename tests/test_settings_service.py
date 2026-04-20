@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
-
+from morsl.db import ensure_default_user, get_db
+from morsl.repositories.settings import SettingsRepository
 from morsl.services.settings_service import DEFAULTS, PUBLIC_KEYS, SettingsService
 
 
@@ -79,18 +79,24 @@ class TestSettingsService:
 
     def test_load_with_migrated_kiosk_pin(self, tmp_path):
         """Old kiosk_pin key should migrate to pin."""
-        (tmp_path / "settings.json").write_text(json.dumps({"kiosk_pin": "1234", "theme": "dark"}))
-        svc = SettingsService(data_dir=str(tmp_path))
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = SettingsRepository(conn)
+        repo.set(1, "kiosk_pin", "1234")
+        repo.set(1, "theme", "dark")
+        svc = SettingsService(repo=repo)
         settings = svc.get_all()
         assert settings["pin"] == "1234"
         assert settings["theme"] == "dark"
 
     def test_new_defaults_on_upgrade(self, tmp_path):
-        """Settings file from older version missing new keys gets defaults."""
-        (tmp_path / "settings.json").write_text(
-            json.dumps({"theme": "custom", "ratings_enabled": False})
-        )
-        svc = SettingsService(data_dir=str(tmp_path))
+        """Stored settings missing new keys get defaults."""
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = SettingsRepository(conn)
+        repo.set(1, "theme", "custom")
+        repo.set(1, "ratings_enabled", False)
+        svc = SettingsService(repo=repo)
         settings = svc.get_all()
         assert settings["theme"] == "custom"
         assert settings["ratings_enabled"] is False
@@ -98,8 +104,11 @@ class TestSettingsService:
         assert settings["qr_show_on_menu"] is False
 
     def test_migrate_default_profile(self, tmp_path):
-        (tmp_path / "settings.json").write_text(json.dumps({"default_profile": "cocktails"}))
-        svc = SettingsService(data_dir=str(tmp_path))
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = SettingsRepository(conn)
+        repo.set(1, "default_profile", "cocktails")
+        svc = SettingsService(repo=repo)
 
         class FakeConfigService:
             def __init__(self):

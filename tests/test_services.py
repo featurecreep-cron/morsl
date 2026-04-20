@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -812,30 +811,36 @@ class TestDateFilterFunctions:
 
 
 class TestConfigService:
+    def _make_svc(self, tmp_path):
+        """Create a ConfigService backed by a temp SQLite DB."""
+        from morsl.db import ensure_default_user, get_db
+        from morsl.repositories.profile import ProfileRepository
+
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = ProfileRepository(conn)
+        return ConfigService(repo=repo), repo
+
     def test_load_profile(self, tmp_path):
-        """Test loading a v2 JSON profile."""
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(
-            json.dumps({"cache": 120, "choices": 3, "constraints": []})
-        )
-        (profiles_dir / "test.json").write_text(
-            json.dumps(
-                {
-                    "choices": 7,
-                    "constraints": [
-                        {
-                            "type": "keyword",
-                            "items": [{"id": 1, "name": "Test"}],
-                            "count": 7,
-                            "operator": "==",
-                        }
-                    ],
-                }
-            )
+        """Test loading a profile with base merging."""
+        svc, repo = self._make_svc(tmp_path)
+        repo.create(1, "base", {"cache": 120, "choices": 3, "constraints": []})
+        repo.create(
+            1,
+            "test",
+            {
+                "choices": 7,
+                "constraints": [
+                    {
+                        "type": "keyword",
+                        "items": [{"id": 1, "name": "Test"}],
+                        "count": 7,
+                        "operator": "==",
+                    }
+                ],
+            },
         )
 
-        svc = ConfigService(profiles_dir=str(profiles_dir))
         config = svc.load_profile("test")
         assert config["choices"] == 7
         assert config["cache"] == 120  # inherited from base
@@ -843,94 +848,82 @@ class TestConfigService:
 
     def test_load_profile_no_base(self, tmp_path):
         """Test loading profile without a base."""
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "solo.json").write_text(json.dumps({"choices": 4}))
+        svc, repo = self._make_svc(tmp_path)
+        repo.create(1, "solo", {"choices": 4})
 
-        svc = ConfigService(profiles_dir=str(profiles_dir))
         config = svc.load_profile("solo")
         assert config["choices"] == 4
 
     def test_load_profile_missing(self, tmp_path):
-        svc = ConfigService(profiles_dir=str(tmp_path))
+        svc, _ = self._make_svc(tmp_path)
         with pytest.raises(FileNotFoundError, match="Profile not found"):
             svc.load_profile("nonexistent")
 
     def test_list_profiles(self, tmp_path):
         """Test listing profiles shows constraint count."""
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(json.dumps({"choices": 5}))
-        (profiles_dir / "weekday.json").write_text(
-            json.dumps(
-                {
-                    "choices": 5,
-                    "constraints": [
-                        {"type": "keyword", "items": [], "count": 1, "operator": ">="}
-                    ],
-                }
-            )
+        svc, repo = self._make_svc(tmp_path)
+        repo.create(1, "base", {"choices": 5})
+        repo.create(
+            1,
+            "weekday",
+            {
+                "choices": 5,
+                "constraints": [{"type": "keyword", "items": [], "count": 1, "operator": ">="}],
+            },
         )
-        (profiles_dir / "weekend.json").write_text(json.dumps({"choices": 3, "constraints": []}))
+        repo.create(1, "weekend", {"choices": 3, "constraints": []})
 
-        svc = ConfigService(profiles_dir=str(profiles_dir))
         profiles = svc.list_profiles()
         assert len(profiles) == 2
         names = [p.name for p in profiles]
         assert "weekday" in names
         assert "weekend" in names
-        # base.json should not appear
+        # base should not appear
         assert "base" not in names
 
         # Check constraint count
         weekday = next(p for p in profiles if p.name == "weekday")
         assert weekday.constraint_count == 1
 
-    def test_list_profiles_empty_dir(self, tmp_path):
-        svc = ConfigService(profiles_dir=str(tmp_path))
-        assert svc.list_profiles() == []
-
-    def test_list_profiles_nonexistent_dir(self):
-        svc = ConfigService(profiles_dir="/nonexistent")
+    def test_list_profiles_empty(self, tmp_path):
+        svc, _ = self._make_svc(tmp_path)
         assert svc.list_profiles() == []
 
     def test_profile_constraints_concatenated(self, tmp_path):
         """Test that constraints from base and profile are concatenated."""
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(
-            json.dumps(
-                {
-                    "cache": API_CACHE_TTL_MINUTES,
-                    "choices": 5,
-                    "constraints": [
-                        {
-                            "type": "keyword",
-                            "items": [{"id": 1, "name": "Base KW"}],
-                            "count": 1,
-                            "operator": ">=",
-                        }
-                    ],
-                }
-            )
+        svc, repo = self._make_svc(tmp_path)
+        repo.create(
+            1,
+            "base",
+            {
+                "cache": API_CACHE_TTL_MINUTES,
+                "choices": 5,
+                "constraints": [
+                    {
+                        "type": "keyword",
+                        "items": [{"id": 1, "name": "Base KW"}],
+                        "count": 1,
+                        "operator": ">=",
+                    }
+                ],
+            },
         )
-        (profiles_dir / "custom.json").write_text(
-            json.dumps(
-                {
-                    "choices": 3,
-                    "constraints": [
-                        {
-                            "type": "food",
-                            "items": [{"id": 10, "name": "Whiskey"}],
-                            "count": 2,
-                            "operator": ">=",
-                        }
-                    ],
-                }
-            )
+        repo.create(
+            1,
+            "custom",
+            {
+                "choices": 3,
+                "constraints": [
+                    {
+                        "type": "food",
+                        "items": [{"id": 10, "name": "Whiskey"}],
+                        "count": 2,
+                        "operator": ">=",
+                    }
+                ],
+            },
         )
 
-        svc = ConfigService(profiles_dir=str(profiles_dir))
         config = svc.load_profile("custom")
         # choices overridden, constraints concatenated
         assert config["choices"] == 3
@@ -939,62 +932,48 @@ class TestConfigService:
         assert config["constraints"][1]["type"] == "food"
 
     def test_create_profile(self, tmp_path):
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        svc = ConfigService(profiles_dir=str(profiles_dir))
-
+        svc, _ = self._make_svc(tmp_path)
         result = svc.create_profile("new_profile", {"choices": 7, "description": "Fresh"})
         assert result["choices"] == 7
-        assert (profiles_dir / "new_profile.json").is_file()
 
     def test_create_profile_duplicate_raises(self, tmp_path):
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "existing.json").write_text('{"choices": 5}')
-
-        svc = ConfigService(profiles_dir=str(profiles_dir))
+        svc, _ = self._make_svc(tmp_path)
+        svc.create_profile("existing", {"choices": 5})
         with pytest.raises(FileExistsError):
             svc.create_profile("existing", {"choices": 5})
 
     def test_update_profile(self, tmp_path):
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "editable.json").write_text('{"choices": 5}')
-
-        svc = ConfigService(profiles_dir=str(profiles_dir))
+        svc, _ = self._make_svc(tmp_path)
+        svc.create_profile("editable", {"choices": 5})
         result = svc.update_profile("editable", {"choices": 12})
         assert result["choices"] == 12
 
-        saved = json.loads((profiles_dir / "editable.json").read_text())
-        assert saved["choices"] == 12
+        # Verify persisted
+        loaded = svc.load_profile("editable")
+        assert loaded["choices"] == 12
 
     def test_update_profile_not_found(self, tmp_path):
-        svc = ConfigService(profiles_dir=str(tmp_path))
+        svc, _ = self._make_svc(tmp_path)
         with pytest.raises(FileNotFoundError):
             svc.update_profile("ghost", {"choices": 5})
 
     def test_delete_profile(self, tmp_path):
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "doomed.json").write_text('{"choices": 5}')
-
-        svc = ConfigService(profiles_dir=str(profiles_dir))
+        svc, _ = self._make_svc(tmp_path)
+        svc.create_profile("doomed", {"choices": 5})
         svc.delete_profile("doomed")
-        assert not (profiles_dir / "doomed.json").is_file()
+        assert svc.list_profiles() == []
 
     def test_delete_profile_not_found(self, tmp_path):
-        svc = ConfigService(profiles_dir=str(tmp_path))
+        svc, _ = self._make_svc(tmp_path)
         with pytest.raises(FileNotFoundError):
             svc.delete_profile("ghost")
 
     def test_get_profile_raw(self, tmp_path):
         """Test getting raw profile without base merge."""
-        profiles_dir = tmp_path / "profiles"
-        profiles_dir.mkdir()
-        (profiles_dir / "base.json").write_text(json.dumps({"cache": 300, "choices": 5}))
-        (profiles_dir / "child.json").write_text(json.dumps({"choices": 8}))
+        svc, repo = self._make_svc(tmp_path)
+        repo.create(1, "base", {"cache": 300, "choices": 5})
+        repo.create(1, "child", {"choices": 8})
 
-        svc = ConfigService(profiles_dir=str(profiles_dir))
         raw = svc.get_profile_raw("child")
         assert raw["choices"] == 8
         assert "cache" not in raw  # Not merged with base
@@ -1011,7 +990,7 @@ class TestConfigService:
     )
     def test_path_traversal_blocked(self, tmp_path, name):
         """Profile names with path separators or leading dots are rejected."""
-        svc = ConfigService(profiles_dir=str(tmp_path))
+        svc, _ = self._make_svc(tmp_path)
         with pytest.raises(ValueError, match="Invalid profile name"):
             svc.get_profile_raw(name)
         with pytest.raises(ValueError, match="Invalid profile name"):
@@ -1163,21 +1142,27 @@ class TestGenerationService:
         svc = GenerationService(data_dir=str(tmp_path))
         assert svc.get_current_menu() is None
 
-    def test_get_current_menu_from_file(self, tmp_path):
-        menu_data = {"recipes": [{"id": 1, "name": "Test"}], "generated_at": "2024-01-01T00:00:00"}
-        (tmp_path / "current_menu.json").write_text(json.dumps(menu_data))
+    def test_get_current_menu_from_db(self, tmp_path):
+        from morsl.db import ensure_default_user, get_db
+        from morsl.repositories.menu import MenuRepository
+
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = MenuRepository(conn)
+        repo.save_current(1, "test", [{"id": 1, "name": "Test"}], "2024-01-01T00:00:00")
 
         svc = GenerationService(data_dir=str(tmp_path))
         result = svc.get_current_menu()
         assert result is not None
         assert len(result["recipes"]) == 1
 
-    def test_save_menu_atomic(self, tmp_path):
+    def test_save_menu_persists(self, tmp_path):
         svc = GenerationService(data_dir=str(tmp_path))
         menu_data = {"recipes": [], "generated_at": "2024-01-01T00:00:00"}
         svc._save_menu(menu_data)
 
-        saved = json.loads((tmp_path / "current_menu.json").read_text())
+        # Verify via the cached menu
+        saved = svc.get_current_menu()
         assert saved["generated_at"] == "2024-01-01T00:00:00"
 
     def test_start_generation_returns_request_id(self, mock_logger, tmp_path):
@@ -1227,15 +1212,20 @@ class TestGenerationService:
                 loop.close()
 
     def test_clear_menu(self, tmp_path):
-        menu_data = {"recipes": [{"id": 1, "name": "Test"}]}
-        (tmp_path / "current_menu.json").write_text(json.dumps(menu_data))
+        from morsl.db import ensure_default_user, get_db
+        from morsl.repositories.menu import MenuRepository
+
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = MenuRepository(conn)
+        repo.save_current(1, "test", [{"id": 1, "name": "Test"}], "2024-01-01")
+
         svc = GenerationService(data_dir=str(tmp_path))
         assert svc.get_current_menu() is not None
 
         result = svc.clear_menu()
         assert result is True
         assert svc.get_current_menu() is None
-        assert not (tmp_path / "current_menu.json").exists()
 
     def test_clear_menu_nothing_to_clear(self, tmp_path):
         svc = GenerationService(data_dir=str(tmp_path))
@@ -1305,10 +1295,8 @@ class TestGenerationService:
     def test_cleanup_stale_temp_files(self, tmp_path):
         """Stale .tmp files are removed on init."""
         (tmp_path / "menu.tmp").write_text("stale")
-        (tmp_path / "current_menu.json").write_text('{"recipes": []}')
         GenerationService(data_dir=str(tmp_path))
         assert not (tmp_path / "menu.tmp").exists()
-        assert (tmp_path / "current_menu.json").exists()
 
     @pytest.mark.asyncio
     async def test_wait_for_completion_timeout(self, tmp_path, mock_logger):
