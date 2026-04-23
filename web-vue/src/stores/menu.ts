@@ -86,6 +86,9 @@ export const useMenuStore = defineStore('menu', () => {
   let _carouselCache: CarouselItem[] | null = null
   let _carouselCacheKey: string | null = null
 
+  // Carousel scroll trigger — increment to signal scroll-to-start
+  const carouselScrollTrigger = ref(0)
+
   // ---- Computed ----
 
   const isGenerating = computed(() => state.value === 'generating')
@@ -308,6 +311,14 @@ export const useMenuStore = defineStore('menu', () => {
   function retryGeneration() {
     if (activeProfile.value) {
       generate(activeProfile.value)
+    } else {
+      const profilesStore = useProfilesStore()
+      const visible = profilesStore.visibleProfiles
+      if (visible.length > 0) {
+        generate(visible[0].name)
+      } else {
+        loadMenu()
+      }
     }
   }
 
@@ -353,6 +364,7 @@ export const useMenuStore = defineStore('menu', () => {
         menuVersion.value = data.version
         currentRecipes.value = data.recipes || []
         saveShelves()
+        carouselScrollTrigger.value++
         state.value = 'ready'
       } else if (res.status === 404) {
         state.value = 'ready'
@@ -447,6 +459,7 @@ export const useMenuStore = defineStore('menu', () => {
 
   function activateDeck(name: string) {
     activeDeckName.value = name
+    carouselScrollTrigger.value++
     saveShelves()
   }
 
@@ -486,6 +499,38 @@ export const useMenuStore = defineStore('menu', () => {
     } catch {
       // ignore corrupt data
     }
+  }
+
+  // ---- Generation Navigation ----
+
+  function prevGeneration(shelfName: string) {
+    const shelf = shelves.value.find(s => s.name === shelfName)
+    if (!shelf || shelf.generations.length === 0) return
+    shelf.currentIndex = Math.min((shelf.currentIndex || 0) + 1, shelf.generations.length - 1)
+    _carouselCache = null
+    _carouselCacheKey = null
+    carouselScrollTrigger.value++
+    saveShelves()
+  }
+
+  function nextGeneration(shelfName: string) {
+    const shelf = shelves.value.find(s => s.name === shelfName)
+    if (!shelf || shelf.generations.length === 0) return
+    shelf.currentIndex = Math.max((shelf.currentIndex || 0) - 1, 0)
+    _carouselCache = null
+    _carouselCacheKey = null
+    carouselScrollTrigger.value++
+    saveShelves()
+  }
+
+  function goToGeneration(shelfName: string, index: number) {
+    const shelf = shelves.value.find(s => s.name === shelfName)
+    if (!shelf || shelf.generations.length === 0) return
+    shelf.currentIndex = Math.max(0, Math.min(index, shelf.generations.length - 1))
+    _carouselCache = null
+    _carouselCacheKey = null
+    carouselScrollTrigger.value++
+    saveShelves()
   }
 
   function currentGeneration(shelf: Shelf): Recipe[] {
@@ -744,7 +789,8 @@ export const useMenuStore = defineStore('menu', () => {
 
   function handleSSEGenerating() {
     // Only show spinner on kiosk displays
-    if (state.value !== 'generating') {
+    const settingsStore = useSettingsStore()
+    if (settingsStore.kioskEnabled && state.value !== 'generating') {
       state.value = 'generating'
     }
   }
@@ -842,6 +888,9 @@ export const useMenuStore = defineStore('menu', () => {
     kioskPinValue,
     kioskPinError,
 
+    // Carousel scroll trigger
+    carouselScrollTrigger,
+
     // Computed
     isGenerating,
     isReady,
@@ -867,6 +916,9 @@ export const useMenuStore = defineStore('menu', () => {
     removeShelf,
     activateDeck,
     saveShelves,
+    prevGeneration,
+    nextGeneration,
+    goToGeneration,
     currentGeneration,
     getShelfGenerations,
     deckPreview,

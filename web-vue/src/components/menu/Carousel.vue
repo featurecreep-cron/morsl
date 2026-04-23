@@ -2,6 +2,7 @@
 import { ref, watch, nextTick } from 'vue'
 import type { CarouselItem, CarouselDivider, Recipe } from '@/types/api'
 import { useCarousel } from '@/composables/useCarousel'
+import { useMenuStore } from '@/stores/menu'
 import { timeAgo } from '@/utils/formatting'
 import RecipeCard from './RecipeCard.vue'
 
@@ -35,6 +36,12 @@ watch(() => props.items, () => {
 
 // Expose scrollToStart so parent can call it
 defineExpose({ scrollToStart })
+
+// Watch store's carousel scroll trigger — scroll to start on key actions
+const menuStore = useMenuStore()
+watch(() => menuStore.carouselScrollTrigger, () => {
+  nextTick(() => scrollToStart())
+})
 
 // Suppress unused warning
 void emit

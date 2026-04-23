@@ -49,12 +49,23 @@ export const useSettingsStore = defineStore('settings', () => {
         settings.value = await res.json()
         loaded.value = true
         document.title = settings.value?.app_name || 'Morsl'
+        _updateFaviconLinks()
       }
     } catch (e) {
       console.warn('Failed to load settings:', e)
     } finally {
       loading.value = false
     }
+  }
+
+  function _updateFaviconLinks() {
+    const url = (settings.value?.favicon_use_logo && settings.value?.logo_url)
+      ? settings.value.logo_url
+      : settings.value?.favicon_url
+    if (!url) return
+    document.querySelectorAll('link[rel="icon"]').forEach(link => {
+      ;(link as HTMLLinkElement).href = url as string
+    })
   }
 
   function patch(updates: Partial<AppSettings>) {

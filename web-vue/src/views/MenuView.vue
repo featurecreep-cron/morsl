@@ -19,6 +19,7 @@ import NamePrompt from '@/components/shared/NamePrompt.vue'
 import ConfirmModal from '@/components/shared/ConfirmModal.vue'
 import Toast from '@/components/shared/Toast.vue'
 import MealPlanSave from '@/components/shared/MealPlanSave.vue'
+import QrCorner from '@/components/menu/QrCorner.vue'
 
 const menu = useMenuStore()
 const profiles = useProfilesStore()
@@ -36,7 +37,7 @@ const loadingIconHtml = computed(() =>
 )
 
 // SSE connection
-const { connect: connectSSE, disconnect: disconnectSSE } = useSSE({
+const { connect: connectSSE, disconnect: disconnectSSE, connected: sseConnected } = useSSE({
   url: '/api/menu/stream',
   onGenerating: () => menu.handleSSEGenerating(),
   onMenuUpdated: (clearOthers) => menu.handleSSEMenuUpdated(clearOthers),
@@ -56,7 +57,7 @@ const kiosk = useKiosk({
 let visibilityPollId: ReturnType<typeof setInterval> | null = null
 
 function onVisibilityChange() {
-  if (document.visibilityState === 'visible') {
+  if (document.visibilityState === 'visible' && !sseConnected.value) {
     menu.debouncedLoadMenu()
   }
 }
@@ -323,6 +324,7 @@ watch(() => menu.showKioskPin, (show) => {
         v-if="menu.generatedAt && menu.mainCarouselRecipes.length > 0"
         class="corner-date"
       >{{ formatMenuDate(menu.generatedAt) }}</span>
+      <QrCorner />
     </div>
 
     <!-- Error state -->
