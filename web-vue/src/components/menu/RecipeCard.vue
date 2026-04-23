@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick } from 'vue'
+import { computed } from 'vue'
 import type { Recipe } from '@/types/api'
 import { useMenuStore } from '@/stores/menu'
 import { useSettingsStore } from '@/stores/settings'
@@ -20,16 +20,6 @@ const ingredients = computed(() => props.recipe.ingredients ?? [])
 const placeholderSvg = computed(() =>
   getPlaceholderSvg(props.recipe, menu.activeProfile, menu.iconMappings, settings.logoUrl),
 )
-
-const ingredientsRef = ref<HTMLElement | null>(null)
-const ingredientsOverflow = ref(false)
-
-onMounted(() => {
-  nextTick(() => {
-    const el = ingredientsRef.value
-    if (el) ingredientsOverflow.value = el.scrollHeight > el.clientHeight
-  })
-})
 
 function onCardClick() {
   menu.openRecipe(props.recipe)
@@ -68,9 +58,8 @@ function onOrder(e: Event) {
     </div>
 
     <!-- Inline ingredients -->
-    <div v-if="ingredients.length > 0" ref="ingredientsRef"
-         class="cocktail-ingredients-section"
-         :class="{ 'ingredients-overflow': ingredientsOverflow }">
+    <div v-if="ingredients.length > 0"
+         class="cocktail-ingredients-section">
       <ul class="ingredient-inline">
         <li v-for="(ing, idx) in ingredients" :key="idx">
           {{ formatIngredient(ing) }}
@@ -108,7 +97,7 @@ function onOrder(e: Event) {
   background: var(--card-bg);
   border: var(--card-border);
   border-radius: var(--card-radius, 0.5rem);
-  padding: 1.5rem 1.25rem 2.5rem;
+  padding: 1rem 1rem 2.25rem;
   text-align: center;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -133,9 +122,9 @@ function onOrder(e: Event) {
 
 .cocktail-name {
   font-family: var(--heading-font);
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   color: var(--accent-color);
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.2rem;
   line-height: 1.2;
 }
 
@@ -153,17 +142,17 @@ function onOrder(e: Event) {
 
 .cocktail-image {
   width: 100%;
-  max-height: 180px;
+  max-height: 150px;
   object-fit: cover;
   border-radius: var(--card-radius, 0.5rem) var(--card-radius, 0.5rem) 0 0;
-  margin: -1.5rem -1.25rem 1rem -1.25rem;
-  width: calc(100% + 2.5rem);
+  margin: -1rem -1rem 0.75rem -1rem;
+  width: calc(100% + 2rem);
 }
 
 .cocktail-placeholder {
-  width: calc(100% + 2.5rem);
-  height: 180px;
-  margin: -1.5rem -1.25rem 1rem -1.25rem;
+  width: calc(100% + 2rem);
+  height: 150px;
+  margin: -1rem -1rem 0.75rem -1rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -174,21 +163,14 @@ function onOrder(e: Event) {
 }
 
 .cocktail-placeholder :deep(svg) {
-  width: 200px;
-  height: 140px;
+  width: 180px;
+  height: 120px;
 }
 
 .cocktail-ingredients-section {
-  padding-top: 0.75rem;
+  padding-top: 0.5rem;
   border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
   width: 100%;
-  max-height: 40vh;
-  overflow: hidden;
-}
-
-.cocktail-ingredients-section.ingredients-overflow {
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
 .ingredient-inline {
@@ -286,7 +268,7 @@ function onOrder(e: Event) {
 }
 
 @media (max-width: 575.98px) {
-  .cocktail-card { padding: 1.25rem 1rem; }
-  .cocktail-name { font-size: 1.3rem; }
+  .cocktail-card { padding: 0.75rem 0.75rem 2rem; }
+  .cocktail-name { font-size: 1.15rem; }
 }
 </style>

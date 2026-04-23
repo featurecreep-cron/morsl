@@ -263,7 +263,7 @@ import BrandingImageField from '@/components/admin/BrandingImageField.vue'
 import ToggleSetting from '@/components/shared/ToggleSetting.vue'
 import SearchDropdown from '@/components/shared/SearchDropdown.vue'
 import { useAdminStore } from '@/stores/admin'
-import { STOCK_ICON_SVG } from '@/utils/icons'
+import { getIconByKey } from '@/utils/icons'
 import type { IconPickerExposed } from '@/types/api'
 
 const admin = useAdminStore()
@@ -290,10 +290,7 @@ const sortedFoodIcons = computed(() =>
 // Icon resolution
 function resolveIconHtml(key: string): string {
   if (!key) return ''
-  if (key.startsWith('custom:')) {
-    return `<img src="/api/icons/${encodeURIComponent(key)}" style="width:100%;height:100%;object-fit:contain" alt="${key}">`
-  }
-  return STOCK_ICON_SVG
+  return getIconByKey(key)
 }
 
 // Icon picker bridge

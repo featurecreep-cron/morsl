@@ -520,7 +520,7 @@ export const useAdminStore = defineStore('admin', () => {
 
   async function loadKeywords() {
     try {
-      const res = await fetch('/api/keywords')
+      const res = await adminFetch('/api/keywords')
       if (res.ok) {
         const data = await res.json()
         keywords.value = data.results || data || []
@@ -540,7 +540,7 @@ export const useAdminStore = defineStore('admin', () => {
 
   async function loadCustomFilters() {
     try {
-      const res = await fetch('/api/custom-filters')
+      const res = await adminFetch('/api/custom-filters')
       if (res.ok) {
         const data = await res.json()
         customFilters.value = data.results || data || []
@@ -564,7 +564,7 @@ export const useAdminStore = defineStore('admin', () => {
         return
       }
       try {
-        const res = await fetch(`/api/foods?search=${encodeURIComponent(foodSearch.value)}`)
+        const res = await adminFetch(`/api/foods?search=${encodeURIComponent(foodSearch.value)}`)
         if (res.ok) {
           const data = await res.json()
           const results = data.results || data || []

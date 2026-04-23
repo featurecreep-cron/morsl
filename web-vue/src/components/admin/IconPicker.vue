@@ -161,7 +161,7 @@ function resolveIconHtml(key: string): string {
 }
 
 function resolveCustomIconHtml(key: string): string {
-  return `<img src="/api/icons/${encodeURIComponent(key)}" style="width:100%;height:100%;object-fit:contain" alt="${key}">`
+  return getIconByKey(key)
 }
 
 function formatLabel(key: string): string {
