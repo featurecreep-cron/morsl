@@ -671,7 +671,24 @@ const PROFILE_STYLE_MAP: Record<string, string> = {
 const _customIconCache: Record<string, string> = {}
 
 export function registerCustomIcon(key: string, svg: string): void {
-  _customIconCache[key] = sanitizeSVG(svg)
+  let clean = sanitizeSVG(svg)
+  // Convert hardcoded fill/stroke to currentColor so icons inherit theme colors
+  if (clean) {
+    const doc = new DOMParser().parseFromString(clean, 'image/svg+xml')
+    const svgEl = doc.querySelector('svg')
+    if (svgEl) {
+      for (const el of doc.querySelectorAll('*')) {
+        for (const attr of ['stroke', 'fill']) {
+          const val = el.getAttribute(attr)
+          if (val && val !== 'none' && val !== 'transparent' && val !== 'currentColor' && val !== 'inherit') {
+            el.setAttribute(attr, 'currentColor')
+          }
+        }
+      }
+      clean = svgEl.outerHTML
+    }
+  }
+  _customIconCache[key] = clean
 }
 
 export function removeCustomIcon(key: string): void {
