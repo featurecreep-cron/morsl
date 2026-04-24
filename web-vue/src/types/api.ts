@@ -128,6 +128,7 @@ export interface Ingredient {
   amount: number | null
   unit: string | null
   food: string
+  original_food?: string
   note: string | null
   is_header: boolean
   original_text: string | null

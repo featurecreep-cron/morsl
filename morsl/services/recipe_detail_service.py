@@ -92,14 +92,15 @@ def _extract_steps_and_ingredients(
     resolved_foods = _batch_resolve_foods(provider, raw_foods, logger)
 
     ingredients = []
-    for ing, food_obj in zip(raw_ings, resolved_foods, strict=True):
-        ingredients.append(
-            {
-                "amount": ing.get("amount"),
-                "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
-                "food": food_obj["name"],
-            }
-        )
+    for ing, orig_food, resolved_food in zip(raw_ings, raw_foods, resolved_foods, strict=True):
+        entry: dict[str, Any] = {
+            "amount": ing.get("amount"),
+            "unit": ing.get("unit", {}).get("name") if ing.get("unit") else None,
+            "food": resolved_food["name"],
+        }
+        if resolved_food.get("id") != orig_food.get("id"):
+            entry["original_food"] = orig_food["name"]
+        ingredients.append(entry)
     return ingredients, steps
 
 

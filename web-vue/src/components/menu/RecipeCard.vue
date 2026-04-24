@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { Recipe } from '@/types/api'
 import { useMenuStore } from '@/stores/menu'
 import { useSettingsStore } from '@/stores/settings'
-import { ratingStars, formatIngredient } from '@/utils/formatting'
+import { ratingStars } from '@/utils/formatting'
 import { getPlaceholderSvg } from '@/utils/icons'
 
 const props = defineProps<{
@@ -62,7 +62,7 @@ function onOrder(e: Event) {
          class="cocktail-ingredients-section">
       <ul class="ingredient-inline">
         <li v-for="(ing, idx) in ingredients" :key="idx">
-          {{ formatIngredient(ing) }}
+          {{ ing.food }}<template v-if="ing.original_food"> <span class="sub-hint">(for {{ ing.original_food }})</span></template>
         </li>
       </ul>
     </div>
@@ -171,6 +171,8 @@ function onOrder(e: Event) {
   padding-top: 0.5rem;
   border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
   width: 100%;
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 .ingredient-inline {
@@ -179,7 +181,7 @@ function onOrder(e: Event) {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem 0.4rem;
+  gap: 0.1rem 0;
   justify-content: center;
 }
 
@@ -187,19 +189,26 @@ function onOrder(e: Event) {
   font-size: 0.75rem;
   color: var(--text-muted);
   text-transform: capitalize;
+  line-height: 1.3;
 }
 
 .ingredient-inline li:not(:last-child)::after {
   content: "\00b7";
-  margin-left: 0.4rem;
+  margin: 0 0.3rem;
+}
+
+.sub-hint {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  font-style: italic;
 }
 
 .tap-hint {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: var(--accent-color);
-  opacity: 0.75;
+  opacity: 0.6;
   margin-top: auto;
-  padding-top: 0.5rem;
+  padding-top: 0.25rem;
   flex: 0 0 auto;
   text-transform: uppercase;
   letter-spacing: 0.08em;

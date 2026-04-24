@@ -564,10 +564,6 @@ body {
     padding-top: 0.75rem;
     border-top: 1px solid var(--divider-color, rgba(255,255,255,0.1));
     width: 100%;
-    max-height: 40vh;
-    overflow: hidden;
-    mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
 .ingredient-inline {
