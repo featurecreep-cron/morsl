@@ -1810,7 +1810,7 @@ body {
 }
 .corner-date {
     font-family: var(--heading-font);
-    font-size: 0.95rem;
+    font-size: 1.4rem;
     color: var(--accent-color);
     letter-spacing: 0.02em;
     white-space: nowrap;
@@ -1834,8 +1834,8 @@ body {
     gap: 0.1rem;
 }
 .qr-corner-code {
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
     background: #fff;
     border-radius: 3px;
     padding: 2px;
@@ -1848,7 +1848,7 @@ body {
     height: 100%;
 }
 .qr-corner-label {
-    font-size: 0.5rem;
+    font-size: 0.75rem;
     color: var(--accent-color-dim, #999);
     font-family: var(--body-font);
     letter-spacing: 0.03em;

@@ -651,7 +651,7 @@ watch(() => menu.showKioskPin, (show) => {
 
 .corner-date {
   font-family: var(--body-font);
-  font-size: 0.65rem;
+  font-size: 1rem;
   color: var(--text-muted);
   opacity: 0.6;
   text-transform: uppercase;
