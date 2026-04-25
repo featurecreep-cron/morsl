@@ -1,5 +1,5 @@
 # Stage 1: Frontend build
-FROM node:22-slim AS frontend
+FROM node:25-slim AS frontend
 WORKDIR /app/web-vue
 COPY web-vue/package*.json ./
 RUN npm ci
