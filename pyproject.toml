@@ -27,7 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff==0.15.11",  # linter, formatter, import sort
-    "mypy==1.20.1",
+    "mypy==1.20.2",
     "pre-commit==4.5.1",
     "colorlog==6.10.1",
     "pytest>=8.0",
