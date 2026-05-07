@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -195,14 +195,14 @@ class HistoryRecipeSummary(BaseModel):
 
 
 class HistoryEntryResponse(BaseModel):
-    id: str
+    id: Union[str, int]
     generated_at: str
     duration_ms: int
     profile: str
-    request_id: str
+    request_id: Optional[str] = None
     recipe_count: int
-    requested_count: int
-    constraint_count: int
+    requested_count: Optional[int] = None
+    constraint_count: Optional[int] = None
     status: str
     recipes: List[HistoryRecipeSummary] = []
     relaxed_constraints: List[RelaxedConstraintResponse] = []

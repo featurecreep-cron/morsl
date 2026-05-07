@@ -1,0 +1,67 @@
+/* ========================================
+   Cast Iron Theme
+   Dark charcoal background, muted steel-blue accents,
+   understated industrial sophistication.
+   Inspired by Bootswatch Slate.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #1c1e22;
+    --color-scheme: dark;
+    --bg-image: none;
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(206, 210, 214, 0.92);
+    --text-muted: rgba(206, 210, 214, 0.58);
+    --accent-color: #7a8b9a;
+    --accent-color-dim: rgba(122, 139, 154, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(122, 139, 154, 0.07);
+    --card-border: 1px solid rgba(122, 139, 154, 0.20);
+    --card-radius: 0.25rem;
+    --card-hover-shadow: 0 4px 24px rgba(122, 139, 154, 0.12);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: #8899aa;
+    --btn-border: rgba(122, 139, 154, 0.35);
+    --btn-active-bg: rgba(122, 139, 154, 0.14);
+    --btn-active-text: #95a5b5;
+    --btn-active-border: #95a5b5;
+
+    /* Modal */
+    --modal-bg: #272b30;
+    --modal-border: 1px solid rgba(122, 139, 154, 0.22);
+    --divider-color: rgba(122, 139, 154, 0.10);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(122, 139, 154, 0.12);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.07);
+    --overlay-bg: rgba(0, 0, 0, 0.7);
+    --focus-ring: 0 0 0 2px rgba(122, 139, 154, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.05);
+
+    /* Misc */
+    --star-color: #95a5b5;
+    --logo-filter: invert(1) sepia(0.05) brightness(0.9);
+    --warning-bg: rgba(122, 139, 154, 0.12);
+    --warning-text: #95a5b5;
+
+    /* Theme Family: Material */
+    --card-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.12);
+    --card-backdrop: none;
+    --btn-radius: 0.25rem;
+    --modal-radius: 0.5rem;
+    --heading-letter-spacing: 0.08em;
+}

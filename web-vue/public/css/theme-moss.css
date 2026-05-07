@@ -1,0 +1,66 @@
+/* ========================================
+   Moss Theme
+   Dark background, earthy green accents,
+   natural and botanical atmosphere.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #080d08;
+    --color-scheme: dark;
+    --bg-image: radial-gradient(ellipse at top, rgba(77, 184, 102, 0.04), transparent);
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(220, 235, 220, 0.90);
+    --text-muted: rgba(220, 235, 220, 0.52);
+    --accent-color: #4db866;
+    --accent-color-dim: rgba(77, 184, 102, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(77, 184, 102, 0.08);
+    --card-border: 1px solid rgba(77, 184, 102, 0.18);
+    --card-radius: 0.75rem;
+    --card-hover-shadow: 0 4px 24px rgba(77, 184, 102, 0.14);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: rgba(77, 184, 102, 0.75);
+    --btn-border: rgba(77, 184, 102, 0.35);
+    --btn-active-bg: rgba(77, 184, 102, 0.12);
+    --btn-active-text: #4db866;
+    --btn-active-border: #4db866;
+
+    /* Modal */
+    --modal-bg: #111a12;
+    --modal-border: 1px solid rgba(77, 184, 102, 0.22);
+    --divider-color: rgba(77, 184, 102, 0.10);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(77, 184, 102, 0.15);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --overlay-bg: rgba(0, 0, 0, 0.72);
+    --focus-ring: 0 0 0 2px rgba(77, 184, 102, 0.28);
+    --input-bg: rgba(255, 255, 255, 0.04);
+
+    /* Misc */
+    --star-color: #4db866;
+    --logo-filter: invert(1) sepia(0.3) saturate(2.5) hue-rotate(90deg) brightness(1.0);
+    --warning-bg: rgba(77, 184, 102, 0.14);
+    --warning-text: #4db866;
+
+    /* Theme Family: Glass */
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    --card-backdrop: blur(10px);
+    --btn-radius: 1.5rem;
+    --modal-radius: 1rem;
+    --heading-letter-spacing: normal;
+}

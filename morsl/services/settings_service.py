@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from morsl.constants import (
@@ -12,7 +12,7 @@ from morsl.constants import (
     DEFAULT_MENU_POLL_SECONDS,
     DEFAULT_TOAST_SECONDS,
 )
-from morsl.utils import atomic_write_json, read_json
+from morsl.repositories.settings import SettingsRepository
 
 # Keys that are exposed via the public endpoint (user-visible)
 PUBLIC_KEYS = frozenset(
@@ -108,11 +108,26 @@ DEFAULTS: Dict[str, Any] = {
 
 
 class SettingsService:
-    """Persists admin settings to a JSON file."""
+    """Persists admin settings via a SettingsRepository (SQLite-backed)."""
 
-    def __init__(self, data_dir: str = "data") -> None:
-        self.data_dir = data_dir
+    def __init__(
+        self,
+        repo: Optional[SettingsRepository] = None,
+        user_id: int = 1,
+        data_dir: str = "data",
+    ) -> None:
+        if repo is not None:
+            self._repo = repo
+        else:
+            # Fallback: create a DB connection from data_dir (for tests/backward compat)
+            from morsl.db import ensure_default_user, get_db
+
+            conn = get_db(data_dir)
+            ensure_default_user(conn, user_id)
+            self._repo = SettingsRepository(conn)
+        self._user_id = user_id
         self._lock = threading.Lock()
+        # In-memory cache of settings, loaded from DB on init
         self._settings: Dict[str, Any] = dict(DEFAULTS)
         self._load()
 
@@ -165,8 +180,7 @@ class SettingsService:
             return ZoneInfo("UTC")
 
     def _save(self) -> None:
-        path = os.path.join(self.data_dir, "settings.json")
-        atomic_write_json(path, self._settings)
+        self._repo.set_many(self._user_id, self._settings)
 
     def migrate_default_profile(self, config_service) -> None:
         """Migrate default_profile setting to a profile attribute."""
@@ -177,8 +191,7 @@ class SettingsService:
                 self._save()
 
     def _load(self) -> None:
-        path = os.path.join(self.data_dir, "settings.json")
-        stored = read_json(path)
+        stored = self._repo.get_all(self._user_id)
         if stored:
             # Migrate renamed keys
             if "kiosk_pin" in stored and "pin" not in stored:

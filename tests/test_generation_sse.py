@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 
 import pytest
 
+from morsl.db import ensure_default_user, get_db
+from morsl.repositories.menu import MenuRepository
 from morsl.services.generation_service import GenerationService
 
 
@@ -63,8 +64,10 @@ class TestEventEmission:
     """Verify correct events are emitted on state transitions."""
 
     def test_clear_menu_emits_menu_cleared(self, tmp_path):
-        menu = {"recipes": [{"id": 1, "name": "X"}]}
-        (tmp_path / "current_menu.json").write_text(json.dumps(menu))
+        conn = get_db(str(tmp_path))
+        ensure_default_user(conn)
+        repo = MenuRepository(conn)
+        repo.save_current(1, "test", [{"id": 1, "name": "X"}], "2024-01-01")
         svc = GenerationService(data_dir=str(tmp_path))
 
         q = svc.subscribe()
@@ -100,22 +103,22 @@ class TestEventEmission:
         assert event["type"] == "menu_updated"
         assert event["clear_others"] is True
 
-    def test_clear_others_persisted_in_json(self, tmp_path):
+    def test_clear_others_persisted(self, tmp_path):
         """clear_others is persisted so HTTP clients can read it on reconnect."""
         svc = GenerationService(data_dir=str(tmp_path))
         svc._save_menu(
             {"recipes": [], "generated_at": "2024-01-01"},
             clear_others=True,
         )
-        saved = json.loads((tmp_path / "current_menu.json").read_text())
-        assert saved["clear_others"] is True
+        menu = svc.get_current_menu()
+        assert menu["clear_others"] is True
 
-    def test_clear_others_defaults_false_in_json(self, tmp_path):
+    def test_clear_others_defaults_false(self, tmp_path):
         """Non-clearing generations persist clear_others=false."""
         svc = GenerationService(data_dir=str(tmp_path))
         svc._save_menu({"recipes": [], "generated_at": "2024-01-01"})
-        saved = json.loads((tmp_path / "current_menu.json").read_text())
-        assert saved["clear_others"] is False
+        menu = svc.get_current_menu()
+        assert menu["clear_others"] is False
 
     @pytest.mark.asyncio
     async def test_start_generation_emits_generating(self, tmp_path, mock_logger):

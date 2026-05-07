@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,13 +12,14 @@ from uuid import uuid4
 
 from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_SOFT_WEIGHT, GENERATION_SHUTDOWN_TIMEOUT
 from morsl.providers.tandoor import TandoorProvider
+from morsl.repositories.menu import MenuRepository
 from morsl.services.history_service import HistoryService
 from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
 from morsl.services.sse_publisher import SSEPublisher
 from morsl.solver import RecipePicker
 from morsl.tandoor_api import TandoorAPI
-from morsl.utils import atomic_write_json, now
+from morsl.utils import now
 
 
 class GenerationState(str, Enum):
@@ -44,10 +44,23 @@ class GenerationService(SSEPublisher):
     """Manages asynchronous menu generation with state tracking."""
 
     def __init__(
-        self, data_dir: str = "data", history_service: Optional[HistoryService] = None
+        self,
+        data_dir: str = "data",
+        history_service: Optional[HistoryService] = None,
+        menu_repo: Optional[MenuRepository] = None,
+        user_id: int = 1,
     ) -> None:
         self.data_dir = data_dir
         self._history_service = history_service
+        self._user_id = user_id
+        if menu_repo is not None:
+            self._menu_repo = menu_repo
+        else:
+            from morsl.db import ensure_default_user, get_db
+
+            conn = get_db(data_dir)
+            ensure_default_user(conn, user_id)
+            self._menu_repo = MenuRepository(conn)
         self._status = GenerationStatus()
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
@@ -55,7 +68,7 @@ class GenerationService(SSEPublisher):
         self._init_sse()
         self._cleanup_stale_temp_files()
         # Load menu into cache on startup
-        self._cached_menu = self._load_menu_from_disk()
+        self._cached_menu = self._load_menu()
 
     def get_status(self) -> GenerationStatus:
         return self._status
@@ -64,26 +77,29 @@ class GenerationService(SSEPublisher):
         """Return cached menu (loaded from disk on startup, updated on save/clear)."""
         return self._cached_menu
 
-    def _load_menu_from_disk(self) -> Optional[Dict[str, Any]]:
-        """Load current menu from disk."""
-        menu_path = os.path.join(self.data_dir, "current_menu.json")
-        if not os.path.isfile(menu_path):
+    def _load_menu(self) -> Optional[Dict[str, Any]]:
+        """Load current menu from the database."""
+        row = self._menu_repo.get_current(self._user_id)
+        if row is None:
             return None
-        try:
-            with open(menu_path) as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return None
+        # Reconstruct the menu dict format expected by the rest of the service
+        menu = dict(row.get("metadata") or {})
+        menu["recipes"] = row["recipes"]
+        menu["generated_at"] = row["generated_at"]
+        menu["profile"] = row["profile_name"]
+        if "id" not in menu:
+            menu["id"] = row["id"]
+        menu["_db_id"] = row["id"]
+        return menu
 
     def clear_menu(self) -> bool:
-        """Delete current_menu.json and clear cache. Returns True if a file was removed."""
+        """Clear the current menu. Returns True if a menu was cleared."""
+        had_menu = self._cached_menu is not None
         self._cached_menu = None
-        menu_path = os.path.join(self.data_dir, "current_menu.json")
-        if os.path.isfile(menu_path):
-            os.unlink(menu_path)
+        self._menu_repo.clear_current(self._user_id)
+        if had_menu:
             self._notify_subscribers({"type": "menu_cleared"})
-            return True
-        return False
+        return had_menu
 
     async def start_generation(
         self,
@@ -355,14 +371,32 @@ class GenerationService(SSEPublisher):
 
         # Replace in menu and save
         menu["recipes"][old_index] = new_details[0]
-        self._save_menu(menu)
+        # Update the existing menu row in DB rather than creating a new one
+        db_id = menu.get("_db_id")
+        if db_id:
+            self._menu_repo.update_recipes(db_id, menu["recipes"])
+            self._cached_menu = menu
+            self._notify_subscribers({"type": "menu_updated", "clear_others": False})
+        else:
+            self._save_menu(menu)
 
         return new_details[0]
 
     def _save_menu(self, menu_data: Dict[str, Any], *, clear_others: bool = False) -> None:
-        """Atomic write and update in-memory cache."""
+        """Save menu to database and update in-memory cache."""
         menu_data["clear_others"] = clear_others
-        menu_path = os.path.join(self.data_dir, "current_menu.json")
-        atomic_write_json(menu_path, menu_data)
+        profile_name = menu_data.get("profile", "default")
+        recipes = menu_data.get("recipes", [])
+        generated_at = menu_data.get("generated_at", now().isoformat())
+
+        # Store the full menu dict as metadata for round-trip fidelity
+        db_id = self._menu_repo.save_current(
+            self._user_id,
+            profile_name=profile_name,
+            recipes=recipes,
+            generated_at=generated_at,
+            metadata=menu_data,
+        )
+        menu_data["_db_id"] = db_id
         self._cached_menu = menu_data
         self._notify_subscribers({"type": "menu_updated", "clear_others": clear_others})

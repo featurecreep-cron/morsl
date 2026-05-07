@@ -1,0 +1,65 @@
+/* ========================================
+   Sea Salt Theme
+   Cool aqua with teal accents
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #f2f7f9;
+    --color-scheme: light;
+    --bg-image: radial-gradient(ellipse at top, rgba(45, 125, 154, 0.04), transparent);
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(0, 0, 0, 0.85);
+    --text-muted: rgba(0, 0, 0, 0.55);
+    --accent-color: #2d7d9a;
+    --accent-color-dim: rgba(45, 125, 154, 0.40);
+
+    /* Cards */
+    --card-bg: rgba(45, 125, 154, 0.08);
+    --card-border: 1px solid rgba(45, 125, 154, 0.18);
+    --card-radius: 0.75rem;
+    --card-hover-shadow: 0 4px 24px rgba(45, 125, 154, 0.10);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: #2a7590;
+    --btn-border: rgba(45, 125, 154, 0.40);
+    --btn-active-bg: rgba(45, 125, 154, 0.10);
+    --btn-active-text: #2d7d9a;
+    --btn-active-border: #2d7d9a;
+
+    /* Modal */
+    --modal-bg: #eaf2f5;
+    --modal-border: 1px solid rgba(45, 125, 154, 0.20);
+    --divider-color: rgba(0, 0, 0, 0.08);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(45, 125, 154, 0.12);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(0, 0, 0, 0.03);
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --overlay-bg: rgba(0, 0, 0, 0.4);
+    --focus-ring: 0 0 0 2px rgba(45, 125, 154, 0.25);
+    --input-bg: rgba(0, 0, 0, 0.04);
+
+    /* Misc */
+    --star-color: #2d7d9a;
+    --logo-filter: sepia(1) saturate(2) hue-rotate(170deg) brightness(0.6);
+    --warning-bg: rgba(45, 125, 154, 0.10);
+    --warning-text: #2d7d9a;
+
+    /* Theme Family: Glass */
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --card-backdrop: blur(10px);
+    --btn-radius: 1.5rem;
+    --modal-radius: 1rem;
+    --heading-letter-spacing: normal;
+}

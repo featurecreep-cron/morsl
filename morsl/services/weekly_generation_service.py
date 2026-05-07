@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
-import os
 import re
 from collections import deque
 from dataclasses import dataclass, field
@@ -14,13 +12,14 @@ from uuid import uuid4
 
 from morsl.constants import API_CACHE_TTL_MINUTES, GENERATION_SHUTDOWN_TIMEOUT
 from morsl.providers.tandoor import TandoorProvider
+from morsl.repositories.weekly_plan import WeeklyPlanRepository
 from morsl.services.config_service import ConfigService
 from morsl.services.generation_service import GenerationState
 from morsl.services.menu_service import MenuService
 from morsl.services.recipe_detail_service import fetch_recipe_details
 from morsl.services.template_service import TemplateService
 from morsl.tandoor_api import TandoorAPI
-from morsl.utils import atomic_write_json, now, safe_path
+from morsl.utils import now
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +81,22 @@ class WeeklyGenerationStatus:
 class WeeklyGenerationService:
     """Orchestrates multi-profile generation across a weekly template."""
 
-    def __init__(self, data_dir: str = "data") -> None:
+    def __init__(
+        self,
+        repo: Optional[WeeklyPlanRepository] = None,
+        user_id: int = 1,
+        data_dir: str = "data",
+    ) -> None:
         self.data_dir = data_dir
-        self.plans_dir = os.path.join(data_dir, "weekly_plans")
+        self._user_id = user_id
+        if repo is not None:
+            self._repo = repo
+        else:
+            from morsl.db import ensure_default_user, get_db
+
+            conn = get_db(data_dir)
+            ensure_default_user(conn, user_id)
+            self._repo = WeeklyPlanRepository(conn)
         self._status = WeeklyGenerationStatus()
         self._current_task: Optional[asyncio.Task[None]] = None
         self._lock = asyncio.Lock()
@@ -98,27 +110,16 @@ class WeeklyGenerationService:
         _validate_template_name(template_name)
         if template_name in self._plan_cache:
             return self._plan_cache[template_name]
-        path = safe_path(self.plans_dir, f"{template_name}.json")
-        if not os.path.isfile(path):
-            return None
-        try:
-            with open(path) as f:
-                plan = json.load(f)
+        plan = self._repo.get(self._user_id, template_name)
+        if plan is not None:
             self._plan_cache[template_name] = plan
-            return plan
-        except json.JSONDecodeError:
-            logger.warning("Corrupted weekly plan file: %s", path)
-            return None
+        return plan
 
     def clear_plan(self, template_name: str) -> bool:
-        """Delete a weekly plan file. Returns True if removed."""
+        """Delete a weekly plan. Returns True if removed."""
         _validate_template_name(template_name)
         self._plan_cache.pop(template_name, None)
-        path = safe_path(self.plans_dir, f"{template_name}.json")
-        if os.path.isfile(path):
-            os.unlink(path)
-            return True
-        return False
+        return self._repo.delete(self._user_id, template_name)
 
     async def start_generation(
         self,
@@ -506,9 +507,8 @@ class WeeklyGenerationService:
             self._status.state = GenerationState.IDLE
 
     def _save_plan(self, template_name: str, plan_data: Dict[str, Any]) -> None:
-        """Atomic write of weekly plan."""
+        """Save weekly plan to database."""
         _validate_template_name(template_name)
-        os.makedirs(self.plans_dir, exist_ok=True)
-        path = safe_path(self.plans_dir, f"{template_name}.json")
-        atomic_write_json(path, plan_data)
+        week_start = plan_data.get("week_start", "")
+        self._repo.save(self._user_id, template_name, plan_data, week_start)
         self._plan_cache[template_name] = plan_data

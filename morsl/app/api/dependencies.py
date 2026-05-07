@@ -11,6 +11,15 @@ from fastapi import Depends, HTTPException, Request
 
 from morsl.app.config import Settings
 from morsl.constants import ADMIN_TOKEN_CACHE_MAXSIZE, PIN_IMMEDIATE_GRACE_SECONDS
+from morsl.db import ensure_default_user, get_db
+from morsl.repositories import (
+    HistoryRepository,
+    MenuRepository,
+    ProfileRepository,
+    SettingsRepository,
+    TemplateRepository,
+    WeeklyPlanRepository,
+)
 from morsl.services.category_service import CategoryService
 from morsl.services.config_service import ConfigService
 from morsl.services.custom_icon_service import CustomIconService
@@ -31,6 +40,9 @@ _admin_tokens_lock = threading.Lock()
 
 # Service singleton registry — replaces 12 separate global variables
 _services: dict[str, object] = {}
+
+# Default user ID — used until M2 auth system is implemented
+DEFAULT_USER_ID = 1
 
 
 def _get_or_create(key: str, factory):
@@ -77,25 +89,48 @@ def get_settings() -> Settings:
     return Settings()
 
 
+def _get_conn(settings: Settings):
+    """Get or create a shared DB connection, ensuring the default user exists."""
+    conn = get_db(settings.data_dir)
+    ensure_default_user(conn, DEFAULT_USER_ID)
+    return conn
+
+
 def get_config_service(settings: Settings = Depends(get_settings)) -> ConfigService:
-    return _get_or_create("config", lambda: ConfigService(profiles_dir=settings.profiles_dir))
+    def _create():
+        conn = _get_conn(settings)
+        return ConfigService(repo=ProfileRepository(conn), user_id=DEFAULT_USER_ID)
+
+    return _get_or_create("config", _create)
 
 
 def get_history_service(settings: Settings = Depends(get_settings)) -> HistoryService:
-    return _get_or_create("history", lambda: HistoryService(data_dir=settings.data_dir))
+    def _create():
+        conn = _get_conn(settings)
+        return HistoryService(repo=HistoryRepository(conn), user_id=DEFAULT_USER_ID)
+
+    return _get_or_create("history", _create)
 
 
 def get_generation_service(settings: Settings = Depends(get_settings)) -> GenerationService:
-    return _get_or_create(
-        "generation",
-        lambda: GenerationService(
-            data_dir=settings.data_dir, history_service=get_history_service(settings)
-        ),
-    )
+    def _create():
+        conn = _get_conn(settings)
+        return GenerationService(
+            data_dir=settings.data_dir,
+            history_service=get_history_service(settings),
+            menu_repo=MenuRepository(conn),
+            user_id=DEFAULT_USER_ID,
+        )
+
+    return _get_or_create("generation", _create)
 
 
 def get_settings_service(settings: Settings = Depends(get_settings)) -> SettingsService:
-    return _get_or_create("settings_svc", lambda: SettingsService(data_dir=settings.data_dir))
+    def _create():
+        conn = _get_conn(settings)
+        return SettingsService(repo=SettingsRepository(conn), user_id=DEFAULT_USER_ID)
+
+    return _get_or_create("settings_svc", _create)
 
 
 def resolve_credentials(settings: Settings, settings_svc: SettingsService) -> tuple[str, str]:
@@ -209,15 +244,25 @@ def get_icon_mapping_service(settings: Settings = Depends(get_settings)) -> Icon
 
 
 def get_template_service(settings: Settings = Depends(get_settings)) -> TemplateService:
-    return _get_or_create("template", lambda: TemplateService(data_dir=settings.data_dir))
+    def _create():
+        conn = _get_conn(settings)
+        return TemplateService(repo=TemplateRepository(conn), user_id=DEFAULT_USER_ID)
+
+    return _get_or_create("template", _create)
 
 
 def get_weekly_generation_service(
     settings: Settings = Depends(get_settings),
 ) -> WeeklyGenerationService:
-    return _get_or_create(
-        "weekly_generation", lambda: WeeklyGenerationService(data_dir=settings.data_dir)
-    )
+    def _create():
+        conn = _get_conn(settings)
+        return WeeklyGenerationService(
+            repo=WeeklyPlanRepository(conn),
+            user_id=DEFAULT_USER_ID,
+            data_dir=settings.data_dir,
+        )
+
+    return _get_or_create("weekly_generation", _create)
 
 
 def get_logger(settings: Settings = Depends(get_settings)) -> Logger:

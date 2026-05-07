@@ -1,0 +1,66 @@
+/* ========================================
+   Honey Theme
+   Near-black background, gold/amber accents,
+   elegant serif headings, refined shadows.
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #0d0d0d;
+    --color-scheme: dark;
+    --bg-image: none;
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(255, 255, 255, 0.90);
+    --text-muted: rgba(255, 255, 255, 0.46);
+    --accent-color: #d4a847;
+    --accent-color-dim: rgba(212, 168, 71, 0.55);
+
+    /* Cards */
+    --card-bg: rgba(212, 168, 71, 0.05);
+    --card-border: 1px solid rgba(212, 168, 71, 0.18);
+    --card-radius: 0.25rem;
+    --card-hover-shadow: 0 4px 24px rgba(212, 168, 71, 0.12);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: rgba(212, 168, 71, 0.75);
+    --btn-border: rgba(212, 168, 71, 0.35);
+    --btn-active-bg: rgba(212, 168, 71, 0.12);
+    --btn-active-text: #d4a847;
+    --btn-active-border: #d4a847;
+
+    /* Modal */
+    --modal-bg: #1a1a1a;
+    --modal-border: 1px solid rgba(212, 168, 71, 0.25);
+    --divider-color: rgba(212, 168, 71, 0.12);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(212, 168, 71, 0.15);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(255, 255, 255, 0.04);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --overlay-bg: rgba(0, 0, 0, 0.7);
+    --focus-ring: 0 0 0 2px rgba(212, 168, 71, 0.25);
+    --input-bg: rgba(255, 255, 255, 0.05);
+
+    /* Misc */
+    --star-color: #d4a847;
+    --logo-filter: invert(1) sepia(0.3) brightness(1.1);
+    --warning-bg: rgba(212, 168, 71, 0.15);
+    --warning-text: #d4a847;
+
+    /* Theme Family: Material */
+    --card-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.12);
+    --card-backdrop: none;
+    --btn-radius: 0.25rem;
+    --modal-radius: 0.5rem;
+    --heading-letter-spacing: 0.08em;
+}

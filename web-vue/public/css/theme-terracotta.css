@@ -1,0 +1,65 @@
+/* ========================================
+   Terracotta Theme
+   Warm, rustic light theme with terracotta accents
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #faf5f2;
+    --color-scheme: light;
+    --bg-image: none;
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(0, 0, 0, 0.85);
+    --text-muted: rgba(0, 0, 0, 0.55);
+    --accent-color: #c4704b;
+    --accent-color-dim: rgba(196, 112, 75, 0.40);
+
+    /* Cards */
+    --card-bg: rgba(196, 112, 75, 0.04);
+    --card-border: 1px solid rgba(196, 112, 75, 0.18);
+    --card-radius: 0.5rem;
+    --card-hover-shadow: 0 4px 24px rgba(196, 112, 75, 0.10);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: #a25c3e;
+    --btn-border: rgba(196, 112, 75, 0.40);
+    --btn-active-bg: rgba(196, 112, 75, 0.10);
+    --btn-active-text: #c4704b;
+    --btn-active-border: #c4704b;
+
+    /* Modal */
+    --modal-bg: #f4ece8;
+    --modal-border: 1px solid rgba(196, 112, 75, 0.20);
+    --divider-color: rgba(0, 0, 0, 0.08);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(196, 112, 75, 0.12);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(0, 0, 0, 0.03);
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --overlay-bg: rgba(0, 0, 0, 0.4);
+    --focus-ring: 0 0 0 2px rgba(196, 112, 75, 0.25);
+    --input-bg: rgba(0, 0, 0, 0.04);
+
+    /* Misc */
+    --star-color: #c4704b;
+    --logo-filter: sepia(1) saturate(2) hue-rotate(10deg) brightness(0.6);
+    --warning-bg: rgba(196, 112, 75, 0.10);
+    --warning-text: #c4704b;
+
+    /* Theme Family: Structured */
+    --card-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    --card-backdrop: none;
+    --btn-radius: 0.5rem;
+    --modal-radius: 0.75rem;
+    --heading-letter-spacing: 0.04em;
+}

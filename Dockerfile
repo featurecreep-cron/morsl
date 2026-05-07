@@ -1,4 +1,13 @@
-FROM python:3.14-slim@sha256:bc389f7dfcb21413e72a28f491985326994795e34d2b86c8ae2f417b4e7818aa AS builder
+# Stage 1: Frontend build
+FROM node:25-slim AS frontend
+WORKDIR /app/web-vue
+COPY web-vue/package*.json ./
+RUN npm ci
+COPY web-vue/ ./
+RUN npm run build
+
+# Stage 2: Python venv
+FROM python:3.14-slim@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033 AS builder
 
 WORKDIR /app
 
@@ -16,7 +25,7 @@ RUN mkdir -p morsl/app morsl/services && \
 
 # ---
 
-FROM python:3.14-slim@sha256:bc389f7dfcb21413e72a28f491985326994795e34d2b86c8ae2f417b4e7818aa
+FROM python:3.14-slim@sha256:5b3879b6f3cb77e712644d50262d05a7c146b7312d784a18eff7ff5462e77033
 
 LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
       org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
@@ -39,8 +48,10 @@ WORKDIR /app
 # Copy application source
 COPY morsl/ morsl/
 COPY scripts/ scripts/
-COPY web/ web/
 COPY docker-entrypoint.sh /usr/local/bin/
+
+# Vue build output replaces old web/ static files
+COPY --from=frontend /app/web/ web/
 
 # Create writable dirs for runtime data
 RUN mkdir -p data/branding data/custom-icons data/profiles data/templates data/weekly_plans web/icons

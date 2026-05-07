@@ -1,0 +1,65 @@
+/* ========================================
+   Fig Theme
+   Gentle violet with purple accents
+   ======================================== */
+
+:root {
+    /* Background */
+    --bg-color: #f5f3fa;
+    --color-scheme: light;
+    --bg-image: none;
+
+    /* Typography */
+    --heading-font: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Lato', 'Helvetica Neue', 'Arial', sans-serif;
+    --accent-font: 'Playfair Display', serif;
+    --title-size: 3rem;
+
+    /* Colors */
+    --text-color: rgba(0, 0, 0, 0.85);
+    --text-muted: rgba(0, 0, 0, 0.55);
+    --accent-color: #8b7ec8;
+    --accent-color-dim: rgba(139, 126, 200, 0.40);
+
+    /* Cards */
+    --card-bg: rgba(139, 126, 200, 0.04);
+    --card-border: 1px solid rgba(139, 126, 200, 0.18);
+    --card-radius: 1rem;
+    --card-hover-shadow: 0 4px 24px rgba(139, 126, 200, 0.10);
+
+    /* Buttons */
+    --btn-bg: transparent;
+    --btn-text: #7066a2;
+    --btn-border: rgba(139, 126, 200, 0.40);
+    --btn-active-bg: rgba(139, 126, 200, 0.10);
+    --btn-active-text: #8b7ec8;
+    --btn-active-border: #8b7ec8;
+
+    /* Modal */
+    --modal-bg: #eeeaf5;
+    --modal-border: 1px solid rgba(139, 126, 200, 0.20);
+    --divider-color: rgba(0, 0, 0, 0.08);
+
+    /* Title */
+    --title-shadow: 0 0 30px rgba(139, 126, 200, 0.12);
+
+    /* Surfaces & Borders */
+    --surface-hover: rgba(0, 0, 0, 0.03);
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --overlay-bg: rgba(0, 0, 0, 0.4);
+    --focus-ring: 0 0 0 2px rgba(139, 126, 200, 0.25);
+    --input-bg: rgba(0, 0, 0, 0.04);
+
+    /* Misc */
+    --star-color: #8b7ec8;
+    --logo-filter: sepia(1) saturate(2) hue-rotate(240deg) brightness(0.6);
+    --warning-bg: rgba(139, 126, 200, 0.10);
+    --warning-text: #8b7ec8;
+
+    /* Theme Family: Soft */
+    --card-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    --card-backdrop: none;
+    --btn-radius: 2rem;
+    --modal-radius: 1.25rem;
+    --heading-letter-spacing: 0.01em;
+}

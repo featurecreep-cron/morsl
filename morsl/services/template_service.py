@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
 from datetime import date, timedelta
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from morsl.utils import atomic_write_json, safe_path
+from morsl.repositories.template import TemplateRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +17,21 @@ _DAY_INDEX = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun":
 class TemplateService:
     """CRUD and expansion for weekly meal-plan templates."""
 
-    def __init__(self, data_dir: str = "data") -> None:
-        self.templates_dir = os.path.join(data_dir, "templates")
+    def __init__(
+        self,
+        repo: Optional[TemplateRepository] = None,
+        user_id: int = 1,
+        data_dir: str = "data",
+    ) -> None:
+        if repo is not None:
+            self._repo = repo
+        else:
+            from morsl.db import ensure_default_user, get_db
+
+            conn = get_db(data_dir)
+            ensure_default_user(conn, user_id)
+            self._repo = TemplateRepository(conn)
+        self._user_id = user_id
 
     # ---- Name validation ----
 
@@ -35,60 +45,53 @@ class TemplateService:
 
     def list_templates(self) -> List[Dict[str, Any]]:
         """Return summary info for all templates."""
+        rows = self._repo.list_all(self._user_id)
         templates: List[Dict[str, Any]] = []
-        if not os.path.isdir(self.templates_dir):
-            return templates
-        for filename in sorted(os.listdir(self.templates_dir)):
-            if not filename.endswith(".json"):
-                continue
-            name = Path(filename).stem
-            try:
-                tpl = self._read(name)
-                templates.append(
-                    {
-                        "name": name,
-                        "description": tpl.get("description", ""),
-                        "slot_count": len(tpl.get("slots", [])),
-                        "deduplicate": tpl.get("deduplicate", True),
-                    }
-                )
-            except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Skipping template '%s': %s", name, e)
+        for row in rows:
+            config = row["config"]
+            templates.append(
+                {
+                    "name": row["name"],
+                    "description": config.get("description", ""),
+                    "slot_count": len(config.get("slots", [])),
+                    "deduplicate": config.get("deduplicate", True),
+                }
+            )
         return templates
 
     def get_template(self, name: str) -> Dict[str, Any]:
         """Load a single template by name."""
         self._validate_name(name)
-        return self._read(name)
+        row = self._repo.get_by_name(self._user_id, name)
+        if row is None:
+            raise FileNotFoundError(f"Template not found: {name}")
+        config = row["config"]
+        config["name"] = name
+        return config
 
     def create_template(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new template. Raises FileExistsError if already exists."""
         self._validate_name(name)
-        path = safe_path(self.templates_dir, f"{name}.json")
-        if os.path.isfile(path):
+        if self._repo.exists(self._user_id, name):
             raise FileExistsError(f"Template already exists: {name}")
         config["name"] = name
-        os.makedirs(self.templates_dir, exist_ok=True)
-        atomic_write_json(path, config)
+        self._repo.create(self._user_id, name, config)
         return config
 
     def update_template(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing template."""
         self._validate_name(name)
-        path = safe_path(self.templates_dir, f"{name}.json")
-        if not os.path.isfile(path):
+        if not self._repo.exists(self._user_id, name):
             raise FileNotFoundError(f"Template not found: {name}")
         config["name"] = name
-        atomic_write_json(path, config)
+        self._repo.update(self._user_id, name, config)
         return config
 
     def delete_template(self, name: str) -> None:
         """Delete a template."""
         self._validate_name(name)
-        path = safe_path(self.templates_dir, f"{name}.json")
-        if not os.path.isfile(path):
+        if not self._repo.delete(self._user_id, name):
             raise FileNotFoundError(f"Template not found: {name}")
-        os.unlink(path)
 
     # ---- Validation ----
 
@@ -177,12 +180,3 @@ class TemplateService:
             recipes_per_day = slot.get("recipes_per_day", 1)
             plan[profile] = plan.get(profile, 0) + (num_days * recipes_per_day)
         return plan
-
-    # ---- Internal ----
-
-    def _read(self, name: str) -> Dict[str, Any]:
-        path = safe_path(self.templates_dir, f"{name}.json")
-        if not os.path.isfile(path):
-            raise FileNotFoundError(f"Template not found: {name}")
-        with open(path) as f:
-            return json.load(f)
