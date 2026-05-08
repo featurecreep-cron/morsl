@@ -1,8 +1,9 @@
-"""Tests for TandoorAPI._unpack_list — forward-compatibility with Tandoor Next."""
+"""Tests for TandoorAPI."""
 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -88,3 +89,67 @@ class TestUnpackList:
     def test_empty_paginated(self, api):
         data = {"count": 0, "next": None, "results": []}
         assert api._unpack_list(data) == []
+
+
+class TestCleanupUncookedMealPlans:
+    """Verify cleanup targets plans OLDER than the cutoff, not recent ones."""
+
+    @patch("morsl.tandoor_api.now")
+    def test_date_range_targets_old_plans(self, mock_now, api):
+        """from_date..to_date must cover the past, ending at the cutoff day."""
+        fake_now = datetime(2026, 5, 8, 12, 0, 0)
+        mock_now.return_value = fake_now
+
+        plans_resp = MagicMock()
+        plans_resp.status_code = 200
+        plans_resp.json.return_value = []
+
+        cook_resp = MagicMock()
+        cook_resp.status_code = 200
+        cook_resp.json.return_value = []
+
+        api.session.get.side_effect = [plans_resp, cook_resp]
+
+        api.cleanup_uncooked_meal_plans(meal_plan_type=3, days=7)
+
+        # to_date should be 7 days ago (the cutoff), NOT yesterday
+        expected_to = (fake_now - timedelta(days=7)).strftime("%Y-%m-%d")
+        expected_from = (fake_now - timedelta(days=365)).strftime("%Y-%m-%d")
+
+        meal_plan_call = api.session.get.call_args_list[0]
+        params = meal_plan_call.kwargs.get("params") or meal_plan_call[1].get("params")
+        assert params["to_date"] == expected_to, (
+            f"to_date should be the cutoff ({expected_to}), got {params['to_date']}"
+        )
+        assert params["from_date"] == expected_from
+
+    @patch("morsl.tandoor_api.now")
+    def test_deletes_uncooked_spares_cooked(self, mock_now, api):
+        """Plans without cook-log entries get deleted; cooked ones survive."""
+        fake_now = datetime(2026, 5, 8, 12, 0, 0)
+        mock_now.return_value = fake_now
+
+        plans_resp = MagicMock()
+        plans_resp.status_code = 200
+        plans_resp.json.return_value = [
+            {"id": 10, "recipe": {"id": 100}},  # uncooked — should be deleted
+            {"id": 11, "recipe": {"id": 200}},  # cooked — should survive
+        ]
+
+        cook_resp = MagicMock()
+        cook_resp.status_code = 200
+        cook_resp.json.return_value = [{"recipe": 200}]
+
+        del_resp = MagicMock()
+        del_resp.status_code = 204
+
+        api.session.get.side_effect = [plans_resp, cook_resp]
+        api.session.delete.return_value = del_resp
+
+        deleted = api.cleanup_uncooked_meal_plans(meal_plan_type=3, days=7)
+
+        assert deleted == 1
+        api.session.delete.assert_called_once_with(
+            "http://tandoor.local/api/meal-plan/10/",
+            timeout=DEFAULT_TIMEOUT,
+        )
