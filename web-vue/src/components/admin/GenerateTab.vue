@@ -147,6 +147,13 @@
               <strong>Warnings:</strong>
               <span v-for="w in h.warnings" :key="w" class="warn-item">{{ w }}</span>
             </div>
+            <div class="history-detail-row" style="margin-top:0.5rem;">
+              <button class="btn-generate btn-secondary btn-sm"
+                      style="color:var(--error, #e74c3c); border-color:var(--error, #e74c3c);"
+                      @click.stop="admin.deleteHistoryEntry(h.id)">
+                Delete Entry
+              </button>
+            </div>
           </div>
         </button>
       </div>

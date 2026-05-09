@@ -46,6 +46,16 @@ def delete_menu(
     gen_service.clear_menu()
 
 
+@router.delete("/menu/{menu_id}", status_code=204, dependencies=[Depends(require_admin)])
+def delete_menu_by_id(
+    menu_id: int,
+    gen_service: GenerationService = Depends(get_generation_service),
+) -> None:
+    """Permanently delete a specific menu by ID."""
+    if not gen_service.delete_menu(menu_id):
+        raise HTTPException(status_code=404, detail="Menu not found")
+
+
 @router.get("/status", response_model=GenerationStatusResponse)
 def get_status(
     gen_service: GenerationService = Depends(get_generation_service),

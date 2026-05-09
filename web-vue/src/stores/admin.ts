@@ -92,7 +92,7 @@ const OPERATOR_LABELS: Record<ConstraintOperator, string> = {
   '==': 'Exactly',
 }
 
-const CONSTRAINT_TYPE_ORDER = ['keyword', 'food', 'book', 'rating', 'cookedon', 'createdon', 'makenow']
+const CONSTRAINT_TYPE_ORDER = ['keyword', 'food', 'book', 'mealplan', 'rating', 'cookedon', 'createdon', 'makenow']
 
 export const SCHEDULE_DAYS = [
   { key: 'mon', label: 'Mon' },
@@ -123,6 +123,12 @@ export const CONSTRAINT_TYPES: Record<AdminConstraintType, ConstraintTypeInfo> =
     icon: 'book',
     description: 'Require recipes from specific recipe books or collections',
     help: 'If your recipes are organized into books in Tandoor, use this to pull from specific collections.',
+  },
+  mealplan: {
+    label: 'Meal Plan',
+    icon: 'calendar',
+    description: 'Pick recipes from an existing Tandoor meal plan',
+    help: 'Select a meal type and date to pull recipes from your Tandoor meal plan. Useful for regenerating around existing planned meals.',
   },
   rating: {
     label: 'Rating',
@@ -395,6 +401,7 @@ export const useAdminStore = defineStore('admin', () => {
   let _sseReconnectId: ReturnType<typeof setTimeout> | null = null
   let _mappingKwDebounceId: ReturnType<typeof setTimeout> | null = null
   let _mappingFoodDebounceId: ReturnType<typeof setTimeout> | null = null
+  let _bookDebounceId: ReturnType<typeof setTimeout> | null = null
   let _orderSSE: EventSource | null = null
   let _sseRetryDelay: number = CONST.SSE_INITIAL_RETRY_MS
 
@@ -594,6 +601,34 @@ export const useAdminStore = defineStore('admin', () => {
         .map(k => ({ ...k, path: getKeywordPath(k) }))
         .slice(0, CONST.MAX_KEYWORD_RESULTS)
     }, CONST.KEYWORD_DEBOUNCE_MS)
+  }
+
+  // --- Books ---
+  const bookSearch = ref('')
+  const bookResults = ref<Array<{ id: number; name: string; path: string }>>([])
+
+  function searchBooks() {
+    if (_bookDebounceId) clearTimeout(_bookDebounceId)
+    _bookDebounceId = setTimeout(async () => {
+      if (!bookSearch.value || bookSearch.value.length < CONST.MIN_KEYWORD_SEARCH_LEN) {
+        bookResults.value = []
+        return
+      }
+      try {
+        const res = await adminFetch(`/api/books?search=${encodeURIComponent(bookSearch.value)}`)
+        if (res.ok) {
+          const data = await res.json()
+          const results = data.results || data || []
+          bookResults.value = results.map((b: Record<string, unknown>) => ({
+            id: b.id as number,
+            name: b.name as string,
+            path: b.name as string,
+          }))
+        }
+      } catch {
+        bookResults.value = []
+      }
+    }, CONST.FOOD_DEBOUNCE_MS)
   }
 
   // --- Path helpers ---
@@ -1101,6 +1136,9 @@ export const useAdminStore = defineStore('admin', () => {
 
     if (type === 'keyword' || type === 'food' || type === 'book') {
       newConstraint.items = []
+    } else if (type === 'mealplan') {
+      newConstraint.items = []
+      newConstraint.date = new Date().toISOString().slice(0, 10)
     } else if (type === 'rating') {
       (newConstraint as unknown as Record<string, unknown>).min_rating = 3
     } else if (type === 'cookedon' || type === 'createdon') {
@@ -1200,6 +1238,7 @@ export const useAdminStore = defineStore('admin', () => {
       'include-foods': { type: 'food', operator: '>=', count: 1, items: [], label: 'Include Foods' },
       'avoid-foods': { type: 'food', operator: '==', count: 0, items: [], label: 'Avoid Foods' },
       'from-books': { type: 'book', operator: '>=', count: 1, items: [], label: 'From Books' },
+      'from-mealplan': { type: 'mealplan', operator: '>=', count: 1, items: [], date: new Date().toISOString().slice(0, 10), label: 'From Meal Plan' },
       'min-rating': { type: 'rating', operator: '>=', count: 1, min: 4, label: 'Min Rating' },
       'avoid-recent': { type: 'cookedon', operator: '==', count: 0, date_direction: 'within', date_days: 14, label: 'Avoid Recent' },
       'include-new': { type: 'createdon', operator: '>=', count: 1, date_direction: 'within', date_days: 30, label: 'Include New' },
@@ -1317,6 +1356,14 @@ export const useAdminStore = defineStore('admin', () => {
       const direction = c.date_direction ?? ((record.older_than_days !== undefined) ? 'older' : 'within')
       if (direction === 'older') return `${opLabel} ${c.count} added more than ${days} days ago`
       return `${opLabel} ${c.count} added within last ${days} days`
+    } else if (c.type === 'mealplan') {
+      const items = c.items || []
+      const dateStr = c.date || 'today'
+      if (items.length === 0) return `${opLabel} ${c.count} from meal plan on ${dateStr}`
+      const names = items.slice(0, 2).map(i => i.name)
+      let itemStr = names.join(', ')
+      if (items.length > 2) itemStr += ` +${items.length - 2} more`
+      return `${opLabel} ${c.count} from ${itemStr} on ${dateStr}`
     } else if (c.type === 'makenow') {
       return `${opLabel} ${c.count} with on-hand ingredients`
     }
@@ -1333,6 +1380,12 @@ export const useAdminStore = defineStore('admin', () => {
     const op = c.operator || '>='
     const record = c as unknown as Record<string, unknown>
 
+    if (type === 'mealplan') {
+      const dateStr = c.date || 'today'
+      if (op === '>=') return items.length ? `At least ${count} from: ${nameStr} on ${dateStr}` : `At least ${count} from meal plan on ${dateStr}`
+      if (op === '<=') return items.length ? `At most ${count} from: ${nameStr} on ${dateStr}` : `At most ${count} from meal plan on ${dateStr}`
+      if (op === '==') return items.length ? `Exactly ${count} from: ${nameStr} on ${dateStr}` : `Exactly ${count} from meal plan on ${dateStr}`
+    }
     if (type === 'keyword' || type === 'food' || type === 'book') {
       const typeLabel = type === 'keyword' ? 'keywords' : type === 'food' ? 'foods' : 'books'
       if (record.exclude) {
@@ -2632,6 +2685,19 @@ export const useAdminStore = defineStore('admin', () => {
     expandedHistoryId.value = expandedHistoryId.value === id ? null : id
   }
 
+  async function deleteHistoryEntry(id: number) {
+    try {
+      const res = await adminFetch(`/api/history/${id}`, { method: 'DELETE' })
+      if (res.ok || res.status === 204) {
+        history.value = history.value.filter(h => h.id !== id)
+        historyTotal.value = Math.max(0, historyTotal.value - 1)
+        if (expandedHistoryId.value === id) expandedHistoryId.value = null
+      }
+    } catch (e: unknown) {
+      showError('Failed to delete entry: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
   function clearHistory() {
     confirmModal.value = {
       show: true,
@@ -2837,6 +2903,9 @@ export const useAdminStore = defineStore('admin', () => {
     selectedFoods,
     searchFoods,
     searchKeywords,
+    bookSearch,
+    bookResults,
+    searchBooks,
     filteredKeywords,
     addKeyword,
     removeKeyword,
@@ -3040,6 +3109,7 @@ export const useAdminStore = defineStore('admin', () => {
     loadAnalytics,
     toggleHistoryDetail,
     clearHistory,
+    deleteHistoryEntry,
 
     // 20. Ratings
     setRating,

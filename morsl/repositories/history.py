@@ -133,6 +133,15 @@ class HistoryRepository:
             "avg_recipes_per_generation": round(sum(recipe_counts) / total, 1),
         }
 
+    def delete(self, entry_id: int, user_id: int) -> bool:
+        """Delete a single history entry. Returns True if deleted."""
+        cur = self._conn.execute(
+            "DELETE FROM generation_history WHERE id = ? AND user_id = ?",
+            (entry_id, user_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
     def clear(self, user_id: int) -> None:
         """Delete all history entries for a user."""
         self._conn.execute("DELETE FROM generation_history WHERE user_id = ?", (user_id,))

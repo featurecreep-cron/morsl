@@ -304,6 +304,7 @@ export type AdminConstraintType =
   | 'keyword'
   | 'food'
   | 'book'
+  | 'mealplan'
   | 'rating'
   | 'cookedon'
   | 'createdon'
@@ -321,6 +322,7 @@ export interface AdminConstraint {
   max?: number
   date_direction?: 'within' | 'older'
   date_days?: number
+  date?: string
   date_before?: string
   date_after?: string
   include_children?: boolean

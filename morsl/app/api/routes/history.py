@@ -43,6 +43,16 @@ def get_history_entry(
     return entry
 
 
+@router.delete("/history/{entry_id}", status_code=204)
+def delete_history_entry(
+    entry_id: int,
+    svc: HistoryService = Depends(get_history_service),
+) -> None:
+    """Delete a single history entry by ID."""
+    if not svc.delete_entry(entry_id):
+        raise HTTPException(status_code=404, detail="History entry not found")
+
+
 @router.delete("/history", status_code=204)
 def clear_history(
     svc: HistoryService = Depends(get_history_service),

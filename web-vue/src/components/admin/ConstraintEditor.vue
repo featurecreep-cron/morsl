@@ -81,6 +81,39 @@
                                 placeholder="Type to search ingredients..."
                                 @search="admin.searchFoods()"
                                 @select="(item: SearchDropdownItem) => { admin.addItemToConstraint(c, item); admin.foodSearch = ''; admin.foodResults = [] }" />
+                <SearchDropdown v-show="c.type === 'book'"
+                                v-model="admin.bookSearch"
+                                :results="admin.bookResults"
+                                placeholder="Type to search recipe books..."
+                                @search="admin.searchBooks()"
+                                @select="(item: SearchDropdownItem) => { admin.addItemToConstraint(c, item); admin.bookSearch = ''; admin.bookResults = [] }" />
+              </div>
+
+              <!-- Meal plan fields -->
+              <div class="constraint-field" v-show="c.type === 'mealplan'">
+                <label>Meal Types</label>
+                <small class="field-help">Select which meal types to pull recipes from</small>
+                <div class="constraint-items-list">
+                  <span v-for="item in (c.items || [])" :key="item.id" class="constraint-item-tag">
+                    <span>{{ item.name }}</span>
+                    <button @click="admin.removeItemFromConstraint(c, item.id)" aria-label="Remove">&times;</button>
+                  </span>
+                  <span class="constraint-empty" v-show="!c.items || c.items.length === 0">
+                    No meal types selected — all types will be included
+                  </span>
+                </div>
+                <select class="drawer-select" @change="onMealTypeSelect($event, c)">
+                  <option value="">Add meal type...</option>
+                  <option v-for="mt in admin.mealTypes" :key="mt.id" :value="mt.id"
+                          :disabled="(c.items || []).some(i => i.id === mt.id)">
+                    {{ mt.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="constraint-field" v-show="c.type === 'mealplan'">
+                <label>Date</label>
+                <small class="field-help">Which date to pull meal plan recipes from</small>
+                <input type="date" class="drawer-input" v-model="c.date">
               </div>
 
               <!-- Rating fields -->
@@ -234,6 +267,10 @@
             <span class="add-constraint-option-icon" v-html="constraintTypes.book?.icon"></span>
             <span class="add-constraint-option-content"><span class="add-constraint-option-label">From Books</span><span class="add-constraint-option-desc">Pick from specific recipe books</span></span>
           </button>
+          <button class="add-constraint-option" @click="admin.quickAddConstraint('from-mealplan'); quickAddOpen = false">
+            <span class="add-constraint-option-icon" v-html="constraintTypes.mealplan?.icon"></span>
+            <span class="add-constraint-option-content"><span class="add-constraint-option-label">From Meal Plan</span><span class="add-constraint-option-desc">Pick from existing Tandoor meal plan</span></span>
+          </button>
           <button class="add-constraint-option" @click="admin.quickAddConstraint('min-rating'); quickAddOpen = false">
             <span class="add-constraint-option-icon" v-html="constraintTypes.rating?.icon"></span>
             <span class="add-constraint-option-content"><span class="add-constraint-option-label">Min Rating</span><span class="add-constraint-option-desc">Only highly rated recipes</span></span>
@@ -272,6 +309,7 @@
 import { ref } from 'vue'
 import SearchDropdown from '@/components/shared/SearchDropdown.vue'
 import type { SearchDropdownItem } from '@/components/shared/SearchDropdown.vue'
+import type { AdminConstraint } from '@/types/api'
 import { useAdminStore, CONSTRAINT_TYPES } from '@/stores/admin'
 
 const admin = useAdminStore()
@@ -279,4 +317,15 @@ const constraintTypes = CONSTRAINT_TYPES
 
 const quickAddOpen = ref(false)
 const addRuleOpen = ref(false)
+
+function onMealTypeSelect(event: Event, constraint: AdminConstraint) {
+  const select = event.target as HTMLSelectElement
+  const id = parseInt(select.value)
+  if (!id) return
+  const mt = admin.mealTypes.find(m => m.id === id)
+  if (mt) {
+    admin.addItemToConstraint(constraint, { id: mt.id, name: mt.name })
+  }
+  select.value = ''
+}
 </script>
