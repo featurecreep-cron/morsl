@@ -9,9 +9,10 @@ API_CACHE_MAXSIZE = 512
 API_CACHE_TTL_MINUTES = 240
 ADMIN_TOKEN_CACHE_MAXSIZE = 128
 PIN_TIMEOUT_OPTIONS = [0, 30, 60, 300]
-# Grace period for "immediate" timeout — allows admin page to complete its
-# parallel API calls during a single page load before the token expires.
-PIN_IMMEDIATE_GRACE_SECONDS = 15
+# Grace period for "immediate" timeout — allows the admin session to
+# function after page load. The PIN is required on each visit to /admin,
+# but the token stays valid for interactive use during the session.
+PIN_IMMEDIATE_GRACE_SECONDS = 300
 
 # HTTP client
 HTTP_CONNECT_TIMEOUT = 5

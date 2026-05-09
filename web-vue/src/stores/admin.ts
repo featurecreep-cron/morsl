@@ -105,52 +105,63 @@ export const SCHEDULE_DAYS = [
 ] as const
 
 /** Constraint type metadata for the UI. Icons are text placeholders — components render real SVGs. */
+// Small inline SVGs for constraint type icons (24x24 viewBox, stroke-based)
+const CONSTRAINT_ICON_SVG = {
+  tag: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/></svg>`,
+  food: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 11h.01"/><path d="M11 15h.01"/><path d="M16 16h.01"/><path d="m2 16 20 6-6-20A20 20 0 0 0 2 16"/><path d="M5.71 17.11a17.04 17.04 0 0 1 11.4-11.4"/></svg>`,
+  book: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>`,
+} as const
+
 export const CONSTRAINT_TYPES: Record<AdminConstraintType, ConstraintTypeInfo> = {
   keyword: {
     label: 'Keyword',
-    icon: 'tag',
+    icon: CONSTRAINT_ICON_SVG.tag,
     description: 'Require recipes with specific tags like "Italian", "Quick", or "Vegetarian"',
     help: 'Keywords are tags assigned to recipes in Tandoor. Use this to filter by cuisine, meal type, or any custom tags you\'ve created.',
   },
   food: {
     label: 'Ingredient',
-    icon: 'food',
+    icon: CONSTRAINT_ICON_SVG.food,
     description: 'Require recipes containing specific ingredients like bourbon or lime juice',
     help: 'Filter recipes by their ingredients. Great for using up specific bottles or avoiding ingredients you don\'t have.',
   },
   book: {
     label: 'Book',
-    icon: 'book',
+    icon: CONSTRAINT_ICON_SVG.book,
     description: 'Require recipes from specific recipe books or collections',
     help: 'If your recipes are organized into books in Tandoor, use this to pull from specific collections.',
   },
   mealplan: {
     label: 'Meal Plan',
-    icon: 'calendar',
+    icon: CONSTRAINT_ICON_SVG.calendar,
     description: 'Pick recipes from an existing Tandoor meal plan',
     help: 'Select a meal type and date to pull recipes from your Tandoor meal plan. Useful for regenerating around existing planned meals.',
   },
   rating: {
     label: 'Rating',
-    icon: 'star',
+    icon: CONSTRAINT_ICON_SVG.star,
     description: 'Require recipes with a minimum star rating',
     help: 'Filter by how you\'ve rated recipes. Great for ensuring quality picks or finding underrated gems to try again.',
   },
   cookedon: {
     label: 'Last Made',
-    icon: 'calendar',
+    icon: CONSTRAINT_ICON_SVG.calendar,
     description: 'Filter by when you last made a recipe',
     help: 'Avoid recipes you\'ve had recently, or specifically include recent favorites. Based on Tandoor\'s meal plan history.',
   },
   createdon: {
     label: 'Date Added',
-    icon: 'clock',
+    icon: CONSTRAINT_ICON_SVG.clock,
     description: 'Filter by when recipes were added to your collection',
     help: 'Find new additions you haven\'t tried yet, or stick to tried-and-true classics.',
   },
   makenow: {
     label: 'Make Now',
-    icon: 'check',
+    icon: CONSTRAINT_ICON_SVG.check,
     description: 'Prefer recipes you can make with ingredients on hand',
     help: 'Uses Tandoor\'s on-hand tracking. Mark ingredients as "on hand" in Tandoor, then use this to prefer recipes you can make right now.',
   },
