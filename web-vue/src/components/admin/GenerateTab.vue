@@ -16,10 +16,14 @@
         </select>
         <button class="btn-generate"
                 :disabled="admin.status.state === 'generating' || !admin.selectedProfile"
-                @click="admin.generateProfile()">
+                @click="admin.generateProfile(clearOthers)">
           {{ admin.status.state === 'generating' ? 'Generating...' : 'Generate' }}
         </button>
       </div>
+      <label class="checkbox-row" style="margin-top:0.5rem; font-size:0.85rem;">
+        <input type="checkbox" v-model="clearOthers">
+        Replace existing menu
+      </label>
     </section>
 
     <!-- Schedule Menu -->
@@ -212,10 +216,12 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import ScheduleForm from '@/components/admin/ScheduleForm.vue'
 import { useAdminStore } from '@/stores/admin'
 import { itemNounText } from '@/utils/formatting'
 import { STOCK_ICON_SVG } from '@/utils/icons'
 
 const admin = useAdminStore()
+const clearOthers = ref(true)
 </script>

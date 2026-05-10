@@ -113,7 +113,16 @@
               <div class="constraint-field" v-show="c.type === 'mealplan'">
                 <label>Date</label>
                 <small class="field-help">Which date to pull meal plan recipes from</small>
-                <input type="date" class="drawer-input" v-model="c.date">
+                <select class="drawer-select" v-model="c.date">
+                  <option value="">Any date</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="tomorrow">Tomorrow</option>
+                  <option value="-2">2 days ago</option>
+                  <option value="+2">2 days from now</option>
+                  <option value="-7">7 days ago</option>
+                  <option value="+7">7 days from now</option>
+                </select>
               </div>
 
               <!-- Rating fields -->

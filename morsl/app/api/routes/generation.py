@@ -64,6 +64,7 @@ async def generate_custom(
 @router.post("/generate/{profile}", status_code=202, response_model=GenerateResponse)
 async def generate_profile(
     profile: str,
+    clear_others: bool = False,
     gen_service: GenerationService = Depends(get_generation_service),
     config_service: ConfigService = Depends(get_config_service),
     settings_svc: SettingsService = Depends(get_settings_service),
@@ -72,7 +73,13 @@ async def generate_profile(
 ) -> GenerateResponse:
     """Generate menu using a named profile."""
     return await _start_generation(
-        gen_service, config_service, settings_svc, profile, credentials, logger
+        gen_service,
+        config_service,
+        settings_svc,
+        profile,
+        credentials,
+        logger,
+        clear_others=clear_others,
     )
 
 
@@ -83,6 +90,8 @@ async def _start_generation(
     profile_name: str,
     credentials: tuple[str, str],
     logger: Logger,
+    *,
+    clear_others: bool = False,
 ) -> GenerateResponse:
     if gen_service.get_status().state == GenerationState.GENERATING:
         raise HTTPException(status_code=409, detail="A generation is already in progress")
@@ -100,6 +109,11 @@ async def _start_generation(
 
     url, token = credentials
     request_id = await gen_service.start_generation(
-        config=config, url=url, token=token, logger=logger, profile_name=profile_name
+        config=config,
+        url=url,
+        token=token,
+        logger=logger,
+        profile_name=profile_name,
+        clear_others=clear_others,
     )
     return GenerateResponse(request_id=request_id, status="generating")

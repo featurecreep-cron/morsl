@@ -768,13 +768,14 @@ export const useAdminStore = defineStore('admin', () => {
     return `generating \u00b7 ${secs}s`
   }
 
-  async function generateProfile() {
+  async function generateProfile(clearOthers: boolean = false) {
     if (status.value.state === 'generating' || !selectedProfile.value) return
     status.value = { state: 'generating', started_at: new Date().toISOString() }
     _startGeneratingTick()
 
     try {
-      const url = `/api/generate/${encodeURIComponent(selectedProfile.value)}`
+      const params = clearOthers ? '?clear_others=true' : ''
+      const url = `/api/generate/${encodeURIComponent(selectedProfile.value)}${params}`
       const res = await adminFetch(url, { method: 'POST' })
       if (res.status === 202 || res.status === 409) {
         startStatusPolling()

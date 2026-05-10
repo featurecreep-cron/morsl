@@ -281,11 +281,23 @@ class MenuService:
 
     def _prepare_mealplan_constraint(self, constraint: Dict[str, Any]) -> None:
         """Fetch recipes from an existing Tandoor meal plan by type and date."""
-        from datetime import datetime
+        from datetime import datetime, timedelta
 
         meal_type_ids = constraint.get("item_ids", [])
         date_str = constraint.get("date")
-        date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else None
+        date: datetime | None = None
+        if date_str:
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            if date_str == "today":
+                date = today
+            elif date_str == "yesterday":
+                date = today - timedelta(days=1)
+            elif date_str == "tomorrow":
+                date = today + timedelta(days=1)
+            elif date_str.lstrip("-+").isdigit():
+                date = today + timedelta(days=int(date_str))
+            else:
+                date = datetime.strptime(date_str, "%Y-%m-%d")
 
         found_recipes: List[Recipe] = []
         for r in self.provider.get_mealplan_recipes(mealtype_id=meal_type_ids or None, date=date):
