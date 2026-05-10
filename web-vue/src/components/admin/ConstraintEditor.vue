@@ -241,7 +241,7 @@
 
     <!-- Quick Add presets + Add constraint dropdown -->
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-start;">
-      <div class="add-constraint-dropdown">
+      <div class="add-constraint-dropdown" ref="quickAddRef">
         <button class="btn-add-constraint btn-secondary" @click="quickAddOpen = !quickAddOpen" type="button" style="font-size:0.8rem; height:30px;">
           <span>Quick Add</span>
           <span style="font-size: 0.7em; margin-left: 0.5rem;">{{ quickAddOpen ? '\u25B2' : '\u25BC' }}</span>
@@ -285,7 +285,7 @@
           </button>
         </div>
       </div>
-      <div class="add-constraint-dropdown">
+      <div class="add-constraint-dropdown" ref="addRuleRef">
         <button class="btn-add-constraint" @click="addRuleOpen = !addRuleOpen" type="button">
           <span>+ Add Rule</span>
           <span style="font-size: 0.7em; margin-left: 0.5rem;">{{ addRuleOpen ? '\u25B2' : '\u25BC' }}</span>
@@ -306,7 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import SearchDropdown from '@/components/shared/SearchDropdown.vue'
 import type { SearchDropdownItem } from '@/components/shared/SearchDropdown.vue'
 import type { AdminConstraint } from '@/types/api'
@@ -317,6 +317,20 @@ const constraintTypes = CONSTRAINT_TYPES
 
 const quickAddOpen = ref(false)
 const addRuleOpen = ref(false)
+const quickAddRef = ref<HTMLElement | null>(null)
+const addRuleRef = ref<HTMLElement | null>(null)
+
+function onClickOutside(e: MouseEvent) {
+  if (quickAddOpen.value && quickAddRef.value && !quickAddRef.value.contains(e.target as Node)) {
+    quickAddOpen.value = false
+  }
+  if (addRuleOpen.value && addRuleRef.value && !addRuleRef.value.contains(e.target as Node)) {
+    addRuleOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 function onMealTypeSelect(event: Event, constraint: AdminConstraint) {
   const select = event.target as HTMLSelectElement
