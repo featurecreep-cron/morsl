@@ -101,6 +101,22 @@ class GenerationService(SSEPublisher):
             self._notify_subscribers({"type": "menu_cleared"})
         return had_menu
 
+    def delete_menu(self, menu_id: int) -> bool:
+        """Permanently delete a menu by ID. Returns True if deleted."""
+        # If deleting the current menu, clear the cache
+        if self._cached_menu and self._cached_menu.get("_db_id") == menu_id:
+            self._cached_menu = None
+            self._notify_subscribers({"type": "menu_cleared"})
+        return self._menu_repo.delete(menu_id, self._user_id)
+
+    def delete_all_menus(self) -> int:
+        """Permanently delete all menus. Returns count deleted."""
+        self._cached_menu = None
+        count = self._menu_repo.delete_all(self._user_id)
+        if count > 0:
+            self._notify_subscribers({"type": "menu_cleared"})
+        return count
+
     async def start_generation(
         self,
         config: Dict[str, Any],

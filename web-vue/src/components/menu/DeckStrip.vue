@@ -55,7 +55,7 @@ function getRecipeCount(shelf: Shelf): number {
 </script>
 
 <template>
-  <div v-if="shelves.length > 1" class="deck-strip">
+  <div v-if="shelves.length > 0" class="deck-strip">
     <div
       v-for="shelf in shelves"
       :key="shelf.name"
@@ -72,6 +72,8 @@ function getRecipeCount(shelf: Shelf): number {
       @pointercancel="cancelLongPress()"
       @pointerleave="cancelLongPress()"
     >
+      <button class="deck-card-delete" @click.stop="menu.removeShelf(shelf.name)"
+              title="Remove shelf" aria-label="Remove shelf">&times;</button>
       <div class="deck-card-stack">
         <div class="deck-card-face">
           <img
@@ -124,6 +126,32 @@ function getRecipeCount(shelf: Shelf): number {
 
 .deck-card:hover { transform: translateY(-2px); }
 .deck-card--active { transform: translateY(-3px); }
+
+.deck-card-delete {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  z-index: 10;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--error, #e74c3c);
+  color: #fff;
+  border: none;
+  font-size: 0.75rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.deck-card:hover .deck-card-delete,
+.deck-card-delete:focus-visible {
+  opacity: 1;
+}
 
 .deck-card-stack {
   position: relative;
@@ -231,5 +259,6 @@ function getRecipeCount(shelf: Shelf): number {
 @media (max-width: 575.98px) {
   .deck-card-stack { width: 85px; height: 60px; }
   .deck-card-title { font-size: 0.65rem; }
+  .deck-card-delete { opacity: 0.7; }
 }
 </style>

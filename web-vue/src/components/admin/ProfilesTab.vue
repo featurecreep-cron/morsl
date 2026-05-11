@@ -45,9 +45,9 @@
              style="justify-content:space-between; cursor:default;">
           <span style="display:flex; align-items:center; gap:0.5rem;">
             <span class="drag-handle" style="cursor:grab; opacity:0.5; font-size:1.1rem;" title="Drag to reorder">&#9776;</span>
-            <span>
+            <span style="display:flex; flex-direction:column; gap:0.1rem;">
               <strong>{{ cat.display_name || cat.id }}</strong>
-              <small v-show="cat.subtitle" style="opacity:0.6;">{{ cat.subtitle }}</small>
+              <small v-show="cat.subtitle" style="opacity:0.6; font-size:0.75rem;">{{ cat.subtitle }}</small>
             </span>
           </span>
           <span>

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type {
   Menu, Recipe, GenerationStatus, Shelf, ShelfGeneration,
-  CarouselItem, CarouselDivider, IconMappings,
+  CarouselItem, IconMappings,
   NamePromptState, ConfirmModalState, MealPlanSaveState,
   PendingOrder,
 } from '@/types/api'
@@ -82,10 +82,6 @@ export const useMenuStore = defineStore('menu', () => {
   const kioskPinValue = ref('')
   const kioskPinError = ref('')
 
-  // Carousel cache
-  let _carouselCache: CarouselItem[] | null = null
-  let _carouselCacheKey: string | null = null
-
   // Carousel scroll trigger — increment to signal scroll-to-start
   const carouselScrollTrigger = ref(0)
 
@@ -103,48 +99,20 @@ export const useMenuStore = defineStore('menu', () => {
   })
 
   const mainCarouselRecipes = computed<CarouselItem[]>(() => {
-    let gens: ShelfGeneration[]
+    let shelf: Shelf | undefined
     if (activeDeckName.value) {
-      gens = (shelves.value.find(s => s.name === activeDeckName.value))?.generations ?? []
+      shelf = shelves.value.find(s => s.name === activeDeckName.value)
     } else if (shelves.value.length > 0) {
-      gens = shelves.value[0].generations ?? []
-    } else {
+      shelf = shelves.value[0]
+    }
+    if (!shelf || !shelf.generations || shelf.generations.length === 0) {
       return []
     }
-    const cacheKey = (activeDeckName.value || '_first') + ':' + gens.length + ':' +
-      gens.reduce((s, g) => s + (g.recipes ? g.recipes.length : 0), 0)
-    if (_carouselCacheKey === cacheKey && _carouselCache) {
-      return _carouselCache
-    }
-    const profile = activeDeckName.value || (shelves.value[0]?.name) || 'mixed'
-    _carouselCache = flattenGenerations(gens, profile)
-    _carouselCacheKey = cacheKey
-    return _carouselCache
+    const idx = shelf.currentIndex || 0
+    const gen = shelf.generations[idx]
+    if (!gen || !Array.isArray(gen.recipes)) return []
+    return gen.recipes.filter(r => r && r.id).map(r => ({ ...r, _genIndex: 0 }))
   })
-
-  function flattenGenerations(generations: ShelfGeneration[], defaultProfile: string): CarouselItem[] {
-    const items: CarouselItem[] = []
-    for (let i = 0; i < generations.length; i++) {
-      const gen = generations[i]
-      if (!gen || !Array.isArray(gen.recipes)) continue
-      if (i > 0) {
-        const divider: CarouselDivider = {
-          _isDivider: true,
-          _pageNum: i + 1,
-          _totalPages: generations.length,
-          _generatedAt: gen.generatedAt,
-          _profile: gen.profile || defaultProfile,
-        }
-        items.push(divider)
-      }
-      for (const recipe of gen.recipes) {
-        if (recipe && recipe.id) {
-          items.push({ ...recipe, _genIndex: i })
-        }
-      }
-    }
-    return items
-  }
 
   // ---- Data Loading ----
 
@@ -216,8 +184,7 @@ export const useMenuStore = defineStore('menu', () => {
       if (opts.clearOthers && versionChanged) {
         shelves.value = []
         activeDeckName.value = null
-        _carouselCache = null
-        _carouselCacheKey = null
+
       }
 
       if (shelves.value.length === 0) {
@@ -415,8 +382,7 @@ export const useMenuStore = defineStore('menu', () => {
   // ---- Shelf Management ----
 
   function addShelf(name: string, recipeList: Recipe[], genAt?: string) {
-    _carouselCache = null
-    _carouselCacheKey = null
+
     const generation: ShelfGeneration = {
       recipes: recipeList,
       generatedAt: genAt || new Date().toISOString(),
@@ -507,8 +473,7 @@ export const useMenuStore = defineStore('menu', () => {
     const shelf = shelves.value.find(s => s.name === shelfName)
     if (!shelf || shelf.generations.length === 0) return
     shelf.currentIndex = Math.min((shelf.currentIndex || 0) + 1, shelf.generations.length - 1)
-    _carouselCache = null
-    _carouselCacheKey = null
+
     carouselScrollTrigger.value++
     saveShelves()
   }
@@ -517,8 +482,7 @@ export const useMenuStore = defineStore('menu', () => {
     const shelf = shelves.value.find(s => s.name === shelfName)
     if (!shelf || shelf.generations.length === 0) return
     shelf.currentIndex = Math.max((shelf.currentIndex || 0) - 1, 0)
-    _carouselCache = null
-    _carouselCacheKey = null
+
     carouselScrollTrigger.value++
     saveShelves()
   }
@@ -527,8 +491,7 @@ export const useMenuStore = defineStore('menu', () => {
     const shelf = shelves.value.find(s => s.name === shelfName)
     if (!shelf || shelf.generations.length === 0) return
     shelf.currentIndex = Math.max(0, Math.min(index, shelf.generations.length - 1))
-    _carouselCache = null
-    _carouselCacheKey = null
+
     carouselScrollTrigger.value++
     saveShelves()
   }
@@ -943,6 +906,5 @@ export const useMenuStore = defineStore('menu', () => {
 
     // Internal
     _targetShelf,
-    flattenGenerations,
   }
 })

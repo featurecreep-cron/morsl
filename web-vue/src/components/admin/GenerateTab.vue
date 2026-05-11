@@ -20,6 +20,10 @@
           {{ admin.status.state === 'generating' ? 'Generating...' : 'Generate' }}
         </button>
       </div>
+      <label class="checkbox-row" style="margin-top:0.5rem; font-size:0.85rem;">
+        <input type="checkbox" v-model="admin.clearOthers">
+        Replace existing menu
+      </label>
     </section>
 
     <!-- Schedule Menu -->
@@ -146,6 +150,13 @@
             <div v-if="h.warnings.length > 0" class="history-detail-row">
               <strong>Warnings:</strong>
               <span v-for="w in h.warnings" :key="w" class="warn-item">{{ w }}</span>
+            </div>
+            <div class="history-detail-row" style="margin-top:0.5rem;">
+              <button class="btn-generate btn-secondary btn-sm"
+                      style="color:var(--error, #e74c3c); border-color:var(--error, #e74c3c);"
+                      @click.stop="admin.deleteHistoryEntry(h.id)">
+                Delete Entry
+              </button>
             </div>
           </div>
         </button>

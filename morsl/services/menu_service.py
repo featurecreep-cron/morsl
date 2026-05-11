@@ -193,6 +193,8 @@ class MenuService:
                 self._prepare_food_constraint(constraint)
             elif ctype == "book":
                 self._prepare_book_constraint(constraint)
+            elif ctype == "mealplan":
+                self._prepare_mealplan_constraint(constraint)
             elif ctype == "makenow":
                 self._prepare_makenow_constraint(constraint)
             # rating, cookedon, createdon don't need API prep
@@ -277,6 +279,37 @@ class MenuService:
 
         constraint["matching_recipes"] = _apply_date_filters(found_recipes, constraint)
 
+    def _prepare_mealplan_constraint(self, constraint: Dict[str, Any]) -> None:
+        """Fetch recipes from an existing Tandoor meal plan by type and date."""
+        from datetime import datetime, timedelta
+
+        meal_type_ids = constraint.get("item_ids", [])
+        date_str = constraint.get("date")
+        date: datetime | None = None
+        if date_str:
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            if date_str == "today":
+                date = today
+            elif date_str == "yesterday":
+                date = today - timedelta(days=1)
+            elif date_str == "tomorrow":
+                date = today + timedelta(days=1)
+            elif date_str.lstrip("-+").isdigit():
+                date = today + timedelta(days=int(date_str))
+            else:
+                date = datetime.strptime(date_str, "%Y-%m-%d")
+
+        found_recipes: List[Recipe] = []
+        for r in self.provider.get_mealplan_recipes(mealtype_id=meal_type_ids or None, date=date):
+            found_recipes.append(make_recipe(r))
+
+        self.logger.info(
+            f"Meal plan constraint (types={meal_type_ids}, date={date_str}): "
+            f"{len(found_recipes)} recipes found"
+        )
+
+        constraint["matching_recipes"] = _apply_date_filters(found_recipes, constraint)
+
     def prepare_data(self) -> None:
         """Prepare all data needed for solving."""
         self.prepare_recipes()
@@ -324,6 +357,18 @@ class MenuService:
         )
 
     def _apply_book_constraint(self, c, exclude, weight) -> None:
+        label = self._build_constraint_label(c)
+        self.recipe_picker.add_book_constraint(
+            c.get("matching_recipes", []),
+            c["count"],
+            c["operator"],
+            exclude=exclude,
+            weight=weight,
+            upper_bound=c.get("upper_bound"),
+            label=label,
+        )
+
+    def _apply_mealplan_constraint(self, c, exclude, weight) -> None:
         label = self._build_constraint_label(c)
         self.recipe_picker.add_book_constraint(
             c.get("matching_recipes", []),
@@ -399,6 +444,7 @@ class MenuService:
             "keyword": self._apply_keyword_constraint,
             "food": self._apply_food_constraint,
             "book": self._apply_book_constraint,
+            "mealplan": self._apply_mealplan_constraint,
             "rating": self._apply_rating_constraint,
             "makenow": self._apply_makenow_constraint,
         }

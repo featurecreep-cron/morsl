@@ -1505,7 +1505,15 @@ select.drawer-input option {
     font-size: 0.8rem;
     color: var(--accent-color, #d4a847);
     padding: 0 0.5rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.preview-result.preview-error {
+    color: #f87171;
 }
 
 /* Constraint tab buttons */
@@ -1665,6 +1673,7 @@ select.drawer-input option {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
+    overflow: hidden;
     color: var(--accent-color, #d4a847);
 }
 
@@ -1747,6 +1756,8 @@ select.drawer-input option {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
+    overflow: hidden;
+    display: inline-flex;
     color: var(--accent-color, #d4a847);
 }
 
@@ -2188,7 +2199,7 @@ select.drawer-input option {
     position: absolute;
     bottom: 100%;
     left: 0;
-    right: 0;
+    min-width: 280px;
     margin-bottom: 0.35rem;
     background: var(--modal-bg);
     border: 1px solid var(--card-border, rgba(255,255,255,0.15));
@@ -2224,6 +2235,8 @@ select.drawer-input option {
     width: 1.25rem;
     height: 1.25rem;
     flex-shrink: 0;
+    overflow: hidden;
+    display: inline-flex;
     color: var(--accent-color, #d4a847);
 }
 

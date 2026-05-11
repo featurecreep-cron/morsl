@@ -121,7 +121,10 @@
           <button class="btn-generate btn-secondary" v-show="admin.tierVisible('standard')" @click="admin.previewProfile()" :disabled="admin.profilePreviewing" style="flex:0 0 auto; padding:0 1rem;">
             {{ admin.profilePreviewing ? '...' : 'Test Profile' }}
           </button>
-          <span class="preview-result" v-show="admin.tierVisible('standard') && admin.previewResult !== null">
+          <span class="preview-result"
+                :class="{ 'preview-error': typeof admin.previewResult === 'string' && String(admin.previewResult).startsWith('Error') }"
+                :title="String(admin.previewResult ?? '')"
+                v-show="admin.tierVisible('standard') && admin.previewResult !== null">
             {{ typeof admin.previewResult === 'number' ? admin.previewResult + ' recipes match' : admin.previewResult }}
           </span>
           <button class="btn-generate" @click="admin.saveProfile()" :disabled="admin.profileSaving" style="margin-left:auto;">

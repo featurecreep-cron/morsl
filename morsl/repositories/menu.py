@@ -69,6 +69,24 @@ class MenuRepository:
         )
         self._conn.commit()
 
+    def delete(self, menu_id: int, user_id: int) -> bool:
+        """Delete a menu by ID. Returns True if a row was deleted."""
+        cur = self._conn.execute(
+            "DELETE FROM menus WHERE id = ? AND user_id = ?",
+            (menu_id, user_id),
+        )
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def delete_all(self, user_id: int) -> int:
+        """Delete all menus for a user. Returns count deleted."""
+        cur = self._conn.execute(
+            "DELETE FROM menus WHERE user_id = ?",
+            (user_id,),
+        )
+        self._conn.commit()
+        return cur.rowcount
+
     def list_recent(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
         """Return recent menus for a user, newest first."""
         rows = self._conn.execute(

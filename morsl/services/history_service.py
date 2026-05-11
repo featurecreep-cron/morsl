@@ -79,6 +79,11 @@ class HistoryService:
         with self._lock:
             return self._repo.get_analytics(self._user_id)
 
+    def delete_entry(self, entry_id: int) -> bool:
+        """Delete a single history entry. Returns True if deleted."""
+        with self._lock:
+            return self._repo.delete(entry_id, self._user_id)
+
     def clear(self) -> None:
         """Delete all history entries."""
         with self._lock:

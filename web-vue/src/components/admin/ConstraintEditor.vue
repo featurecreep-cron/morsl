@@ -81,6 +81,58 @@
                                 placeholder="Type to search ingredients..."
                                 @search="admin.searchFoods()"
                                 @select="(item: SearchDropdownItem) => { admin.addItemToConstraint(c, item); admin.foodSearch = ''; admin.foodResults = [] }" />
+                <SearchDropdown v-show="c.type === 'book'"
+                                v-model="admin.bookSearch"
+                                :results="admin.bookResults"
+                                placeholder="Type to search recipe books..."
+                                @search="admin.searchBooks()"
+                                @select="(item: SearchDropdownItem) => { admin.addItemToConstraint(c, item); admin.bookSearch = ''; admin.bookResults = [] }" />
+              </div>
+
+              <!-- Meal plan fields -->
+              <div class="constraint-field" v-show="c.type === 'mealplan'">
+                <label>Meal Types</label>
+                <small class="field-help">Select which meal types to pull recipes from</small>
+                <div class="constraint-items-list">
+                  <span v-for="item in (c.items || [])" :key="item.id" class="constraint-item-tag">
+                    <span>{{ item.name }}</span>
+                    <button @click="admin.removeItemFromConstraint(c, item.id)" aria-label="Remove">&times;</button>
+                  </span>
+                  <span class="constraint-empty" v-show="!c.items || c.items.length === 0">
+                    No meal types selected — all types will be included
+                  </span>
+                </div>
+                <select class="drawer-select" @change="onMealTypeSelect($event, c)">
+                  <option value="">Add meal type...</option>
+                  <option v-for="mt in admin.mealTypes" :key="mt.id" :value="mt.id"
+                          :disabled="(c.items || []).some(i => i.id === mt.id)">
+                    {{ mt.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="constraint-field" v-show="c.type === 'mealplan'">
+                <label>Date</label>
+                <small class="field-help">Which date to pull meal plan recipes from</small>
+                <select class="drawer-select" :value="getDateMode(c.date)" @change="setDateMode(c, ($event.target as HTMLSelectElement).value)">
+                  <option value="">Any date</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="tomorrow">Tomorrow</option>
+                  <option value="days_ago">Days ago...</option>
+                  <option value="days_from_now">Days from now...</option>
+                </select>
+                <div v-show="getDateMode(c.date) === 'days_ago'" class="constraint-inline-row" style="margin-top:0.25rem;">
+                  <input type="number" class="drawer-input drawer-input--small"
+                         :value="Math.abs(Number(c.date) || 2)" min="1" max="365"
+                         @input="c.date = '-' + (($event.target as HTMLInputElement).value || '2')">
+                  <span>days ago</span>
+                </div>
+                <div v-show="getDateMode(c.date) === 'days_from_now'" class="constraint-inline-row" style="margin-top:0.25rem;">
+                  <input type="number" class="drawer-input drawer-input--small"
+                         :value="Number(String(c.date).replace('+','')) || 2" min="1" max="365"
+                         @input="c.date = '+' + (($event.target as HTMLInputElement).value || '2')">
+                  <span>days from now</span>
+                </div>
               </div>
 
               <!-- Rating fields -->
@@ -208,7 +260,7 @@
 
     <!-- Quick Add presets + Add constraint dropdown -->
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-start;">
-      <div class="add-constraint-dropdown">
+      <div class="add-constraint-dropdown" ref="quickAddRef">
         <button class="btn-add-constraint btn-secondary" @click="quickAddOpen = !quickAddOpen" type="button" style="font-size:0.8rem; height:30px;">
           <span>Quick Add</span>
           <span style="font-size: 0.7em; margin-left: 0.5rem;">{{ quickAddOpen ? '\u25B2' : '\u25BC' }}</span>
@@ -234,6 +286,10 @@
             <span class="add-constraint-option-icon" v-html="constraintTypes.book?.icon"></span>
             <span class="add-constraint-option-content"><span class="add-constraint-option-label">From Books</span><span class="add-constraint-option-desc">Pick from specific recipe books</span></span>
           </button>
+          <button class="add-constraint-option" @click="admin.quickAddConstraint('from-mealplan'); quickAddOpen = false">
+            <span class="add-constraint-option-icon" v-html="constraintTypes.mealplan?.icon"></span>
+            <span class="add-constraint-option-content"><span class="add-constraint-option-label">From Meal Plan</span><span class="add-constraint-option-desc">Pick from existing Tandoor meal plan</span></span>
+          </button>
           <button class="add-constraint-option" @click="admin.quickAddConstraint('min-rating'); quickAddOpen = false">
             <span class="add-constraint-option-icon" v-html="constraintTypes.rating?.icon"></span>
             <span class="add-constraint-option-content"><span class="add-constraint-option-label">Min Rating</span><span class="add-constraint-option-desc">Only highly rated recipes</span></span>
@@ -248,7 +304,7 @@
           </button>
         </div>
       </div>
-      <div class="add-constraint-dropdown">
+      <div class="add-constraint-dropdown" ref="addRuleRef">
         <button class="btn-add-constraint" @click="addRuleOpen = !addRuleOpen" type="button">
           <span>+ Add Rule</span>
           <span style="font-size: 0.7em; margin-left: 0.5rem;">{{ addRuleOpen ? '\u25B2' : '\u25BC' }}</span>
@@ -269,9 +325,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import SearchDropdown from '@/components/shared/SearchDropdown.vue'
 import type { SearchDropdownItem } from '@/components/shared/SearchDropdown.vue'
+import type { AdminConstraint } from '@/types/api'
 import { useAdminStore, CONSTRAINT_TYPES } from '@/stores/admin'
 
 const admin = useAdminStore()
@@ -279,4 +336,43 @@ const constraintTypes = CONSTRAINT_TYPES
 
 const quickAddOpen = ref(false)
 const addRuleOpen = ref(false)
+const quickAddRef = ref<HTMLElement | null>(null)
+const addRuleRef = ref<HTMLElement | null>(null)
+
+function onClickOutside(e: MouseEvent) {
+  if (quickAddOpen.value && quickAddRef.value && !quickAddRef.value.contains(e.target as Node)) {
+    quickAddOpen.value = false
+  }
+  if (addRuleOpen.value && addRuleRef.value && !addRuleRef.value.contains(e.target as Node)) {
+    addRuleOpen.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
+
+function getDateMode(date: string | undefined): string {
+  if (!date) return ''
+  if (date === 'today' || date === 'yesterday' || date === 'tomorrow') return date
+  if (/^-\d+$/.test(date)) return 'days_ago'
+  if (/^\+\d+$/.test(date)) return 'days_from_now'
+  return ''
+}
+
+function setDateMode(c: AdminConstraint, mode: string) {
+  if (mode === 'days_ago') c.date = '-2'
+  else if (mode === 'days_from_now') c.date = '+2'
+  else c.date = mode
+}
+
+function onMealTypeSelect(event: Event, constraint: AdminConstraint) {
+  const select = event.target as HTMLSelectElement
+  const id = parseInt(select.value)
+  if (!id) return
+  const mt = admin.mealTypes.find(m => m.id === id)
+  if (mt) {
+    admin.addItemToConstraint(constraint, { id: mt.id, name: mt.name })
+  }
+  select.value = ''
+}
 </script>

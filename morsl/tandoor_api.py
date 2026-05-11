@@ -546,8 +546,8 @@ class TandoorAPI:
         """
         from datetime import timedelta
 
-        to_date = (now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        from_date = (now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        to_date = (now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        from_date = (now() - timedelta(days=365)).strftime("%Y-%m-%d")
 
         # Fetch meal plans in date range
         resp = self.session.get(
