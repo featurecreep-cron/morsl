@@ -9,7 +9,7 @@
   </Transition>
 
   <header class="admin-header" v-show="admin.adminReady">
-    <h1 style="margin-left: 2.5rem;">{{ admin.settings.app_name || 'Morsl' }}</h1>
+    <h1 style="margin-left: 2.5rem;"><a href="/" style="color:inherit; text-decoration:none;">{{ admin.settings.app_name || 'Morsl' }}</a></h1>
     <div class="header-right">
       <div class="tier-selector" role="radiogroup" aria-label="Admin complexity tier"
            title="Controls which settings are visible. Standard: essentials only. Advanced: display, integration, and tuning. Expert: all features including branding.">
