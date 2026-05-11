@@ -113,16 +113,26 @@
               <div class="constraint-field" v-show="c.type === 'mealplan'">
                 <label>Date</label>
                 <small class="field-help">Which date to pull meal plan recipes from</small>
-                <select class="drawer-select" v-model="c.date">
+                <select class="drawer-select" :value="getDateMode(c.date)" @change="setDateMode(c, ($event.target as HTMLSelectElement).value)">
                   <option value="">Any date</option>
                   <option value="today">Today</option>
                   <option value="yesterday">Yesterday</option>
                   <option value="tomorrow">Tomorrow</option>
-                  <option value="-2">2 days ago</option>
-                  <option value="+2">2 days from now</option>
-                  <option value="-7">7 days ago</option>
-                  <option value="+7">7 days from now</option>
+                  <option value="days_ago">Days ago...</option>
+                  <option value="days_from_now">Days from now...</option>
                 </select>
+                <div v-show="getDateMode(c.date) === 'days_ago'" class="constraint-inline-row" style="margin-top:0.25rem;">
+                  <input type="number" class="drawer-input drawer-input--small"
+                         :value="Math.abs(Number(c.date) || 2)" min="1" max="365"
+                         @input="c.date = '-' + (($event.target as HTMLInputElement).value || '2')">
+                  <span>days ago</span>
+                </div>
+                <div v-show="getDateMode(c.date) === 'days_from_now'" class="constraint-inline-row" style="margin-top:0.25rem;">
+                  <input type="number" class="drawer-input drawer-input--small"
+                         :value="Number(String(c.date).replace('+','')) || 2" min="1" max="365"
+                         @input="c.date = '+' + (($event.target as HTMLInputElement).value || '2')">
+                  <span>days from now</span>
+                </div>
               </div>
 
               <!-- Rating fields -->
@@ -340,6 +350,20 @@ function onClickOutside(e: MouseEvent) {
 
 onMounted(() => document.addEventListener('click', onClickOutside))
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
+
+function getDateMode(date: string | undefined): string {
+  if (!date) return ''
+  if (date === 'today' || date === 'yesterday' || date === 'tomorrow') return date
+  if (/^-\d+$/.test(date)) return 'days_ago'
+  if (/^\+\d+$/.test(date)) return 'days_from_now'
+  return ''
+}
+
+function setDateMode(c: AdminConstraint, mode: string) {
+  if (mode === 'days_ago') c.date = '-2'
+  else if (mode === 'days_from_now') c.date = '+2'
+  else c.date = mode
+}
 
 function onMealTypeSelect(event: Event, constraint: AdminConstraint) {
   const select = event.target as HTMLSelectElement

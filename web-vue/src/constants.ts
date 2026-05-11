@@ -47,6 +47,7 @@ export const CONST = {
 
   // localStorage keys (admin)
   LS_ADMIN_TIER: 'admin-tier',
+  LS_CLEAR_OTHERS: 'admin-clear-others',
 
   // Defaults for settings-backed values
   DEFAULT_MENU_POLL_SECONDS: 60,
