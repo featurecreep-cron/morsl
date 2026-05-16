@@ -7,7 +7,7 @@ COPY web-vue/ ./
 RUN npm run build
 
 # Stage 2: Python venv
-FROM python:3.14-slim@sha256:1697e8e8d39bf168e177ac6b5fdab6df86d81cfc24dae17dfb96cfc3ef76b4dd AS builder
+FROM python:3.14-slim@sha256:7a500125bc50693f2214e842a621440a1b1b9cbb2188f74ab045d29ed2ea5856 AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN mkdir -p morsl/app morsl/services && \
 
 # ---
 
-FROM python:3.14-slim@sha256:1697e8e8d39bf168e177ac6b5fdab6df86d81cfc24dae17dfb96cfc3ef76b4dd
+FROM python:3.14-slim@sha256:7a500125bc50693f2214e842a621440a1b1b9cbb2188f74ab045d29ed2ea5856
 
 LABEL org.opencontainers.image.source="https://github.com/featurecreep-cron/morsl" \
       org.opencontainers.image.description="A menu generator for Tandoor Recipes" \
