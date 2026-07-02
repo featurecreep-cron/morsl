@@ -9,7 +9,7 @@ keywords = ["meal-planning", "tandoor", "menu-generator", "docker", "self-hosted
 dependencies = [
     "requests==2.34.2",
     "pulp==2.9.0",
-    "tzlocal==5.4.3",
+    "tzlocal==5.4.4",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "pydantic-settings>=2.1",
