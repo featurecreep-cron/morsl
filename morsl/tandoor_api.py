@@ -540,7 +540,11 @@ class TandoorAPI:
         return data
 
     def cleanup_uncooked_meal_plans(self, meal_plan_type: int, days: int) -> int:
-        """Delete past, uncooked meal plans older than the `days` cutoff.
+        """Delete uncooked meal plans dated within the last `days` days.
+
+        The window is [today - days, today] inclusive: recent cruft from the
+        daily generation cycle, including a stale same-day plan left behind when
+        the user regenerates. Older plans are left alone.
 
         A plan is "cooked" (and spared) only if its recipe has a cook-log entry
         dated on or after the plan's own date. Tandoor has no link between a
@@ -552,8 +556,8 @@ class TandoorAPI:
         """
         from datetime import timedelta
 
-        to_date = (now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        from_date = (now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        from_date = (now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        to_date = now().strftime("%Y-%m-%d")
 
         # Fetch meal plans in date range
         resp = self.session.get(

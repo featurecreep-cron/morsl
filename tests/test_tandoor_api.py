@@ -95,8 +95,8 @@ class TestCleanupUncookedMealPlans:
     """Verify cleanup targets plans OLDER than the cutoff, not recent ones."""
 
     @patch("morsl.tandoor_api.now")
-    def test_date_range_targets_old_plans(self, mock_now, api):
-        """from_date..to_date must cover the past, ending at the cutoff day."""
+    def test_date_range_is_the_last_n_days(self, mock_now, api):
+        """Window is [today - days, today] — the recent cruft, not old plans."""
         fake_now = datetime(2026, 5, 8, 12, 0, 0)
         mock_now.return_value = fake_now
 
@@ -112,16 +112,18 @@ class TestCleanupUncookedMealPlans:
 
         api.cleanup_uncooked_meal_plans(meal_plan_type=3, days=7)
 
-        # to_date should be 7 days ago (the cutoff), NOT yesterday
-        expected_to = (fake_now - timedelta(days=7)).strftime("%Y-%m-%d")
-        expected_from = (fake_now - timedelta(days=365)).strftime("%Y-%m-%d")
+        # from_date = 7 days ago, to_date = today (NOT a year back, NOT ending at the cutoff)
+        expected_from = (fake_now - timedelta(days=7)).strftime("%Y-%m-%d")
+        expected_to = fake_now.strftime("%Y-%m-%d")
 
         meal_plan_call = api.session.get.call_args_list[0]
         params = meal_plan_call.kwargs.get("params") or meal_plan_call[1].get("params")
-        assert params["to_date"] == expected_to, (
-            f"to_date should be the cutoff ({expected_to}), got {params['to_date']}"
+        assert params["from_date"] == expected_from, (
+            f"from_date should be {expected_from} (days ago), got {params['from_date']}"
         )
-        assert params["from_date"] == expected_from
+        assert params["to_date"] == expected_to, (
+            f"to_date should be today ({expected_to}), got {params['to_date']}"
+        )
 
     @patch("morsl.tandoor_api.now")
     def test_deletes_uncooked_spares_cooked(self, mock_now, api):
