@@ -540,7 +540,13 @@ class TandoorAPI:
         return data
 
     def cleanup_uncooked_meal_plans(self, meal_plan_type: int, days: int) -> int:
-        """Delete meal plans older than `days` without a cook log.
+        """Delete past, uncooked meal plans older than the `days` cutoff.
+
+        A plan is "cooked" (and spared) only if its recipe has a cook-log entry
+        dated on or after the plan's own date. Tandoor has no link between a
+        cook-log and a meal plan, and no "cooked" flag on the plan, so recipe +
+        date is the only honest correlation: cooking a recipe last week must not
+        spare an untouched plan for the same recipe today.
 
         Returns count deleted.
         """
@@ -562,29 +568,48 @@ class TandoorAPI:
         if isinstance(plans, dict):
             plans = plans.get("results", [])
 
-        # Fetch cooked recipe IDs in the same range
+        # Map recipe id -> the latest date it was cooked (YYYY-MM-DD).
+        # Tandoor CookLog stamps `created_at`; zero-padded ISO dates compare
+        # chronologically as plain strings, so keeping the greater one per
+        # recipe yields the latest cook without parsing to datetime.
         cook_resp = self.session.get(
             f"{self.url}cook-log/",
             params={"from_date": from_date, "to_date": to_date},
             timeout=DEFAULT_TIMEOUT,
         )
-        cooked_ids: set = set()
+        last_cooked: Dict[int, str] = {}
         if cook_resp.status_code == 200:
             logs = cook_resp.json()
             if isinstance(logs, dict):
                 logs = logs.get("results", [])
-            cooked_ids = {log.get("recipe") for log in logs if log.get("recipe")}
+            for log in logs:
+                rid = log.get("recipe")
+                stamp = log.get("created_at")
+                if rid and stamp:
+                    cooked_date = str(stamp)[:10]
+                    if cooked_date > last_cooked.get(rid, ""):
+                        last_cooked[rid] = cooked_date
 
         deleted = 0
         for plan in plans:
             recipe = plan.get("recipe")
-            if recipe and recipe.get("id") not in cooked_ids:
-                del_resp = self.session.delete(
-                    f"{self.url}meal-plan/{plan['id']}/",
-                    timeout=DEFAULT_TIMEOUT,
-                )
-                if del_resp.status_code in (200, 204):
-                    deleted += 1
+            if not recipe:
+                continue
+            rid = recipe.get("id")
+            plan_date = str(plan.get("from_date") or "")[:10]
+            if not plan_date:
+                # Can't date the plan — don't risk deleting it.
+                continue
+            # Spare only if this recipe was cooked on or after the plan's date.
+            cooked_on_or_after = rid in last_cooked and last_cooked[rid] >= plan_date
+            if cooked_on_or_after:
+                continue
+            del_resp = self.session.delete(
+                f"{self.url}meal-plan/{plan['id']}/",
+                timeout=DEFAULT_TIMEOUT,
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += 1
         self.logger.info(
             f"Cleanup: deleted {deleted} uncooked meal plans from {from_date} to {to_date}"
         )
