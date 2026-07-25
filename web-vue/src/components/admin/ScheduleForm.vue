@@ -73,7 +73,7 @@
         <div class="settings-row">
           <div class="settings-label">
             Uncooked Meal Cleanup
-            <small>Automatically remove uncooked meal plans older than this many days (0 = off)</small>
+            <small>Automatically remove uncooked meal plans from the last this many days (0 = off)</small>
           </div>
           <input type="number" class="drawer-input drawer-input--small"
                  v-model.number="admin.scheduleForm.cleanup_uncooked_days"
