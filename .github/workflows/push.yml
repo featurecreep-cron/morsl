@@ -34,8 +34,57 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  # Decides whether this push changed anything that reaches the shipped image.
+  # Deliberately a deny-list: an unrecognised path counts as shippable, so a
+  # new source directory can never be silently excluded from releases.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      shippable: ${{ steps.filter.outputs.shippable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether this push ships
+        id: filter
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Fail safe: if the diff base is unusable (first push, force push,
+          # pruned object) release rather than silently skipping one.
+          if [ -z "${BEFORE}" ] \
+             || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "Diff base unavailable; defaulting to release."
+            echo "shippable=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "${BEFORE}" "${AFTER}")"
+          echo "Changed files:"
+          echo "${changed}"
+
+          # Paths that cannot affect the built image or the running app.
+          shippable="$(printf '%s\n' "${changed}" | grep -vE \
+            '(^docs/|^\.github/(dependabot\.yml$|ISSUE_TEMPLATE/)|^LICENSE$|^\.gitignore$|^\.editorconfig$|\.md$)' \
+            || true)"
+
+          if [ -z "${shippable}" ]; then
+            echo "Only release-irrelevant paths changed; skipping release."
+            echo "shippable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Shippable changes:"
+            echo "${shippable}"
+            echo "shippable=true" >> "$GITHUB_OUTPUT"
+          fi
+
   auto-release:
-    needs: ci
+    needs: [ci, changes]
+    if: needs.changes.outputs.shippable == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
