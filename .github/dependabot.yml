@@ -37,6 +37,29 @@ updates:
     labels:
       - dependencies
 
+  # web-vue/ was previously uncovered: no npm ecosystem meant the Vite
+  # frontend got no version updates at all, so its lockfile drifted until
+  # 7 advisories accumulated with no PR ever opened for them.
+  - package-ecosystem: npm
+    directory: /web-vue
+    target-branch: develop
+    schedule:
+      interval: weekly
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+    groups:
+      npm-patches:
+        update-types: ["patch"]
+      npm-minors:
+        update-types: ["minor"]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+
   - package-ecosystem: docker
     directory: /
     target-branch: develop
