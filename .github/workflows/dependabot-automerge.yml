@@ -2,7 +2,12 @@ name: Dependabot Auto-merge
 
 on:
   pull_request_target:
-    branches: [develop]
+    # Version updates honour `target-branch: develop` from dependabot.yml.
+    # Security updates ignore it and always open against the default branch,
+    # so main has to be listed too — otherwise every security backport stalls
+    # at REVIEW_REQUIRED with nothing to approve it. Merging to main releases;
+    # for a security patch that is the point.
+    branches: [develop, main]
 
 permissions:
   contents: write
