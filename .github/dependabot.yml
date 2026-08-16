@@ -49,6 +49,14 @@ updates:
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
+    ignore:
+      # TypeScript 7 is the Go compiler and dropped the programmatic compiler
+      # API that vue-tsc drives, so `vue-tsc -b` dies with
+      # ERR_PACKAGE_PATH_NOT_EXPORTED on typescript/lib/tsc and the image build
+      # fails. No vue-tsc release fixes this — verified against 3.3.10, the
+      # latest. Drop this ignore when vuejs/language-tools#5381 ships.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-patches:
         update-types: ["patch"]
