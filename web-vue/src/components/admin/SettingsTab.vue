@@ -115,17 +115,31 @@
         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
           <div class="settings-label">
             Tandoor Connection
-            <small v-show="admin.credEnvLocked">Credentials are set via environment variables and cannot be changed here.</small>
+            <small v-show="admin.credEnvLocked">Set by the <code>TANDOOR_URL</code> and <code>TANDOOR_TOKEN</code> environment variables, which take priority over anything saved here. To change them, edit the environment for the container &mdash; usually the <code>.env</code> file next to your <code>docker-compose.yml</code> &mdash; then recreate it with <code>docker compose up -d --force-recreate</code>.</small>
             <small v-show="!admin.credEnvLocked">URL and API token for your Tandoor instance.</small>
           </div>
           <div v-show="!admin.credEditing && !admin.credEnvLocked" style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
             <span style="font-size:0.85rem; color:var(--text-muted);">{{ admin.settings.tandoor_url || 'Not configured' }}</span>
             <span v-show="admin.settings.has_tandoor_token" style="font-size:0.75rem; color:var(--accent);">&#10003; Token saved</span>
-            <button class="btn btn-sm" @click="startCredEdit" style="margin-left:auto;">Change</button>
+            <button class="btn btn-sm" :disabled="admin.credCurrentTesting" @click="admin.testCurrentCredentials()" style="margin-left:auto;">
+              <span v-show="!admin.credCurrentTesting">Test Connection</span>
+              <span v-show="admin.credCurrentTesting">Testing...</span>
+            </button>
+            <button class="btn btn-sm" @click="startCredEdit">Change</button>
           </div>
-          <div v-show="admin.credEnvLocked" style="display:flex; align-items:center; gap:0.5rem;">
+          <div v-show="admin.credEnvLocked" style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
             <span style="font-size:0.85rem; color:var(--text-muted);">{{ admin.settings.tandoor_url || 'Set via TANDOOR_URL' }}</span>
+            <span v-show="admin.settings.has_tandoor_token" style="font-size:0.75rem; color:var(--text-muted);">token set</span>
             <span style="font-size:0.75rem; color:var(--accent);">&#10003; ENV</span>
+            <button class="btn btn-sm" :disabled="admin.credCurrentTesting" @click="admin.testCurrentCredentials()" style="margin-left:auto;">
+              <span v-show="!admin.credCurrentTesting">Test Connection</span>
+              <span v-show="admin.credCurrentTesting">Testing...</span>
+            </button>
+          </div>
+          <div v-show="!admin.credEditing && admin.credCurrentResult" style="font-size:0.85rem;"
+               :style="admin.credCurrentResult?.success ? 'color:var(--accent)' : 'color:var(--error, #e74c3c)'">
+            <span v-show="admin.credCurrentResult?.success">&#10003; Connection successful</span>
+            <span v-show="admin.credCurrentResult && !admin.credCurrentResult.success">&#10007; {{ admin.credCurrentResult?.error || 'Connection failed' }}</span>
           </div>
           <div v-show="admin.credEditing" style="display:flex; flex-direction:column; gap:0.5rem;">
             <input type="url" class="drawer-input" v-model="admin.credUrl" placeholder="https://tandoor.example.com" style="width:100%;">
@@ -333,6 +347,7 @@ function startCredEdit() {
   admin.credUrl = String(admin.settings.tandoor_url || '')
   admin.credToken = ''
   admin.credTestResult = null
+  admin.credCurrentResult = null
   admin.credError = ''
 }
 </script>

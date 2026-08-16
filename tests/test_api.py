@@ -878,6 +878,119 @@ class TestAdminAuth:
 
 
 @pytest.mark.asyncio
+class TestCurrentConnectionTest:
+    """POST /settings/test-connection/current — probes the credentials the server resolves."""
+
+    @staticmethod
+    def _patch_probe(status_code=200):
+        client = patch("morsl.app.api.routes.settings.httpx.AsyncClient")
+        mock = client.start()
+        session = mock.return_value.__aenter__.return_value
+        session.get = AsyncMock(return_value=MagicMock(status_code=status_code))
+        return client, session
+
+    async def test_uses_env_credentials(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        patcher, session = self._patch_probe()
+        try:
+            response = await settings_client.post("/api/settings/test-connection/current")
+        finally:
+            patcher.stop()
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+        called_url = session.get.call_args[0][0]
+        assert called_url.startswith("http://test.local/api/food")
+
+    async def test_lan_address_is_not_rejected(self, settings_client, mock_settings_service):
+        """Unlike /test-connection, no SSRF guard — the URL is operator-supplied."""
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            tandoor_url="http://192.168.1.50:8080",
+            tandoor_token="env_token",
+            log_level="INFO",
+            profiles_dir="profiles",
+            data_dir="data",
+        )
+        patcher, session = self._patch_probe()
+        try:
+            response = await settings_client.post("/api/settings/test-connection/current")
+        finally:
+            patcher.stop()
+        assert response.json() == {"success": True}
+        assert session.get.call_args[0][0].startswith("http://192.168.1.50:8080/api/food")
+
+    async def test_reports_http_error(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        patcher, _ = self._patch_probe(status_code=401)
+        try:
+            response = await settings_client.post("/api/settings/test-connection/current")
+        finally:
+            patcher.stop()
+        assert response.json() == {"success": False, "error": "HTTP 401"}
+
+    async def test_no_credentials_configured(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            tandoor_url="",
+            tandoor_token="",
+            log_level="INFO",
+            profiles_dir="profiles",
+            data_dir="data",
+        )
+        response = await settings_client.post("/api/settings/test-connection/current")
+        assert response.status_code == 200
+        assert response.json() == {"success": False, "error": "No credentials configured"}
+
+    async def test_requires_admin(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {
+            "admin_pin_enabled": True,
+            "pin": "1234",
+            "kiosk_enabled": False,
+            "kiosk_pin_enabled": False,
+        }
+        response = await settings_client.post("/api/settings/test-connection/current")
+        assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+class TestSettingsCredentialReporting:
+    """GET /settings reports the credentials actually in effect, not just stored ones."""
+
+    async def test_env_url_surfaced_over_empty_stored(
+        self, settings_client, mock_settings_service
+    ):
+        mock_settings_service.get_all.return_value = {
+            "admin_pin_enabled": False,
+            "tandoor_url": "",
+            "tandoor_token_b64": "",
+        }
+        response = await settings_client.get("/api/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["tandoor_url"] == "http://test.local"
+        assert data["has_tandoor_token"] is True
+
+    async def test_stored_url_used_when_no_env(self, settings_client, mock_settings_service):
+        mock_settings_service.get_all.return_value = {
+            "admin_pin_enabled": False,
+            "tandoor_url": "http://stored.local",
+            "tandoor_token_b64": "c3RvcmVk",
+        }
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            tandoor_url="",
+            tandoor_token="",
+            log_level="INFO",
+            profiles_dir="profiles",
+            data_dir="data",
+        )
+        response = await settings_client.get("/api/settings")
+        data = response.json()
+        assert data["tandoor_url"] == "http://stored.local"
+        assert data["has_tandoor_token"] is True
+        assert "tandoor_token_b64" not in data
+
+
+@pytest.mark.asyncio
 class TestNewSettings:
     """Tests for the 4 new admin settings (menu_poll_seconds, toast_seconds,
     max_discover_generations, max_previous_recipes)."""
