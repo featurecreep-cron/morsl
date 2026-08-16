@@ -26,10 +26,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.15.22",  # linter, formatter, import sort
+    "ruff==0.16.2",  # linter, formatter, import sort
     "mypy==2.3.0",
-    "pre-commit==4.6.0",
-    "colorlog==6.11.0",
+    "pre-commit==4.6.1",
+    "colorlog==6.12.0",
     "pytest>=8.0",
     "pytest-cov>=4.1",
     "pytest-asyncio>=1.3.0",
@@ -42,6 +42,10 @@ include = ["morsl", "morsl.*"]
 fix = true
 line-length = 99
 target-version = "py312"
+# ruff >= 0.16 formats Python blocks inside Markdown. The design docs use
+# elided snippets (`...` for omitted bodies), which the formatter rewrites —
+# so keep prose out of its reach.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [

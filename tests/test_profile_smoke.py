@@ -55,7 +55,9 @@ def test_profile_generates_recipes(profile_name, credentials, config_service):
     """Test that each profile can successfully generate recipes."""
     import logging
 
-    from services.menu_service import MenuService
+    from morsl.providers.tandoor import TandoorProvider
+    from morsl.services.menu_service import MenuService
+    from morsl.tandoor_api import TandoorAPI
 
     url, token = credentials
 
@@ -73,7 +75,8 @@ def test_profile_generates_recipes(profile_name, credentials, config_service):
         pytest.skip(f"Profile {profile_name} has no constraints")
 
     # Run the solver
-    ms = MenuService(url, token, config, logger)
+    provider = TandoorProvider(TandoorAPI(url, token, logger))
+    ms = MenuService(config=config, logger=logger, provider=provider)
     ms.prepare_data()
 
     # Should not raise

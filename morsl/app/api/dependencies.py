@@ -280,7 +280,8 @@ def get_provider(
     from morsl.tandoor_api import TandoorAPI
 
     url, token = resolve_credentials(settings, settings_svc)
-    api = TandoorAPI(url, token, logger, cache=API_CACHE_TTL_MINUTES)
+    cache = settings_svc.get_all().get("api_cache_minutes", API_CACHE_TTL_MINUTES)
+    api = TandoorAPI(url, token, logger, cache=int(cache))
     return TandoorProvider(api)
 
 

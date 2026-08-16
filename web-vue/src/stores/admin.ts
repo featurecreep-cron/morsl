@@ -2298,6 +2298,8 @@ export const useAdminStore = defineStore('admin', () => {
   const credSaving = ref(false)
   const credTestResult = ref<CredTestResult | null>(null)
   const credError = ref('')
+  const credCurrentTesting = ref(false)
+  const credCurrentResult = ref<CredTestResult | null>(null)
 
   async function loadSettings() {
     try {
@@ -2366,6 +2368,22 @@ export const useAdminStore = defineStore('admin', () => {
       credTestResult.value = { success: false, error: 'Cannot reach server' }
     } finally {
       credTesting.value = false
+    }
+  }
+
+  /** Test the credentials the server is actually using — works when they come from ENV. */
+  async function testCurrentCredentials() {
+    credCurrentTesting.value = true
+    credCurrentResult.value = null
+    try {
+      const res = await adminFetch('/api/settings/test-connection/current', { method: 'POST' })
+      credCurrentResult.value = res.ok
+        ? await res.json()
+        : { success: false, error: 'Server error' }
+    } catch {
+      credCurrentResult.value = { success: false, error: 'Cannot reach server' }
+    } finally {
+      credCurrentTesting.value = false
     }
   }
 
@@ -3075,10 +3093,13 @@ export const useAdminStore = defineStore('admin', () => {
     credSaving,
     credTestResult,
     credError,
+    credCurrentTesting,
+    credCurrentResult,
     loadSettings,
     saveSettings,
     toggleSetting,
     testCredentials,
+    testCurrentCredentials,
     saveCredentials,
 
     // 16. Branding

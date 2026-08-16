@@ -7,15 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from morsl.app.api.dependencies import (
     get_config_service,
-    get_credentials,
-    get_settings_service,
+    get_provider,
     require_admin,
 )
 from morsl.app.api.models import ProfileCreateRequest, ProfileDetailResponse, ProfileResponse
-from morsl.constants import API_CACHE_TTL_MINUTES, DEFAULT_CHOICES
+from morsl.constants import DEFAULT_CHOICES
+from morsl.providers.base import RecipeProvider
 from morsl.services.config_service import ConfigService
 from morsl.services.menu_service import MenuService
-from morsl.services.settings_service import SettingsService
 
 router = APIRouter(tags=["profiles"])
 
@@ -133,20 +132,16 @@ def delete_profile(
 def preview_profile(
     request: ProfileCreateRequest,
     config_service: ConfigService = Depends(get_config_service),
-    settings_svc: SettingsService = Depends(get_settings_service),
-    credentials: tuple[str, str] = Depends(get_credentials),
+    provider: RecipeProvider = Depends(get_provider),
 ) -> Dict[str, Any]:
     """Preview constraint matching - returns count of recipes that match the constraints."""
-    url, token = credentials
-
     logger = logging.getLogger("menu_preview")
     config = request.to_config_dict()
     config["description"] = request.description  # Preserve description
-    config["cache"] = settings_svc.get_all().get("api_cache_minutes", API_CACHE_TTL_MINUTES)
 
     try:
         service = MenuService(  # direct-service — preview needs request-scoped config
-            url=url, token=token, config=config, logger=logger
+            config=config, logger=logger, provider=provider
         )
         service.prepare_data()
         return {

@@ -26,6 +26,7 @@ from morsl.app.api.dependencies import (
     require_admin,
     reset_all_singletons,
     reset_credential_singletons,
+    resolve_credentials,
     revoke_admin_tokens,
 )
 from morsl.app.config import Settings
@@ -109,9 +110,18 @@ def require_admin_or_first_run(
 
 
 @router.get("", dependencies=[Depends(require_admin)])
-def get_all_settings(svc: SettingsService = Depends(get_settings_service)) -> Dict[str, Any]:
+def get_all_settings(
+    svc: SettingsService = Depends(get_settings_service),
+    settings: Settings = Depends(get_settings),
+) -> Dict[str, Any]:
     """Return all settings (admin)."""
-    return _mask_secrets(svc.get_all())
+    result = _mask_secrets(svc.get_all())
+    # ENV credentials win at resolve time, so report the URL actually in use —
+    # otherwise the admin page shows a blank field while the app talks to Tandoor.
+    if settings.tandoor_url and settings.tandoor_token:
+        result["tandoor_url"] = settings.tandoor_url
+        result["has_tandoor_token"] = True
+    return result
 
 
 @router.put("", dependencies=[Depends(require_admin)])
@@ -235,20 +245,13 @@ def get_setup_status(
     }
 
 
-@router.post("/test-connection", dependencies=[Depends(require_admin_or_first_run)])
-async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
-    """Test a Tandoor API connection with the given credentials."""
-    url = str(body.url).rstrip("/")
-    # SSRF protection: resolve hostname and reject internal/loopback addresses
-    _err = _reject_private_url(url)
-    if _err:
-        return {"success": False, "error": _err}
-
+async def _probe_tandoor(url: str, token: str) -> Dict[str, Any]:
+    """Issue a cheap authenticated request against a Tandoor instance."""
     try:
         async with httpx.AsyncClient(follow_redirects=False) as client:
             resp = await client.get(
                 f"{url}/api/food/?limit=1",
-                headers={"Authorization": f"Bearer {body.token}"},
+                headers={"Authorization": f"Bearer {token}"},
                 timeout=10,
             )
         if resp.status_code < 400:
@@ -259,6 +262,39 @@ async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
     except (httpx.HTTPError, OSError) as e:
         logger.warning("test-connection failed for %s: %s", url, e)
         return {"success": False, "error": "Connection failed"}
+
+
+@router.post("/test-connection", dependencies=[Depends(require_admin_or_first_run)])
+async def test_connection(body: CredentialRequest) -> Dict[str, Any]:
+    """Test a Tandoor API connection with the given credentials."""
+    url = str(body.url).rstrip("/")
+    # SSRF protection: resolve hostname and reject internal/loopback addresses.
+    # Required here because the URL is request-supplied and this endpoint is
+    # reachable unauthenticated during first-run.
+    _err = _reject_private_url(url)
+    if _err:
+        return {"success": False, "error": _err}
+
+    return await _probe_tandoor(url, body.token)
+
+
+@router.post("/test-connection/current", dependencies=[Depends(require_admin)])
+async def check_current_connection(  # not test_* — ruff reads that as a pytest function
+    settings: Settings = Depends(get_settings),
+    svc: SettingsService = Depends(get_settings_service),
+) -> Dict[str, Any]:
+    """Test whichever credentials the server actually resolves (ENV or stored).
+
+    The URL comes from the operator's own environment or saved settings, never
+    from the request, so the SSRF guard on ``/test-connection`` does not apply —
+    which is what makes a LAN Tandoor address testable here. The token is used
+    but never returned.
+    """
+    try:
+        url, token = resolve_credentials(settings, svc)
+    except HTTPException:
+        return {"success": False, "error": "No credentials configured"}
+    return await _probe_tandoor(url.rstrip("/"), token)
 
 
 @router.post("/credentials", dependencies=[Depends(require_admin_or_first_run)])
