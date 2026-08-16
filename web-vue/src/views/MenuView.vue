@@ -6,7 +6,13 @@ import { useSettingsStore } from '@/stores/settings'
 import { useSSE } from '@/composables/useSSE'
 import { useKiosk } from '@/composables/useKiosk'
 import { useTheme } from '@/composables/useTheme'
-import { prefetchBrandSvg, getLoadingIconHtml, STOCK_ICON_SVG, inlineSvg } from '@/utils/icons'
+import {
+  prefetchBrandSvg,
+  prefetchLoadingIcon,
+  getLoadingIconHtml,
+  STOCK_ICON_SVG,
+  inlineSvg,
+} from '@/utils/icons'
 import { formatMenuDate } from '@/utils/formatting'
 
 import CategoryBar from '@/components/menu/CategoryBar.vue'
@@ -121,6 +127,10 @@ async function applyLogo() {
   await inlineSvg(settings.logoUrl, logoRef.value)
 }
 
+function loadLoadingIcon() {
+  void prefetchLoadingIcon(settings.loadingIconUrl)
+}
+
 // Auto-generate from URL param
 function checkAutoGenerate() {
   const params = new URLSearchParams(window.location.search)
@@ -158,6 +168,10 @@ onMounted(async () => {
     await prefetchBrandSvg(settings.logoUrl)
     await applyLogo()
   }
+
+  // And for the loading icon, so it inlines and takes the theme colour
+  // instead of rendering as a black <img>.
+  loadLoadingIcon()
 
   // Load menu data
   await menu.loadMenu()
@@ -202,6 +216,9 @@ watch(() => settings.logoUrl, async () => {
     await applyLogo()
   }
 })
+
+// Watch loading icon changes
+watch(() => settings.loadingIconUrl, loadLoadingIcon)
 
 // Watch kiosk PIN modal — focus input on open
 watch(() => menu.showKioskPin, (show) => {

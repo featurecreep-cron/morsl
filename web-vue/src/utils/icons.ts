@@ -1,16 +1,26 @@
+import { ref } from 'vue'
 import type { Recipe, IconMappings } from '@/types/api'
 
-const DEFAULT_FAVICON_PATH = '/icons/default-favicon.svg'
+export const DEFAULT_FAVICON_PATH = '/icons/default-favicon.svg'
 
 export const STOCK_ICON_SVG = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block"><g transform="translate(4,3) scale(1.1)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></g></svg>`
 
 // SVG prefetch cache (logo, loading icon)
 const _svgPrefetchCache = new Map<string, string>()
 
+// Bumped whenever a prefetch lands. Read by getBrandIcon so that a computed
+// calling it re-evaluates once the SVG is inlined — a plain Map write is not
+// reactive, and the icon would otherwise stay an <img> until something else
+// happened to invalidate the computed.
+const _svgCacheVersion = ref(0)
+
 export function getBrandIcon(logoUrl: string): string {
+  void _svgCacheVersion.value
   if (logoUrl) {
     const cached = _svgPrefetchCache.get(logoUrl)
     if (cached) return cached
+    // Fallback only. An <img> cannot inherit the theme colour: currentColor
+    // inside it resolves against the SVG's own document and paints black.
     return `<img src="${logoUrl}" class="favicon-icon" style="width:100%;height:100%;object-fit:contain" alt="">`
   }
   return STOCK_ICON_SVG
@@ -42,6 +52,17 @@ function sanitizeSVG(svgString: string): string {
   return svg ? svg.outerHTML : ''
 }
 
+/**
+ * Prefetch the loading icon so it inlines instead of rendering as an `<img>`.
+ * An `<img>` cannot take the theme colour — `currentColor` inside it resolves
+ * against the SVG's own document and paints black. The default path needs no
+ * fetch: it resolves to the built-in inline SVG.
+ */
+export async function prefetchLoadingIcon(url: string): Promise<boolean> {
+  if (!url || url === DEFAULT_FAVICON_PATH) return false
+  return prefetchBrandSvg(url)
+}
+
 export async function prefetchBrandSvg(url: string): Promise<boolean> {
   if (!url) return false
   if (_svgPrefetchCache.has(url)) return true
@@ -67,6 +88,7 @@ export async function prefetchBrandSvg(url: string): Promise<boolean> {
     svg.style.display = 'block'
     svg.setAttribute('aria-hidden', 'true')
     _svgPrefetchCache.set(url, svg.outerHTML)
+    _svgCacheVersion.value++
     return true
   } catch {
     return false
