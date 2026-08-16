@@ -393,6 +393,22 @@ class TestProfileEndpoints:
         response = await settings_client.delete("/api/profiles/missing")
         assert response.status_code == 404
 
+    async def test_preview_profile(self, settings_client, mock_settings_service):
+        """Preview builds a real MenuService — guards against provider signature drift."""
+        mock_settings_service.get_all.return_value = {"admin_pin_enabled": False}
+        provider = MagicMock()
+        provider.get_recipes.return_value = [
+            {"id": 1, "name": "Soup", "created_at": "2026-01-01T00:00:00"},
+            {"id": 2, "name": "Stew", "created_at": "2026-01-02T00:00:00"},
+        ]
+        app.dependency_overrides[get_provider] = lambda: provider
+        response = await settings_client.post(
+            "/api/profiles/preview",
+            json={"name": "preview-me", "choices": 4},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {"matching_count": 2, "choices": 4}
+
 
 @pytest.mark.asyncio
 class TestSettingsEnforcement:
