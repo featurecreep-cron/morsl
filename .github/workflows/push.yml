@@ -95,24 +95,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag and bump patch
+      # The old logic was always "latest tag + 1 patch", so a feat could never
+      # cut a minor and a breaking change could never cut a major — the version
+      # carried no information about what changed. python-semantic-release reads
+      # the conventional commit types instead. It only computes here: no write,
+      # no commit, no tag. The tag below is still ours to create.
+      - name: Compute the next version
         id: bump
         run: |
-          latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          if [ -z "$latest" ]; then
-            echo "next=v0.1.0" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          python3 -m pip install --quiet "python-semantic-release==10.6.2"
+          if next=$(semantic-release version --print 2>/dev/null) && [ -n "$next" ]; then
+            echo "next=v${next}" >> "$GITHUB_OUTPUT"
+            echo "Next version: v${next}"
           else
-            IFS='.' read -r major minor patch <<< "${latest#v}"
-            echo "next=v${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+            # Nothing releasable since the last tag (docs, chore, ci only).
+            echo "next=" >> "$GITHUB_OUTPUT"
+            echo "No releasable commits since the last tag; skipping the release."
           fi
 
       - name: Create tag
+        if: steps.bump.outputs.next != ''
         run: |
           git tag "${{ steps.bump.outputs.next }}"
           git push origin "${{ steps.bump.outputs.next }}"
 
   build-and-scan:
     needs: auto-release
+    if: needs.auto-release.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -148,6 +158,7 @@ jobs:
 
   push-image:
     needs: [auto-release, build-and-scan]
+    if: needs.auto-release.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -191,6 +202,7 @@ jobs:
 
   github-release:
     needs: [auto-release, push-image]
+    if: needs.auto-release.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -1,6 +1,5 @@
 [project]
 name = "morsl"
-version = "0.1.0"
 description = "Autocreate menus from Tandoor API"
 requires-python = ">=3.12"
 license = "MIT"
@@ -103,3 +102,28 @@ ignore_missing_imports = true
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.semantic_release]
+# Used only to COMPUTE the next version in push.yml's auto-release job; psr
+# never writes, commits or tags here. The tag is created by that job and fed to
+# the image build as APP_VERSION, so the git tag stays the single source.
+commit_parser = "conventional"
+tag_format = "v{version}"
+major_on_zero = false
+allow_zero_version = true
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+# "deps" is patch-producing: pip, npm and docker updates all reach a user here.
+# allowed_tags must be listed explicitly — its default is computed from the
+# class-level defaults, so overriding patch_tags alone leaves "deps"
+# unrecognised and silently drops every such commit.
+patch_tags = ["fix", "perf", "deps"]
+allowed_tags = [
+    "feat", "fix", "perf", "deps",
+    "build", "chore", "ci", "docs", "style", "refactor", "test",
+]
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
