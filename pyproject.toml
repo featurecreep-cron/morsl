@@ -1,5 +1,11 @@
 [project]
 name = "morsl"
+# Build scaffolding only, NOT the shipped version. The Dockerfile does
+# `pip install .` in the builder purely to resolve dependencies into the venv,
+# and a project table needs a version for that to work — it then deletes the
+# package. The version users see is MORSL_VERSION, set from the git tag via
+# APP_VERSION at image build time. Do not read this value for anything.
+version = "0.0.0"
 description = "Autocreate menus from Tandoor API"
 requires-python = ">=3.12"
 license = "MIT"
