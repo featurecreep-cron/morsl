@@ -27,6 +27,17 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # A second app, distinct from the one that approves: GitHub refuses
+      # self-approval, so the opener and the approver cannot be the same
+      # identity. Keeps the promotion inside the normal PR path with nothing
+      # exempt from main-protection.
+      - name: Generate promoter token
+        id: promoter
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.PROMOTER_APP_ID }}
+          private-key: ${{ secrets.PROMOTER_PRIVATE_KEY }}
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
@@ -36,7 +47,7 @@ jobs:
       # and auto-merge lands it once the required checks are green.
       - name: Open promotion PR and wait for it to merge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.promoter.outputs.token }}
         run: |
           set -euo pipefail
 
