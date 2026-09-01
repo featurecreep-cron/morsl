@@ -1,0 +1,69 @@
+name: Promote
+
+# morsl releases when develop reaches main, and nothing was promoting it. The
+# last release was 2026-08-16 while dependency updates kept landing on develop —
+# eight of them, unreleased. This is the absence floor: a maintainer away for
+# months must not leave security updates sitting on develop.
+#
+# workflow_dispatch is the normal path (promote at the end of a session). The
+# weekly schedule is the backstop. Neither releases anything by itself — push.yml
+# decides that from the conventional commit types once main moves.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Through a PR, not a direct push: nothing is exempt from main-protection.
+      # The automerge workflow's author allowlist supplies the approving review
+      # and auto-merge lands it once the required checks are green.
+      - name: Open promotion PR and wait for it to merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet origin/main origin/develop; then
+            echo "develop and main are identical — nothing to promote."
+            exit 0
+          fi
+
+          pr=$(gh pr list --base main --head develop --state open \
+                 --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            pr=$(gh pr create --base main --head develop \
+                   --title "release: promote develop to main" \
+                   --body "Automated promotion. Merged by auto-merge once CI is green." \
+                   | grep -oE '[0-9]+$')
+            echo "opened PR #$pr"
+          else
+            echo "reusing open PR #$pr"
+          fi
+
+          gh pr merge --auto --merge "$pr"
+
+          for _ in $(seq 1 60); do
+            state=$(gh pr view "$pr" --json state --jq .state)
+            [ "$state" = "MERGED" ] && { echo "promotion merged"; exit 0; }
+            [ "$state" = "CLOSED" ] && { echo "::error::promotion PR was closed"; exit 1; }
+            sleep 30
+          done
+          echo "::error::promotion PR #$pr did not merge within 30 minutes"
+          exit 1
