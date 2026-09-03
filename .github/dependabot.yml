@@ -2,7 +2,6 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: /
-    target-branch: develop
     schedule:
       interval: daily
     cooldown:
@@ -15,19 +14,19 @@ updates:
     groups:
       pip-patches:
         update-types: ["patch"]
-      pip-minors:
-        update-types: ["minor"]
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: deps
     labels:
       - dependencies
 
   - package-ecosystem: github-actions
     directory: /
-    target-branch: develop
     schedule:
       interval: weekly
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
       actions:
         patterns: ["*"]
@@ -42,7 +41,6 @@ updates:
   # 7 advisories accumulated with no PR ever opened for them.
   - package-ecosystem: npm
     directory: /web-vue
-    target-branch: develop
     schedule:
       interval: weekly
     cooldown:
@@ -60,24 +58,23 @@ updates:
     groups:
       npm-patches:
         update-types: ["patch"]
-      npm-minors:
-        update-types: ["minor"]
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: deps
     labels:
       - dependencies
 
   - package-ecosystem: docker
     directory: /
-    target-branch: develop
     schedule:
       interval: weekly
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     ignore:
       - dependency-name: python
         update-types: ["version-update:semver-major"]
     commit-message:
-      prefix: chore
-      include: scope
+      prefix: deps
     labels:
       - dependencies
