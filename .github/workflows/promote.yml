@@ -68,7 +68,10 @@ jobs:
             echo "reusing open PR #$pr"
           fi
 
-          gh pr merge --auto --merge "$pr"
+          # Auto-merge is enabled by automerge.yml, which fires on this PR and
+          # approves it as a different identity. Doing it here as well needs
+          # permissions the promoter does not have, and does not need:
+          # "Resource not accessible by integration (enablePullRequestAutoMerge)".
 
           for _ in $(seq 1 60); do
             state=$(gh pr view "$pr" --json state --jq .state)
