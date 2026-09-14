@@ -22,7 +22,7 @@ dependencies = [
     "apscheduler==3.11.3",
     "defusedxml==0.7.1",
     "Pillow==12.3.0",
-    "cairosvg==2.9.0",
+    "cairosvg==2.9.1",
     "python-slugify==8.0.4",
     "cachetools==7.1.8",
     "py-svg-hush==0.3.0",
@@ -31,7 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.16.5",  # linter, formatter, import sort
+    "ruff==0.16.6",  # linter, formatter, import sort
     "mypy==2.3.1",
     "pre-commit==4.6.2",
     "colorlog==6.12.0",
