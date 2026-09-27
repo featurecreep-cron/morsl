@@ -33,15 +33,19 @@ jobs:
       # secrets, so checking out PR head code would hand them to the PR author.
       - name: Generate token
         id: generate_token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
 
+      # gh with the app token, not a third-party action: one less dependency to
+      # pin, and hmarr/auto-approve-action targets Node 20, which runners now
+      # force onto Node 24.
       - name: Approve PR
-        uses: hmarr/auto-approve-action@b40d6c9ed2fa10c9a2749eca7eb004418a705501
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       # Must be the app token, not GITHUB_TOKEN. GitHub does not start new
       # workflow runs for events triggered by GITHUB_TOKEN, so an auto-merge
