@@ -16,7 +16,7 @@ dependencies = [
     "pulp==2.9.0",
     "tzlocal==5.4.4",
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.4",
+    "uvicorn[standard]==0.53.0",
     "pydantic-settings==2.15.0",
     "python-multipart==0.0.32",
     "apscheduler==3.11.3",
@@ -24,14 +24,14 @@ dependencies = [
     "Pillow==12.3.0",
     "cairosvg==2.9.1",
     "python-slugify==8.0.4",
-    "cachetools==7.1.8",
+    "cachetools==7.2.0",
     "py-svg-hush==0.3.0",
     "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.16.7",  # linter, formatter, import sort
+    "ruff==0.16.8",  # linter, formatter, import sort
     "mypy==2.3.1",
     "pre-commit==4.6.2",
     "colorlog==6.12.0",
