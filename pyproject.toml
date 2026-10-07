@@ -15,7 +15,7 @@ dependencies = [
     "requests==2.34.2",
     "pulp==2.9.0",
     "tzlocal==5.4.4",
-    "fastapi==0.141.1",
+    "fastapi==0.142.2",
     "uvicorn[standard]==0.54.0",
     "pydantic-settings==2.15.0",
     "python-multipart==0.0.32",
