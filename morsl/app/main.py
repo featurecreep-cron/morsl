@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -26,7 +27,15 @@ from morsl.app.api.dependencies import (
     resolve_credentials,
 )
 from morsl.app.api.routes import api_router
-from morsl.constants import GENERATION_SHUTDOWN_TIMEOUT, GZIP_MIN_SIZE, ICONS_DIR, UPLOADS_DIR
+from morsl.constants import (
+    DB_BACKUP_HOUR,
+    DB_BACKUP_MINUTE,
+    GENERATION_SHUTDOWN_TIMEOUT,
+    GZIP_MIN_SIZE,
+    ICONS_DIR,
+    UPLOADS_DIR,
+)
+from morsl.db import backup_database, backup_if_stale
 from morsl.db import close_all as close_all_db
 from morsl.migrate_json_to_db import migrate as migrate_json_to_db
 
@@ -198,6 +207,14 @@ def _build_scheduler_callbacks(settings):
     )
 
 
+def _daily_backup(settings) -> None:
+    """Scheduled snapshot of the database. Failures are logged, never raised."""
+    try:
+        backup_database(os.path.join(settings.data_dir, "morsl.db"))
+    except (OSError, sqlite3.Error):
+        logger.error("Daily database backup failed", exc_info=True)
+
+
 def _setup_scheduler(settings) -> None:
     """Wire up scheduler callbacks and start the scheduler."""
     scheduler_svc = get_scheduler_service(settings)
@@ -212,6 +229,12 @@ def _setup_scheduler(settings) -> None:
     scheduler_svc.set_meal_plan_callback(meal_plan_cb)
     scheduler_svc.set_weekly_generation_callback(weekly_gen_cb)
     scheduler_svc.set_weekly_save_callback(weekly_save_cb)
+    scheduler_svc.add_daily_job(
+        "system:db-backup",
+        lambda: _daily_backup(settings),
+        hour=DB_BACKUP_HOUR,
+        minute=DB_BACKUP_MINUTE,
+    )
     scheduler_svc.start()
     logger.info("Scheduler started")
 
@@ -253,6 +276,12 @@ async def lifespan(app: FastAPI):
             logger.info("Migrated JSON data to SQLite")
     except Exception:  # broad-except — non-fatal startup
         logger.warning("JSON-to-SQLite migration failed (non-fatal)", exc_info=True)
+
+    # Catch up if the container was down when the daily backup was due.
+    try:
+        backup_if_stale(settings.data_dir)
+    except (OSError, sqlite3.Error):
+        logger.error("Startup database backup failed", exc_info=True)
 
     _generate_startup_icons(settings)
 
