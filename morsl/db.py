@@ -6,9 +6,11 @@ WAL mode, stdlib sqlite3, hand-rolled migrations. No ORM.
 from __future__ import annotations
 
 import contextlib
+import gzip
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -200,7 +202,7 @@ def _main_db_file(conn: sqlite3.Connection) -> str:
 
 def _backups_for(backup_dir: str, reason: str) -> list[str]:
     """Existing snapshots for one reason, oldest first (the timestamp sorts)."""
-    suffix = f"-{reason}.db"
+    suffix = f"-{reason}.db.gz"
     try:
         names = os.listdir(backup_dir)
     except FileNotFoundError:
@@ -209,12 +211,14 @@ def _backups_for(backup_dir: str, reason: str) -> list[str]:
 
 
 def backup_database(db_file: str, reason: str = "daily", keep: int = DAILY_BACKUPS_KEPT) -> str:
-    """Snapshot db_file into a timestamped file and prune older ones of the same reason.
+    """Snapshot db_file into a timestamped .db.gz and prune older ones of the same reason.
 
     Uses SQLite's online backup API from a separate connection, so the result is
     consistent even with WAL frames not yet checkpointed and the app still
-    writing. The snapshot is written under a temporary name and renamed into
-    place, so an interrupted backup never counts as one.
+    writing. The backup API needs a real database file as its target, so the
+    snapshot is taken uncompressed, gzipped, and the uncompressed copy removed.
+    Both are written under .partial names and only the finished archive is
+    renamed into place, so an interrupted backup never counts as one.
 
     Returns the path of the new snapshot.
     """
@@ -224,24 +228,30 @@ def backup_database(db_file: str, reason: str = "daily", keep: int = DAILY_BACKU
     backup_dir = os.path.join(os.path.dirname(db_file), BACKUP_DIR_NAME)
     os.makedirs(backup_dir, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    final = os.path.join(backup_dir, f"morsl-{stamp}-{reason}.db")
+    final = os.path.join(backup_dir, f"morsl-{stamp}-{reason}.db.gz")
+    raw = os.path.join(backup_dir, f"morsl-{stamp}-{reason}.db.partial")
     partial = final + ".partial"
 
     try:
         src = sqlite3.connect(db_file)
         try:
-            dest = sqlite3.connect(partial)
+            dest = sqlite3.connect(raw)
             try:
                 src.backup(dest)
             finally:
                 dest.close()
         finally:
             src.close()
+        with open(raw, "rb") as fin, gzip.open(partial, "wb") as fout:
+            shutil.copyfileobj(fin, fout)
         os.replace(partial, final)
     except (OSError, sqlite3.Error):
         with contextlib.suppress(FileNotFoundError):
             os.remove(partial)
         raise
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(raw)
     logger.info("Database backed up to %s", final)
 
     for old in _backups_for(backup_dir, reason)[:-keep]:
