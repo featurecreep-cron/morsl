@@ -29,6 +29,8 @@ class SchedulerService:
         self._meal_plan_callback: Optional[Callable[..., Any]] = None
         self._weekly_generation_callback: Optional[Callable[..., Any]] = None
         self._weekly_save_callback: Optional[Callable[..., Any]] = None
+        # Housekeeping jobs, kept so a timezone change can reschedule them.
+        self._daily_jobs: Dict[str, tuple[Callable[[], Any], int, int]] = {}
         self._load()
 
     def set_generation_callback(self, callback: Callable[..., Any]) -> None:
@@ -61,6 +63,24 @@ class SchedulerService:
             if schedule.get("enabled", True):
                 self._remove_job(schedule_id)
                 self._add_job(schedule_id, schedule)
+        for job_id, (func, hour, minute) in list(self._daily_jobs.items()):
+            self.add_daily_job(job_id, func, hour, minute)
+
+    def add_daily_job(self, job_id: str, func: Callable[[], Any], hour: int, minute: int) -> None:
+        """Run func every day at hour:minute in the scheduler's timezone.
+
+        For housekeeping, not user schedules: it is neither persisted nor listed.
+        A plain function runs in APScheduler's thread pool, off the event loop.
+        """
+        self._daily_jobs[job_id] = (func, hour, minute)
+        self._scheduler.add_job(
+            func,
+            trigger=CronTrigger(hour=hour, minute=minute, timezone=self._timezone),
+            id=job_id,
+            replace_existing=True,
+            misfire_grace_time=None,
+            coalesce=True,
+        )
 
     @property
     def is_running(self) -> bool:

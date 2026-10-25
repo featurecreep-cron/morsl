@@ -29,6 +29,12 @@ API_PAGE_SIZE = 100
 SSE_QUEUE_TIMEOUT = 30.0
 GENERATION_SHUTDOWN_TIMEOUT = 10.0
 
+# Daily database backup, in the scheduler's (admin-set) timezone. Off the hour
+# so it does not land on the same minute as user schedules, which are usually
+# whole hours.
+DB_BACKUP_HOUR = 3
+DB_BACKUP_MINUTE = 17
+
 # Upload limits
 CUSTOM_ICON_MAX_SIZE = 512 * 1024
 BRANDING_IMAGE_MAX_SIZE = 5 * 1024 * 1024

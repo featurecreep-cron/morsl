@@ -5,11 +5,13 @@ WAL mode, stdlib sqlite3, hand-rolled migrations. No ORM.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import sqlite3
 import threading
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -117,6 +119,13 @@ _MIGRATIONS: dict[int, tuple[str, list[str]]] = {
 }
 
 
+# Snapshots live in <data_dir>/backups/. Daily ones keep a week; pre-migration
+# ones are rarer and only need to outlive the upgrade that made them.
+BACKUP_DIR_NAME = "backups"
+DAILY_BACKUPS_KEPT = 7
+MIGRATION_BACKUPS_KEPT = 3
+
+
 def _get_db_path(data_dir: str) -> str:
     return os.path.join(data_dir, "morsl.db")
 
@@ -151,6 +160,15 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     if current >= SCHEMA_VERSION:
         return
 
+    # A migration is the likeliest moment to lose data, and an upgrade can land
+    # nearly a day after the last daily snapshot. A brand-new database has
+    # nothing to lose. If the snapshot fails the migration does not run: the
+    # error propagates rather than migrating without a way back.
+    if current > 0:
+        db_file = _main_db_file(conn)
+        if db_file:
+            backup_database(db_file, f"pre-v{SCHEMA_VERSION}", keep=MIGRATION_BACKUPS_KEPT)
+
     for version in range(current + 1, SCHEMA_VERSION + 1):
         if version not in _MIGRATIONS:
             raise RuntimeError(f"Missing migration for version {version}")
@@ -165,6 +183,95 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         conn.commit()
 
     logger.info("Database at schema version %d", SCHEMA_VERSION)
+
+
+# ---------------------------------------------------------------------------
+# Backups
+# ---------------------------------------------------------------------------
+
+
+def _main_db_file(conn: sqlite3.Connection) -> str:
+    """Path of the connection's main database file; empty for in-memory."""
+    for row in conn.execute("PRAGMA database_list").fetchall():
+        if row[1] == "main":
+            return row[2] or ""
+    return ""
+
+
+def _backups_for(backup_dir: str, reason: str) -> list[str]:
+    """Existing snapshots for one reason, oldest first (the timestamp sorts)."""
+    suffix = f"-{reason}.db"
+    try:
+        names = os.listdir(backup_dir)
+    except FileNotFoundError:
+        return []
+    return sorted(n for n in names if n.startswith("morsl-") and n.endswith(suffix))
+
+
+def backup_database(db_file: str, reason: str = "daily", keep: int = DAILY_BACKUPS_KEPT) -> str:
+    """Snapshot db_file into a timestamped file and prune older ones of the same reason.
+
+    Uses SQLite's online backup API from a separate connection, so the result is
+    consistent even with WAL frames not yet checkpointed and the app still
+    writing. The snapshot is written under a temporary name and renamed into
+    place, so an interrupted backup never counts as one.
+
+    Returns the path of the new snapshot.
+    """
+    # sqlite3.connect would create an empty database and back that up instead.
+    if not os.path.exists(db_file):
+        raise FileNotFoundError(db_file)
+    backup_dir = os.path.join(os.path.dirname(db_file), BACKUP_DIR_NAME)
+    os.makedirs(backup_dir, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    final = os.path.join(backup_dir, f"morsl-{stamp}-{reason}.db")
+    partial = final + ".partial"
+
+    try:
+        src = sqlite3.connect(db_file)
+        try:
+            dest = sqlite3.connect(partial)
+            try:
+                src.backup(dest)
+            finally:
+                dest.close()
+        finally:
+            src.close()
+        os.replace(partial, final)
+    except (OSError, sqlite3.Error):
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(partial)
+        raise
+    logger.info("Database backed up to %s", final)
+
+    for old in _backups_for(backup_dir, reason)[:-keep]:
+        os.remove(os.path.join(backup_dir, old))
+        logger.info("Pruned old backup %s", old)
+    return final
+
+
+def latest_backup_time(data_dir: str, reason: str = "daily") -> datetime | None:
+    """When the newest snapshot for reason was taken, or None if there is none."""
+    existing = _backups_for(os.path.join(data_dir, BACKUP_DIR_NAME), reason)
+    if not existing:
+        return None
+    stamp = existing[-1].removeprefix("morsl-").split("-", 1)[0]
+    return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+
+
+def backup_if_stale(data_dir: str, max_age: timedelta = timedelta(days=1)) -> str | None:
+    """Take a daily snapshot unless one younger than max_age exists.
+
+    Called at startup, so a container that is never up at the scheduled hour
+    still gets its backups. Returns the new snapshot's path, or None if skipped.
+    """
+    db_file = _get_db_path(data_dir)
+    if not os.path.exists(db_file):
+        return None
+    last = latest_backup_time(data_dir)
+    if last is not None and datetime.now(timezone.utc) - last < max_age:
+        return None
+    return backup_database(db_file)
 
 
 # ---------------------------------------------------------------------------
