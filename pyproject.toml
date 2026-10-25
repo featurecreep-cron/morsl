@@ -15,6 +15,11 @@ dependencies = [
     "requests==2.34.2",
     "pulp==2.9.0",
     "tzlocal==5.4.4",
+    # zoneinfo reads the system tz database first and falls back to this
+    # package. Recent Debian/Ubuntu moved legacy names (US/Eastern) into an
+    # optional tzdata-legacy package, so without it TZ=US/Eastern silently
+    # resolves to UTC depending on the base image.
+    "tzdata==2026.5",
     "fastapi==0.143.5",
     "uvicorn[standard]==0.54.0",
     "pydantic-settings==2.16.0",
