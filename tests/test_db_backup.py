@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import gzip
 import os
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -40,14 +42,22 @@ def _backup_dir(data_dir: str) -> str:
 def _fake_backup(data_dir: str, when: datetime, reason: str = "daily") -> str:
     """An existing snapshot taken at `when` (content irrelevant to pruning)."""
     os.makedirs(_backup_dir(data_dir), exist_ok=True)
-    name = f"morsl-{when.strftime('%Y%m%dT%H%M%SZ')}-{reason}.db"
+    name = f"morsl-{when.strftime('%Y%m%dT%H%M%SZ')}-{reason}.db.gz"
     path = os.path.join(_backup_dir(data_dir), name)
     open(path, "wb").close()
     return path
 
 
+def _open_snapshot(path: str, tmp_path) -> sqlite3.Connection:
+    """Decompress a snapshot the way a restore would and open it."""
+    restored = tmp_path / ("restored-" + os.path.basename(path).removesuffix(".gz"))
+    with gzip.open(path, "rb") as fin, open(restored, "wb") as fout:
+        shutil.copyfileobj(fin, fout)
+    return sqlite3.connect(restored)
+
+
 class TestBackupDatabase:
-    def test_snapshot_contains_uncheckpointed_wal_writes(self, data_dir, db_file):
+    def test_snapshot_contains_uncheckpointed_wal_writes(self, data_dir, db_file, tmp_path):
         # A file copy of a WAL database misses writes still in the -wal file.
         # The online backup API must not.
         writer = sqlite3.connect(db_file)
@@ -59,7 +69,7 @@ class TestBackupDatabase:
         path = backup_database(db_file)
         writer.close()
 
-        snap = sqlite3.connect(path)
+        snap = _open_snapshot(path, tmp_path)
         names = [r[0] for r in snap.execute("SELECT username FROM users")]
         snap.close()
         assert names == ["alice"]
@@ -68,7 +78,7 @@ class TestBackupDatabase:
         before = datetime.now(timezone.utc).replace(microsecond=0)
         path = backup_database(db_file, reason="daily")
         assert os.path.dirname(path) == _backup_dir(data_dir)
-        assert path.endswith("-daily.db")
+        assert path.endswith("-daily.db.gz")
         assert latest_backup_time(data_dir) >= before
 
     def test_keeps_a_week_of_daily_snapshots(self, data_dir, db_file):
@@ -77,7 +87,7 @@ class TestBackupDatabase:
 
         newest = backup_database(db_file)
 
-        kept = sorted(n for n in os.listdir(_backup_dir(data_dir)) if n.endswith("-daily.db"))
+        kept = sorted(n for n in os.listdir(_backup_dir(data_dir)) if n.endswith("-daily.db.gz"))
         assert len(kept) == DAILY_BACKUPS_KEPT
         assert kept[-1] == os.path.basename(newest)
         # The six youngest pre-existing ones survive, the four oldest are gone.
@@ -93,9 +103,11 @@ class TestBackupDatabase:
 
         assert os.path.exists(migration)
 
-    def test_no_partial_file_is_left_behind(self, data_dir, db_file):
-        backup_database(db_file)
-        assert not [n for n in os.listdir(_backup_dir(data_dir)) if n.endswith(".partial")]
+    def test_only_the_compressed_snapshot_is_left_behind(self, data_dir, db_file):
+        path = backup_database(db_file)
+        assert os.listdir(_backup_dir(data_dir)) == [os.path.basename(path)]
+        with open(path, "rb") as f:
+            assert f.read(2) == b"\x1f\x8b"  # gzip magic
 
     def test_interrupted_backup_does_not_count_and_leaves_nothing(
         self, data_dir, db_file, monkeypatch
@@ -150,7 +162,9 @@ def _downgrade_to_v1(db_file: str) -> None:
 
 
 class TestPreMigrationBackup:
-    def test_snapshot_of_the_old_schema_is_taken_before_migrating(self, data_dir, db_file):
+    def test_snapshot_of_the_old_schema_is_taken_before_migrating(
+        self, data_dir, db_file, tmp_path
+    ):
         _downgrade_to_v1(db_file)
 
         get_connection(data_dir).close()
@@ -158,10 +172,10 @@ class TestPreMigrationBackup:
         snaps = [
             n
             for n in os.listdir(_backup_dir(data_dir))
-            if n.endswith(f"-pre-v{SCHEMA_VERSION}.db")
+            if n.endswith(f"-pre-v{SCHEMA_VERSION}.db.gz")
         ]
         assert len(snaps) == 1
-        snap = sqlite3.connect(os.path.join(_backup_dir(data_dir), snaps[0]))
+        snap = _open_snapshot(os.path.join(_backup_dir(data_dir), snaps[0]), tmp_path)
         version = snap.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
         users = [r[0] for r in snap.execute("SELECT username FROM users")]
         snap.close()

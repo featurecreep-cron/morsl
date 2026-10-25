@@ -178,7 +178,7 @@ Either way, restart the container afterward, then set a new PIN from admin setti
 
 All Morsl data lives in the `data` volume.
 
-**Automatic snapshots.** Morsl snapshots its database to `data/backups/` every day at 03:17 (in the timezone set in admin settings), and at startup if the newest daily snapshot is more than a day old. It keeps the last 7. Before applying a schema migration it also takes a `pre-vN` snapshot, keeping the last 3, and if that snapshot fails the migration does not run. Snapshots use SQLite's online backup API, so they are consistent while Morsl is running.
+**Automatic snapshots.** Morsl snapshots its database to `data/backups/` every day at 03:17 (in the timezone set in admin settings), and at startup if the newest daily snapshot is more than a day old. It keeps the last 7. Before applying a schema migration it also takes a `pre-vN` snapshot, keeping the last 3, and if that snapshot fails the migration does not run. Snapshots use SQLite's online backup API, so they are consistent while Morsl is running, and are gzipped: `morsl-<UTC timestamp>-<daily|pre-vN>.db.gz`.
 
 These live in the same volume as the database. They protect against a bad upgrade, a bug or an accidental delete, not against losing the disk. Copy the volume somewhere else as well.
 
@@ -187,7 +187,7 @@ To restore a snapshot:
 ```bash
 docker compose stop morsl
 docker run --rm -v morsl-data:/data alpine sh -c \
-  'rm -f /data/morsl.db-wal /data/morsl.db-shm && cp /data/backups/morsl-20261025T081700Z-daily.db /data/morsl.db'
+  'rm -f /data/morsl.db-wal /data/morsl.db-shm && gunzip -c /data/backups/morsl-20261025T081700Z-daily.db.gz > /data/morsl.db'
 docker compose start morsl
 ```
 
