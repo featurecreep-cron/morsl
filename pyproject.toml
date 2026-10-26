@@ -14,7 +14,7 @@ keywords = ["meal-planning", "tandoor", "menu-generator", "docker", "self-hosted
 dependencies = [
     "requests==2.34.2",
     "pulp==2.9.0",
-    "tzlocal==5.4.4",
+    "tzlocal==5.4.5",
     # zoneinfo reads the system tz database first and falls back to this
     # package. Recent Debian/Ubuntu moved legacy names (US/Eastern) into an
     # optional tzdata-legacy package, so without it TZ=US/Eastern silently
@@ -22,7 +22,7 @@ dependencies = [
     "tzdata==2026.5",
     "fastapi==0.148.0",
     "uvicorn[standard]==0.54.0",
-    "pydantic-settings==2.16.0",
+    "pydantic-settings==2.16.1",
     "python-multipart==0.0.32",
     "apscheduler==3.11.3",
     "defusedxml==0.7.1",
@@ -36,7 +36,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.17.1",  # linter, formatter, import sort
+    "ruff==0.17.2",  # linter, formatter, import sort
     "mypy==2.4.0",
     "pre-commit==4.7.0",
     "colorlog==6.12.0",
