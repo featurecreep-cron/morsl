@@ -11,7 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "pinia": "^4.0.3",
+    "pinia": "^4.1.0",
     "qrcode-generator": "^2.0.4",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0"
@@ -21,10 +21,10 @@
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "typescript": "~6.0.2",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.4",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
 }
