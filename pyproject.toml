@@ -20,7 +20,7 @@ dependencies = [
     # optional tzdata-legacy package, so without it TZ=US/Eastern silently
     # resolves to UTC depending on the base image.
     "tzdata==2026.5",
-    "fastapi==0.143.5",
+    "fastapi==0.148.0",
     "uvicorn[standard]==0.54.0",
     "pydantic-settings==2.16.0",
     "python-multipart==0.0.32",
