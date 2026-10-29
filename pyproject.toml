@@ -42,7 +42,7 @@ dev = [
     "colorlog==6.12.0",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
-    "pytest-asyncio==1.4.0",
+    "pytest-asyncio==1.4.1",
 ]
 
 [tool.setuptools.packages.find]
