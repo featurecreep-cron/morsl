@@ -20,9 +20,9 @@ dependencies = [
     # optional tzdata-legacy package, so without it TZ=US/Eastern silently
     # resolves to UTC depending on the base image.
     "tzdata==2026.6",
-    "fastapi==0.162.1",
+    "fastapi==0.162.5",
     "uvicorn[standard]==0.54.0",
-    "pydantic-settings==2.16.2",
+    "pydantic-settings==2.16.3",
     "python-multipart==0.0.33",
     "apscheduler==3.11.3",
     "defusedxml==0.7.1",
@@ -36,7 +36,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.17.4",  # linter, formatter, import sort
+    "ruff==0.17.5",  # linter, formatter, import sort
     "mypy==2.4.1",
     "pre-commit==4.7.0",
     "colorlog==6.12.0",
