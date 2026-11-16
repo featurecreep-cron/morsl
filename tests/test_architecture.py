@@ -276,16 +276,16 @@ class TestFrozenDataclasses:
                                     f"class {node.name} — "
                                     f"@dataclass without frozen=True"
                                 )
-                    elif isinstance(decorator, ast.Name) and decorator.id == "dataclass":
-                        if (
-                            path.name,
-                            node.name,
-                        ) not in self._MUTABLE_ALLOWED:
-                            violations.append(
-                                f"{path.name}:{node.lineno} "
-                                f"class {node.name} — "
-                                f"@dataclass without frozen=True"
-                            )
+                    elif (
+                        isinstance(decorator, ast.Name)
+                        and decorator.id == "dataclass"
+                        and (path.name, node.name) not in self._MUTABLE_ALLOWED
+                    ):
+                        violations.append(
+                            f"{path.name}:{node.lineno} "
+                            f"class {node.name} — "
+                            f"@dataclass without frozen=True"
+                        )
         assert not violations, (
             "Dataclass not frozen (add frozen=True or add to "
             "_MUTABLE_ALLOWED with justification):\n" + "\n".join(violations)
