@@ -105,7 +105,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install --quiet "python-semantic-release==10.6.2"
-          if next=$(semantic-release version --print 2>/dev/null) && [ -n "$next" ]; then
+          # `version --print` prints the CURRENT version and exits 0 when
+          # nothing is releasable, so a non-empty answer is not a new version.
+          # A version whose tag already exists means "no release".
+          if next=$(semantic-release version --print 2>/dev/null) && [ -n "$next" ] \
+              && ! git rev-parse -q --verify "refs/tags/v${next}" >/dev/null; then
             echo "next=v${next}" >> "$GITHUB_OUTPUT"
             echo "Next version: v${next}"
           else
